@@ -46,14 +46,22 @@ public is the tool, the index, and the resonance weights — not the source text
 ```bash
 python3 -m venv .venv
 .venv/bin/pip install -r requirements.txt
+
+# a single video:
 .venv/bin/python ingest.py "https://www.youtube.com/watch?v=VIDEO_ID" \
-    --author "Russell Barkley" --title "30 Essential Ideas 1A — Intro" --resonance high
+    --author "Author" --title "Talk title" --resonance high
+
+# a whole playlist → ONE digest (a lecture series is a single work):
+.venv/bin/python ingest.py "https://www.youtube.com/playlist?list=PLAYLIST_ID" \
+    --author "Russell Barkley" --title "30 Essential Ideas (full series)" --resonance high
 ```
 
-## The canonical spine (ship one at a time — NOT all at once)
+## The canonical spine (ship one coherent source at a time — NOT all at once)
 
-- [x] Barkley — *30 Essential Ideas* 1A: Intro / chronic developmental disability
-- [ ] Barkley — *30 Essential Ideas* (rest of the 27-part series, one at a time)
+A *source* is a whole work. A lecture series chopped into parts is one source —
+digest it as one file, not N stubs.
+
+- [x] Barkley — *30 Essential Ideas You Should Know about ADHD* (full 27-part lecture → one digest)
 - [ ] Barkley — *ADHD and the Nature of Self-Control* (1997)
 - [ ] Barkley — *Executive Functions* (2012)
 - [ ] Thomas E. Brown — *Smart but Stuck* (the high-IQ coast-to-collapse pattern)
