@@ -70,7 +70,7 @@ digest it as one file, not N stubs.
 | Barkley — *ADHD and the Nature of Self-Control* (1997 book) | — | pending |
 | Barkley — *Executive Functions* (2012 book) | — | pending |
 | Thomas E. Brown — *Smart but Stuck* (the high-IQ coast-to-collapse pattern) | — | pending |
-| Dodson — interest-based nervous system / RSD | — | pending |
+| Dodson — *Defining Features of ADHD* (ADDitude lecture: interest-based nervous system, RSD, hyperarousal) | high | done |
 | Mahan — the Wall of Awful | — | pending |
 
 ## Where this goes
