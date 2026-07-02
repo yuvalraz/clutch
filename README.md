@@ -65,8 +65,8 @@ digest it as one file, not N stubs.
 | Source | Resonance | Status |
 |--------|-----------|--------|
 | Barkley — *30 Essential Ideas You Should Know about ADHD* (full 27-part lecture → one digest) | high | done |
-| Thomas E. Brown — *Emotions and Motivation in ADHD* (CHADD lecture) | high | pending |
-| Hallowell & Ratey — *ADHD 2.0* webinar | med | pending |
+| Thomas E. Brown — *Emotions and Motivation in ADHD* (CHADD lecture) | high | done |
+| Hallowell & Ratey — *ADHD 2.0* webinar | med | done |
 | Barkley — *ADHD and the Nature of Self-Control* (1997 book) | — | pending |
 | Barkley — *Executive Functions* (2012 book) | — | pending |
 | Thomas E. Brown — *Smart but Stuck* (the high-IQ coast-to-collapse pattern) | — | pending |
