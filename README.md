@@ -25,15 +25,16 @@ single source. Add the next one when the streak needs feeding — not before.
 Plain markdown, one file per source in `sources/`, with frontmatter:
 
 ```yaml
-author: Russell Barkley
-title: 30 Essential Ideas 1A — Intro
-type: lecture          # lecture | book | article | podcast
+author: "Russell Barkley"
+title: "30 Essential Ideas — full series"
+type: lecture          # lecture | lecture-series | book | article | podcast
 source: https://...
 resonance: high        # high | med | low — how much it maps to MY condition
 ```
 
 `resonance` is the "weight" — hand-assigned, not learned. No vector DB yet: a
-folder of markdown *is* the database (grep + read reason over it directly).
+folder of markdown *is* the database — an agent or LLM greps and reads it
+directly, reasoning over it without a query layer in between.
 
 Raw transcripts stay **local** (they're copyrighted third-party text). What's
 public is the tool, the index, and the resonance weights — not the source text.
@@ -61,12 +62,24 @@ python3 -m venv .venv
 A *source* is a whole work. A lecture series chopped into parts is one source —
 digest it as one file, not N stubs.
 
-- [x] Barkley — *30 Essential Ideas You Should Know about ADHD* (full 27-part lecture → one digest)
-- [ ] Barkley — *ADHD and the Nature of Self-Control* (1997)
-- [ ] Barkley — *Executive Functions* (2012)
-- [ ] Thomas E. Brown — *Smart but Stuck* (the high-IQ coast-to-collapse pattern)
-- [ ] Dodson — interest-based nervous system / RSD
-- [ ] Hallowell & Ratey — *ADHD 2.0*
-- [ ] Mahan — the Wall of Awful
+| Source | Resonance | Status |
+|--------|-----------|--------|
+| Barkley — *30 Essential Ideas You Should Know about ADHD* (full 27-part lecture → one digest) | high | done |
+| Thomas E. Brown — *Emotions and Motivation in ADHD* (CHADD lecture) | high | pending |
+| Hallowell & Ratey — *ADHD 2.0* webinar | med | pending |
+| Barkley — *ADHD and the Nature of Self-Control* (1997 book) | — | pending |
+| Barkley — *Executive Functions* (2012 book) | — | pending |
+| Thomas E. Brown — *Smart but Stuck* (the high-IQ coast-to-collapse pattern) | — | pending |
+| Dodson — interest-based nervous system / RSD | — | pending |
+| Mahan — the Wall of Awful | — | pending |
+
+## Where this goes
+
+The weighted corpus is the knowledge layer under a runtime harness — not a
+planner or a tracker. The harness will consume it at the point of performance:
+decay-triggered interventions that cite the canon when an executive-function
+breakdown is actually happening, not when I'm planning ahead. The library isn't
+a dashboard to review; it's the substrate that makes just-in-time recall
+possible.
 
 Built in public, with AI assistance (Claude).

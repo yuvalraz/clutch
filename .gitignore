@@ -6,3 +6,6 @@ __pycache__/
 # raw transcripts/books are third-party copyrighted text — keep local, publish only the tool + index
 sources/*
 !sources/README.md
+
+# Local agent-session contract (operator-private, never committed)
+CLAUDE.local.md

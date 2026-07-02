@@ -11,6 +11,7 @@ Usage:
 # ponytail: youtube only; add epub/pdf/article ingest when those sources actually arrive.
 """
 import argparse
+import json
 import re
 import sys
 from datetime import date
@@ -45,13 +46,24 @@ def _slug(s: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", s.lower()).strip("-")
 
 
+def _stem(author: str, title: str) -> str:
+    return "-".join(p for p in (_slug(author), _slug(title)) if p)
+
+
 def _transcript(video_id: str) -> str:
     from youtube_transcript_api import YouTubeTranscriptApi
+    from youtube_transcript_api._errors import NoTranscriptFound, TranscriptsDisabled
     api = YouTubeTranscriptApi()
     try:
         tr = api.fetch(video_id, languages=["en", "en-US", "en-GB"])
-    except Exception:
-        tr = api.fetch(video_id)  # fall back to any available language
+    except (NoTranscriptFound, TranscriptsDisabled):
+        # ponytail: enumerate all available; fetch first — covers non-English sources.
+        # upgrade: prefer auto-generated English translation when available.
+        transcript_list = api.list(video_id)
+        first = next(iter(transcript_list), None)
+        if first is None:
+            raise ValueError(f"no transcripts available for {video_id}")
+        tr = first.fetch()
     return _clean(tr)
 
 
@@ -74,11 +86,32 @@ def fetch_playlist(url: str):
             ok += 1
             status = "ok"
         except Exception as e:
-            body = f"_(transcript unavailable: {e})_"
+            body = f"_(transcript unavailable: {type(e).__name__})_"
+            status = "MISSING"
+        if not body:
+            # fetch succeeded but cleaned to empty — count as MISSING
+            body = "_(transcript unavailable: empty)_"
+            ok -= 1
             status = "MISSING"
         parts.append(f"## Part {i:02d} — {title}\n\n{body}")
         print(f"  part {i:02d}/{len(entries)} {vid} {status}")
     return "\n\n".join(parts), ok, len(entries)
+
+
+def _build_frontmatter(author: str, title: str, kind: str, src: str,
+                        parts_line: str, today: str, resonance: str) -> str:
+    """Build YAML frontmatter block with safely-quoted scalar values."""
+    return (
+        "---\n"
+        f"author: {json.dumps(author)}\n"
+        f"title: {json.dumps(title)}\n"
+        f"type: {json.dumps(kind)}\n"
+        f"source: {json.dumps(src)}\n"
+        f"{parts_line}"
+        f"retrieved: {today}\n"
+        f"resonance: {resonance}\n"
+        "---\n\n"
+    )
 
 
 def _selftest() -> None:
@@ -86,8 +119,36 @@ def _selftest() -> None:
     assert _extract_id("https://youtu.be/BzhbAK1pdPM?t=10") == "BzhbAK1pdPM"
     assert _extract_id("BzhbAK1pdPM") == "BzhbAK1pdPM"
     assert _slug("Barkley: 30 Ideas!") == "barkley-30-ideas"
+    assert _stem("Barkley", "מאמר") == "barkley", f"_stem latin+nonlatin broken: {_stem('Barkley', 'מאמר')!r}"
+    assert _stem("יובל", "מאמר") == "", f"_stem all-nonlatin broken: {_stem('יובל', 'מאמר')!r}"
     assert _is_playlist("https://www.youtube.com/playlist?list=PLxyz")
     assert not _is_playlist("https://www.youtube.com/watch?v=BzhbAK1pdPM&list=PLxyz")
+
+    # A1: frontmatter title with ": " must be safely quoted
+    tricky = 'ADHD 2.0, Clarified: Essential Strategies (with John Ratey)'
+    fm = _build_frontmatter('Edward Hallowell', tricky, 'lecture',
+                             'https://youtu.be/test', '', '2026-07-02', 'med')
+    title_line = [l for l in fm.splitlines() if l.startswith('title:')][0]
+    # The value must be a valid JSON string (double-quoted, colon safe)
+    _, _, raw_val = title_line.partition(': ')
+    assert json.loads(raw_val) == tricky, f"title quoting broken: {title_line!r}"
+    # A1 extended: source: must also be quoted (json.dumps) — round-trip proves it
+    tricky_src = 'https://youtu.be/test?t=10&list=PLab'
+    fm2 = _build_frontmatter('Author', 'Title', 'lecture',
+                              tricky_src, '', '2026-07-02', 'med')
+    src_line = [l for l in fm2.splitlines() if l.startswith('source:')][0]
+    _, _, raw_src = src_line.partition(': ')
+    assert json.loads(raw_src) == tricky_src, f"source quoting broken: {src_line!r}"
+
+    # A3: degenerate slug (pure non-Latin author + title) must sys.exit
+    import subprocess
+    r = subprocess.run(
+        [sys.executable, __file__,
+         "BzhbAK1pdPM", "--author", "יובל", "--title", "מאמר", "--resonance", "med"],
+        capture_output=True, text=True, timeout=30
+    )
+    assert r.returncode != 0, "expected sys.exit for degenerate slug, got 0"
+
     print("selftest ok")
 
 
@@ -107,6 +168,13 @@ def main() -> None:
     if not (args.source and args.author and args.title):
         p.error("source, --author and --title are required")
 
+    stem = _stem(args.author, args.title)
+    if not stem:
+        sys.exit(
+            f"error: author '{args.author}' + title '{args.title}' produce an empty slug "
+            "(non-Latin characters are stripped). Use ASCII author/title values."
+        )
+
     if _is_playlist(args.source):
         body, ok, total = fetch_playlist(args.source)
         if ok == 0:
@@ -124,17 +192,10 @@ def main() -> None:
         parts_line = ""
 
     SOURCES.mkdir(exist_ok=True)
-    out = SOURCES / f"{_slug(args.author)}-{_slug(args.title)}.md"
-    frontmatter = (
-        "---\n"
-        f"author: {args.author}\n"
-        f"title: {args.title}\n"
-        f"type: {kind}\n"
-        f"source: {src}\n"
-        f"{parts_line}"
-        f"retrieved: {date.today().isoformat()}\n"
-        f"resonance: {args.resonance}\n"
-        "---\n\n"
+    out = SOURCES / f"{stem}.md"
+    frontmatter = _build_frontmatter(
+        args.author, args.title, kind, src, parts_line,
+        date.today().isoformat(), args.resonance
     )
     out.write_text(frontmatter + body + "\n", encoding="utf-8")
     print(f"wrote {out.relative_to(Path(__file__).parent)} ({len(body.split())} words)")
