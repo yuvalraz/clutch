@@ -71,7 +71,7 @@ digest it as one file, not N stubs.
 | Barkley — *Executive Functions* (2012 book) | — | pending |
 | Thomas E. Brown — *Smart but Stuck* (the high-IQ coast-to-collapse pattern) | — | pending |
 | Dodson — *Defining Features of ADHD* (ADDitude lecture: interest-based nervous system, RSD, hyperarousal) | high | done |
-| Mahan — the Wall of Awful | — | pending |
+| Mahan — *the Wall of Awful* (StudyPro "Unlocking ADHD" webinar) | med | done |
 
 ## Where this goes
 
