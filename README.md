@@ -71,9 +71,9 @@ digest it as one file, not N stubs.
 | Barkley — *30 Essential Ideas You Should Know about ADHD* (full 27-part lecture → one digest) | high | done |
 | Thomas E. Brown — *Emotions and Motivation in ADHD* (CHADD lecture) | high | done |
 | Hallowell & Ratey — *ADHD 2.0* webinar | med | done |
-| Barkley — *ADHD and the Nature of Self-Control* (1997 book) | — | pending |
-| Barkley — *Executive Functions* (2012 book) | — | pending |
-| Thomas E. Brown — *Smart but Stuck* (the high-IQ coast-to-collapse pattern) | — | pending |
+| Barkley — *ADHD and the Nature of Self-Control* (1997 book) | — | dropped — no e-book edition exists; its model matured into *Executive Functions* (2012), already digested |
+| Barkley — *Executive Functions* (2012 book, Guilford DRM-free ePub) | high | done |
+| Thomas E. Brown — *Smart but Stuck* (the high-IQ coast-to-collapse pattern) | — | blocked — no DRM-free edition sold anywhere; Brown's voice carried by his CHADD lecture above |
 | Dodson — *Defining Features of ADHD* (ADDitude lecture: interest-based nervous system, RSD, hyperarousal) | high | done |
 | Mahan — *the Wall of Awful* (StudyPro "Unlocking ADHD" webinar) | high | done |
 
