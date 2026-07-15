@@ -36,6 +36,11 @@ resonance: high        # high | med | low — how much it maps to MY condition
 folder of markdown *is* the database — an agent or LLM greps and reads it
 directly, reasoning over it without a query layer in between.
 
+The reasoning behind the weights, plus what to *distrust* in the canon, lives in
+[`ANNOTATIONS.md`](ANNOTATIONS.md): a quarantine ledger (claims that are in the
+corpus but must not drive the product) and a typed-edge map of how the sources
+connect. The transcripts stay local; the annotations are the public part.
+
 Raw transcripts stay **local** (they're copyrighted third-party text). What's
 public is the tool, the index, and the resonance weights — not the source text.
 
