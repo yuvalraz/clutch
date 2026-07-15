@@ -55,6 +55,10 @@ python3 -m venv .venv
 # a whole playlist → ONE digest (a lecture series is a single work):
 .venv/bin/python ingest.py "https://www.youtube.com/playlist?list=PLAYLIST_ID" \
     --author "Russell Barkley" --title "30 Essential Ideas (full series)" --resonance high
+
+# a book (DRM-free EPUB, bought — the file stays local like every source):
+.venv/bin/python ingest_book.py path/to/book.epub \
+    --author "Thomas E. Brown" --title "Smart but Stuck" --resonance high
 ```
 
 ## The canonical spine (ship one coherent source at a time — NOT all at once)
