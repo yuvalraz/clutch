@@ -69,6 +69,12 @@ How the canon connects. Read each row as `From --relation--> To`.
 | Ego-depletion fuel model (Barkley EF-2012) | contradicts | the transmission framing | an internal tension in Barkley. Quarantined (ledger 1). |
 | "82 studies" read flat (Dodson) | refutes | the thesis | the interpretive fork the whole premise rides on. Quarantined (ledger 2). |
 | Barkley ↔ Hallowell "gift war" | tension, not circuitry | shared disinhibition wiring | Hallowell's race-car reframes Barkley's disinhibition. Same brain, opposite story. |
+| "Motivation is not gas in the tank" (Brown, Smart but Stuck) | supports | the ego-depletion quarantine (ledger 1) | second independent voice rejecting the fuel model. Hardens the quarantine from "Barkley contradicts himself" to "the affective-EF school rejects fuel." |
+| Intelligence masks the EF deficit (Brown, Smart but Stuck) | is the mechanism for | coast-to-collapse | smarts delay the wall and make the crash more shame-laden. The exact profile Clutch is built for. |
+| Context-dependent motivation / amygdala-as-Google (Brown, Smart but Stuck) | underpins | point of performance | motivation shifts by where/who/what, not just the task; the bell must read context, not only task state. |
+| Possible selves (Brown, Smart but Stuck) | underpins | the recognition bell | competing emotion-laden future-selves; the bell feeds the graduate-self so it beats the failure-self. Ties to Mahan's RRE. |
+| Scaffold-dependence is legitimate (Brown, Smart but Stuck) | supports | Barkley's reading of the 82-studies fork (ledger 2) | third independent voice framing scaffold-dependence as support, not failure. A vote for the bet Clutch already made. |
+| The CEO's three assistants (Brown, Smart but Stuck) | illustrates | prosthesis is permanent | a successful adult whose success *is* the ongoing scaffold; the answer to "isn't a permanent crutch a failure?" |
 
 ## Not built yet
 
