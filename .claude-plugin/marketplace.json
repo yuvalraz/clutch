@@ -1,0 +1,14 @@
+{
+  "name": "clutch",
+  "owner": {
+    "name": "Yuval Raz"
+  },
+  "description": "One-plugin marketplace for clutch, an opinionated ADHD execution harness.",
+  "plugins": [
+    {
+      "name": "clutch",
+      "source": "./",
+      "description": "An opinionated ADHD execution harness that fires at the point of performance: it names what moved and one smallest next move, never a nag."
+    }
+  ]
+}

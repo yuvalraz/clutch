@@ -1,0 +1,12 @@
+{
+  "name": "clutch",
+  "version": "1.0.0",
+  "description": "An opinionated ADHD execution harness that fires at the point of performance: it names what moved and one smallest next move, never a nag.",
+  "author": {
+    "name": "Yuval Raz"
+  },
+  "homepage": "https://github.com/yuvalraz/clutch",
+  "repository": "https://github.com/yuvalraz/clutch",
+  "license": "MIT",
+  "keywords": ["adhd", "executive-function", "point-of-performance", "harness"]
+}

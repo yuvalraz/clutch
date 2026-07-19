@@ -17,7 +17,7 @@ import sys
 from datetime import date
 from pathlib import Path
 
-SOURCES = Path(__file__).parent / "sources"
+SOURCES = Path(__file__).resolve().parents[2] / "sources"
 
 
 def _extract_id(s: str) -> str:
@@ -198,7 +198,7 @@ def main() -> None:
         date.today().isoformat(), args.resonance
     )
     out.write_text(frontmatter + body + "\n", encoding="utf-8")
-    print(f"wrote {out.relative_to(Path(__file__).parent)} ({len(body.split())} words)")
+    print(f"wrote {out.relative_to(SOURCES.parent)} ({len(body.split())} words)")
 
 
 if __name__ == "__main__":

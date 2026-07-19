@@ -26,7 +26,7 @@ from xml.etree import ElementTree as ET
 
 from ingest import _build_frontmatter, _stem  # reuse; do not duplicate
 
-SOURCES = Path(__file__).parent / "sources"
+SOURCES = Path(__file__).resolve().parents[2] / "sources"
 
 _OPF = "http://www.idpf.org/2007/opf"
 _CONTAINER = "urn:oasis:names:tc:opendocument:xmlns:container"
@@ -226,7 +226,7 @@ def main():
         f"chapters: {chapters}\n", date.today().isoformat(), args.resonance,
     )
     out.write_text(frontmatter + body + "\n", encoding="utf-8")
-    print(f"wrote {out.relative_to(Path(__file__).parent)} ({len(body.split())} words, {chapters} chapters)")
+    print(f"wrote {out.relative_to(SOURCES.parent)} ({len(body.split())} words, {chapters} chapters)")
 
 
 if __name__ == "__main__":

@@ -19,25 +19,46 @@ way down. For me, launching was always cheap. Projects die around day ten,
 when novelty drains and the boring plumbing starts. That day is what Clutch
 instruments.
 
-## What it will actually do
+## What it does
 
-Nothing yet. The harness is not built; this section is the design commitment,
-already fixed in [ANNOTATIONS.md](ANNOTATIONS.md). One worked example of a
-future intervention:
+The harness exists. It ships as a Claude Code plugin in this repo, four
+mechanisms, zero configuration. Each fires at the point of performance, while
+you are at the machine and could act, because intervention effect degrades
+with distance from that moment (Barkley). What it says is recognition, never
+a demand. The design commitments behind it are fixed in
+[ANNOTATIONS.md](ANNOTATIONS.md).
 
-A side project has had zero forward movement for five days. Zero, and only
-zero: the trigger never fires on slowness, because slow is legal and decay is
-the signal (Mahan's forward-movement sensor, the biggest product yield in the
-canon). It fires at the point of performance, while I'm at the machine and
-could act, because intervention effect degrades with distance from that moment
-(Barkley). And what it says is recognition, never a demand:
+- **The thread.** Every session opens with an anchor: the branch you were on,
+  the last commit you authored, what was mid-change. Picking a project back
+  up stops costing a re-orientation tax.
+- **The recognition bell.** Silent by default; the gate is the point. When a
+  commit of yours lands mid-session, it says one line, at most twice a
+  session:
 
-> Day 12 on the parser. It ran clean on Tuesday; that shipped. The smallest
-> legal move is one commit.
+  > Landed: 'parser runs clean'. Smallest next move: one commit.
 
-It names what moved and the smallest next step. It never asks for the finish:
-demanding the far side of the wall lays a brick (Mahan again), and the bell's
-whole job is to prevent one.
+  It names what moved and the smallest next step. It never asks for the
+  finish: demanding the far side of the wall lays a brick (Mahan), and the
+  bell's whole job is to prevent one. No day-counts, no streak language, no
+  nag, ever.
+- **smallest-move.** A skill that triggers on "stuck", "too big", "where do I
+  even start" and returns exactly one named smallest legal move. Never a list.
+- **sprint.** A fixed 20-minute timebox on one named shippable, with the bell
+  surfacing the remaining time.
+
+## Install
+
+Two commands inside Claude Code:
+
+```
+/plugin marketplace add yuvalraz/clutch
+/plugin install clutch@clutch
+```
+
+No settings, no env vars, no modes. The opinions are the product.
+
+Two known limits. Concurrent sessions on the same repo share `.clutch/` state, last writer wins.
+The hooks emit at most two visible lines per session by design.
 
 ## The library so far
 
@@ -83,30 +104,17 @@ directly, reasoning over it without a query layer in between.
 
 ## Ingest a source
 
-```bash
-python3 -m venv .venv
-.venv/bin/pip install -r requirements.txt
-
-# a single video:
-.venv/bin/python ingest.py "https://www.youtube.com/watch?v=VIDEO_ID" \
-    --author "Author" --title "Talk title" --resonance high
-
-# a whole playlist → ONE digest (a lecture series is a single work):
-.venv/bin/python ingest.py "https://www.youtube.com/playlist?list=PLAYLIST_ID" \
-    --author "Russell Barkley" --title "30 Essential Ideas (full series)" --resonance high
-
-# a book (DRM-free EPUB, bought — the file stays local like every source):
-.venv/bin/python ingest_book.py path/to/book.epub \
-    --author "Thomas E. Brown" --title "Smart but Stuck" --resonance high
-```
+Moved to [tools/ingest/](tools/ingest/README.md). The ingester is the
+authoring scaffold behind the library, not part of the plugin.
 
 ## Why the library looks empty
 
 `sources/` carries no text on GitHub. The transcripts and book texts are
 third-party copyrighted material and stay local by design. What's public is
 the editorial layer (the resonance weights, [ANNOTATIONS.md](ANNOTATIONS.md),
-[GLOSSARY.md](GLOSSARY.md)) and the tool. Anyone can rebuild the corpus
-locally by re-running the ingester against the same public sources.
+[GLOSSARY.md](GLOSSARY.md)) and the harness built on it. The ingester is my
+private canon-authoring scaffold, documented in [tools/ingest/](tools/ingest/);
+the public layer is the editorial one.
 
 ## The canonical spine (one coherent source at a time, not all at once)
 
@@ -126,10 +134,20 @@ digest it as one file, not N stubs.
 
 ## Where this goes
 
-The weighted corpus is the knowledge layer under a runtime harness, neither a
-planner nor a tracker. The harness will consume it at the point of
-performance: decay-triggered interventions that cite the canon while an
-executive-function breakdown is actually happening, not while I'm planning
-ahead. Just-in-time recall, never a dashboard reviewed later.
+It already went. The harness is the plugin shipping in this repo, neither a
+planner nor a tracker. The mechanisms carry the canon's distilled judgment in
+fixed wording and baked constants; nothing reads the corpus at runtime. The
+weighted library stays as the authoring substrate: when new research clears
+the bar, its yield gets distilled into the next wording. Just-in-time
+recognition, never a dashboard reviewed later.
+
+## Is this abandoned?
+
+Finished is a deliberate state for an opinionated tool. No news is stability.
+The version bumps for exactly three reasons: new research clears the bar,
+wording fails in the wild, or the plugin API drifts.
+
+No script makes a network call. Verify:
+`grep -rE 'curl|wget|/dev/tcp|nc ' scripts/` returns nothing.
 
 Built in public, with AI assistance (Claude).

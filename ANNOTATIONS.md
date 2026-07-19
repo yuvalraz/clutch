@@ -12,6 +12,10 @@ It's also a pilot. The typed edges below (supports, refutes, underpins,
 converges, bridges, quarantines) are the same primitive I want spanning every
 project later, so the canon is where the vocabulary gets proven first.
 
+Provenance: entries and mechanism constants marked "operator field note" are
+my lived-experience calls, not canon claims. The 20-minute sprint length and
+the proxy-phrase patterns are field notes, not findings.
+
 ## Quarantine ledger
 
 Claims that are in the canon but must not drive the product. Ordered by how far
@@ -61,7 +65,7 @@ How the canon connects. Read each row as `From --relation--> To`.
 | Hot/cool EF split (Barkley EF-2012) | underpins | "interest is an emotion" (Brown) + interest-based nervous system (Dodson) | the circuitry under the affective claim. Strongest convergence in the canon: mechanism, affect, and circuitry from three independent voices. |
 | "Interest is an emotion" (Brown) | supports | the pricing-failure reframe | abandonment is an affective mismatch, not a willpower gap. |
 | Ignition vs brakes (Brown) | underpins | Clutch as a non-fear ignition | fear is the last ignition when interest dies; the product supplies a different one. |
-| Saltatory cognition (Dodson) | names | feel-first foresight | the spark-protocol premise, named by the source. |
+| Saltatory cognition (Dodson) | names | feel-first foresight | see the Spark-protocol entry in [GLOSSARY.md](GLOSSARY.md), whose premise the source names. |
 | "Owner's manual" (Dodson) | names | Clutch's category | taken straight from the source. |
 | RSD pre-emptive surrender (Dodson) | bridges to | the bricks (Mahan) | Dodson had the mechanism, Mahan the accumulation model. |
 | The bricks (Mahan) | is the mechanism for | sustain-failure | each shamed quit lays a brick that raises tomorrow's initiation wall. |
@@ -83,5 +87,4 @@ How the canon connects. Read each row as `From --relation--> To`.
 
 No validator, no traversal tool. Seven sources and about two dozen nodes fit in
 a read, so grep serves. <!-- ponytail: add a dangling-reference check + an edge
-parser when the graph outgrows eyeballing, or when the scheduled cross-project
-pass needs to consume this file. -->
+parser when the graph outgrows eyeballing. -->
