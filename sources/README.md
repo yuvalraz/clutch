@@ -1,10 +1,10 @@
 # sources/
 
-Raw transcripts and extracted source text live here **locally only** — they're
-third-party copyrighted material (lectures, books) and aren't republished.
-
-What's public is the *tool* (`../ingest.py`), the *index* (the spine table
-in the top-level README), and the hand-assigned `resonance` weights.
+This folder is empty on GitHub by design. The transcripts and book texts are
+third-party copyrighted material and stay local; what's public is the
+editorial layer (the resonance weights, [ANNOTATIONS.md](../ANNOTATIONS.md),
+[GLOSSARY.md](../GLOSSARY.md)) and the tool. Anyone can rebuild the corpus
+locally by re-running the ingester against the same public sources.
 
 For YouTube lectures: re-run the ingester against the same URLs to populate
 this folder:
@@ -14,4 +14,5 @@ this folder:
     --author "..." --title "..." --resonance high
 ```
 
-Book and article ingest is future work — the tool is YouTube-only for now.
+Books: `../ingest_book.py` digests a bought, DRM-free EPUB the same way. The
+file stays local like every source. Article ingest is future work.

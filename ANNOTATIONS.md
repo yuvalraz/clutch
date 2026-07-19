@@ -1,5 +1,8 @@
 # Annotations
 
+Private vocabulary below (the decay-trigger, the recognition bell,
+sustain-failure, and the rest) is defined in [GLOSSARY.md](GLOSSARY.md).
+
 The `sources/` transcripts are local (copyright). This file is the part that's
 mine: the editorial layer over the canon. What to trust, what to quarantine, and
 how the claims connect. Resonance weights live in the README; this is the
