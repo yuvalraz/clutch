@@ -45,6 +45,10 @@ if [ -f "$CLUTCH_DIR/breadcrumb" ]; then
 fi
 SUBJECT=$(clutch_last_authored %s) || SUBJECT=""
 [ -n "$SUBJECT" ] && printf "Last landed: '%s'\n" "$SUBJECT"
+if [ -s "$CLUTCH_DIR/captures.md" ]; then
+  NCAP=$(grep -c . "$CLUTCH_DIR/captures.md" 2>/dev/null) || NCAP=0
+  [ "$NCAP" -gt 0 ] 2>/dev/null && printf 'Captures waiting: %s. Pull with /clutch:capture when you choose.\n' "$NCAP"
+fi
 printf 'Smallest legal move: one commit.\n'
 
 exit 0
