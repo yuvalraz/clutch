@@ -117,23 +117,38 @@ esac
 [ $((NOW - FIRST)) -ge 1500 ] || exit 0
 
 # (b) actual movement: a new authored commit since the session baseline.
+# No movement is not an exit: the landing check below still deserves its turn.
+RANG=0
 BASE=$(grep "^base " "$STATE" 2>/dev/null | tail -n 1) || BASE=""
 BASE=${BASE#base }
-[ -n "$BASE" ] || exit 0
 CUR=$(clutch_last_authored %H) || CUR=""
-[ -n "$CUR" ] || exit 0
-[ "$CUR" != "$BASE" ] || exit 0
-
 SUBJECT=$(clutch_last_authored %s) || SUBJECT=""
-[ -n "$SUBJECT" ] || exit 0
+if [ -n "$BASE" ] && [ -n "$CUR" ] && [ "$CUR" != "$BASE" ] && [ -n "$SUBJECT" ]; then
+  # Record first (rewrite-and-swap), emit only if the whole chain landed.
+  if {
+    grep -v "^base " "$STATE" 2>/dev/null > "$STATE.tmp" &&
+      printf 'base %s\nemit %s\n' "$CUR" "$NOW" >> "$STATE.tmp" &&
+      mv "$STATE.tmp" "$STATE"
+  } >/dev/null 2>&1; then
+    clutch_say "Landed: '$SUBJECT'. Smallest next move: one commit."
+    RANG=1
+  fi
+fi
 
-# Record first (rewrite-and-swap), emit only if the whole chain landed.
-if {
-  grep -v "^base " "$STATE" 2>/dev/null > "$STATE.tmp" &&
-    printf 'base %s\nemit %s\n' "$CUR" "$NOW" >> "$STATE.tmp" &&
-    mv "$STATE.tmp" "$STATE"
-} >/dev/null 2>&1; then
-  clutch_say "Landed: '$SUBJECT'. Smallest next move: one commit."
+# --- safe-landing: after a long unbroken run with unbanked work, one offer
+# to bank the gains at a seam. Turn-end is the seam proxy; green-test seam
+# detection needs session state that does not ship yet. One offer per state,
+# never on a stop where the bell already spoke, same 2-line cap, and
+# ignoring the offer is a full answer.
+if [ "$RANG" = 0 ] && [ $((NOW - FIRST)) -ge 5400 ]; then
+  if ! grep -q "^emit land " "$STATE" 2>/dev/null; then
+    DIRTY=$(git status --porcelain 2>/dev/null | head -n 1)
+    if [ -n "$DIRTY" ]; then
+      if { printf 'emit land %s\n' "$NOW" >> "$STATE"; } 2>/dev/null; then
+        clutch_say "Long run, unbanked work. A seam if you want one: bank what works with one commit and a resume note. Ignoring this is also a move."
+      fi
+    fi
+  fi
 fi
 
 exit 0
