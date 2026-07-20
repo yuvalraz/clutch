@@ -11,16 +11,16 @@ them distinguishable: it prints facts and changes nothing.
 
 Procedure:
 
-1. Run the status script that ships with this plugin. From this skill's base
-   directory it lives two levels up:
+1. Run the status script that ships with this plugin. The harness names this
+   skill's base directory when it loads; the script lives two levels up from
+   there. Substitute the literal path and run:
 
    ```sh
-   sh "$(dirname "$0" 2>/dev/null || echo .)/../../scripts/status.sh"
+   sh <base-directory>/../../scripts/status.sh
    ```
 
-   If the shell substitution is awkward in context, resolve the path from the
-   base directory shown when this skill loads and run
-   `sh <plugin-root>/scripts/status.sh` directly.
+   Never locate it with $0 or $BASH_SOURCE; under a harness Bash tool those
+   name the shell binary, not this file.
 
 2. Show the report verbatim. Do not summarize it away; the lines are the
    evidence.

@@ -1,6 +1,5 @@
 #!/bin/sh
 # clutch status: read-only report. Prints facts; mutates nothing; always exits 0.
-NOW=$(date +%s)
 SELF_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" 2>/dev/null && pwd)
 
 echo "clutch status"
@@ -32,7 +31,7 @@ if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
       EMITS=$(grep -c '^emit ' "$S" 2>/dev/null)
       case "$LAST" in
         ''|*[!0-9]*) echo "  stop hook: state present but unreadable" ;;
-        *) echo "  stop hook: last fired $(( (NOW - LAST) / 60 )) min ago (stop events recorded: $NSTOP)" ;;
+        *) echo "  stop hook: fired in this state (stop events recorded: $NSTOP)" ;;
       esac
       echo "  bell: $EMITS of 2 emissions used this state"
     else
