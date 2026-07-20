@@ -24,9 +24,10 @@ Twenty minutes, one shippable. The duration is fixed; there is no parameter.
    tries to grow, deflect: note the new idea in one line and return. One line,
    then back to the shippable.
 
-4. Close at 20 minutes. The harness surfaces the remaining time; when it runs
-   out, stop and name what shipped, recognition wording: the concrete thing
-   that moved and one smallest next move. Then remove the marker:
+4. Close at 20 minutes. The heartbeat carries the clock each turn (sprint
+   clock: N min left); when it reads time is up, stop and name what shipped,
+   recognition wording: the concrete thing that moved and one smallest next
+   move. Then remove the marker:
 
    ```sh
    ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
