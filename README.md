@@ -18,8 +18,8 @@ It is a transmission. It gets your existing intent to the wheels.
 
 Every mechanism fires at the point of performance, while you are working and
 could act, because the effect degrades with distance from that moment (Barkley).
-It speaks at most twice a session, and what it says is recognition. Eleven
-mechanisms ship. Here are seven of the moments they catch.
+It speaks at most twice a session, and what it says is recognition. Thirteen
+mechanisms ship. Here are eight of the moments they catch.
 
 - **You open a project cold.** It greets you with the branch, your last landed
   commit, and the one file to pick back up. The re-orientation tax is gone.
@@ -37,6 +37,10 @@ mechanisms ship. Here are seven of the moments they catch.
 - **You look up after a fast session and cannot tell what you built.**
   `/clutch:retrace` walks it back from git, not memory: what landed, what is in
   flight, what to be aware of, and one move to regain control.
+- **A test fails, you change nothing, and run it again.** On the second
+  identical red with no edit between, it puts one line in front of you: the red
+  is the first half of the loop, not a verdict, and the smaller move is to make
+  just the one failing thing pass. It never counts the failures out loud.
 
 It never counts days, never mentions a streak, never shames. The anti-nag stance
 is a mechanism. A nag lays a brick that raises tomorrow's wall (Mahan, the Wall
