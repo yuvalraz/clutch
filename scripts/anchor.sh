@@ -39,9 +39,15 @@ case "$INPUT" in
 esac
 
 echo ""
+# The breadcrumb's last field is the most-recently-modified path (written by
+# stop.sh). When present it turns the generic resume line into a specific one.
+RECENT_PATH=""
 if [ -f "$CLUTCH_DIR/breadcrumb" ]; then
   BC=$(cat "$CLUTCH_DIR/breadcrumb" 2>/dev/null)
   [ -n "$BC" ] && printf 'Thread: %s\n' "$BC"
+  case "$BC" in
+    *"most recent: "*) RECENT_PATH=${BC##*most recent: } ;;
+  esac
 fi
 SUBJECT=$(clutch_last_authored %s) || SUBJECT=""
 [ -n "$SUBJECT" ] && printf "Last landed: '%s'\n" "$SUBJECT"
@@ -49,6 +55,10 @@ if [ -s "$CLUTCH_DIR/captures.md" ]; then
   NCAP=$(grep -c . "$CLUTCH_DIR/captures.md" 2>/dev/null) || NCAP=0
   [ "$NCAP" -gt 0 ] 2>/dev/null && printf 'Captures waiting: %s. Pull with /clutch:capture when you choose.\n' "$NCAP"
 fi
-printf 'Smallest legal move: one commit.\n'
+if [ -n "$RECENT_PATH" ]; then
+  printf 'Smallest move to resume: finish or bank the change in %s.\n' "$RECENT_PATH"
+else
+  printf 'Smallest legal move: one commit.\n'
+fi
 
 exit 0

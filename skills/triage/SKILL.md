@@ -1,6 +1,6 @@
 ---
 name: triage
-description: Fork a "task undone" into its two opposite causes and hand back one immediate action. Use when the user says a task didn't happen and the reason is unclear, "I keep not doing this", "why didn't I do it", "can't tell if I'm stuck or I forgot", or a review turns up something untouched.
+description: Fork a "task undone" into its two opposite causes (a flinch at the wall versus never entering awareness) and hand back one immediate action. Use when the user says a task didn't happen and the reason is unclear, "I keep not doing this", "why didn't I do it", or "can't tell if I'm stuck or I forgot". Ask the one disambiguating question first; engage nothing until it is answered; never auto-classify a wall.
 ---
 
 # Triage

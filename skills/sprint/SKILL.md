@@ -1,6 +1,6 @@
 ---
 name: sprint
-description: Run a fixed 20-minute sprint on one minimal shippable. Use when the user says sprint, timebox, "just get started", or "20 minutes".
+description: Run a fixed 20-minute sprint on one minimal shippable. Use when the user explicitly asks for a timebox: "sprint", "timebox", "just get started", "20 minutes", or "set a clock".
 ---
 
 # Sprint

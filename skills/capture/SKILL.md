@@ -1,6 +1,6 @@
 ---
 name: capture
-description: Catch a tangent, leap, or shiny thing in one line and return to the current unit. Use when the user says "capture this", "note this for later", "oh wait, idea", jumps to an unrelated idea mid-task, or asks what captures are waiting.
+description: Catch a tangent, leap, or shiny thing in one line and return to the current unit. Use when the user says "capture this", "note this for later", "oh wait, idea", or jumps to an unrelated idea mid-task. One line then return; pull-only; never auto-surface or push waiting captures.
 ---
 
 # Capture

@@ -2,49 +2,54 @@
 
 *The coupling between intention and action.*
 
-Clutch is an execution harness for ADHD: software that catches a project at
-the exact moment it stops moving and answers with recognition instead of a nag.
+Clutch is a Claude Code plugin that catches you at the moment a task stalls and
+hands back the next small move.
 
-It stands on Barkley's frame: ADHD is a performance disorder. The knowledge is
-there, the intent is there, and the coupling between intention and action
-fails at the point of performance. So Clutch isn't a motivation supply. It's a
-transmission: it gets your existing intent to the wheels.
+ADHD is a performance disorder, not a knowledge one. The gap is execution at the
+point of performance, the moment you actually have to act. Most productivity
+tools work on knowledge: a better planner, another app, one more system to
+remember. Clutch works on performance. It moves the intervention into the moment
+you are at the machine, in your editor, where it can act on you whether or not
+your attention showed up.
 
-## Who it's for
+It is a transmission. It gets your existing intent to the wheels.
 
-The smart-but-stuck profile Brown calls coast-to-collapse: intelligence masks
-the executive-function deficit, delays the wall, and makes the crash more
-shame-laden, because "you're so smart" was the standing explanation the whole
-way down. For me, launching was always cheap. Projects die around day ten,
-when novelty drains and the boring plumbing starts. That day is what Clutch
-instruments.
+## What it does on a normal day
 
-## What it does
+Every mechanism fires at the point of performance, while you are working and
+could act, because the effect degrades with distance from that moment (Barkley).
+It speaks at most twice a session, and what it says is recognition. Eleven
+mechanisms ship. Here are six of the moments they catch.
 
-The harness exists. It ships as a Claude Code plugin in this repo, four
-mechanisms, zero configuration. Each fires at the point of performance, while
-you are at the machine and could act, because intervention effect degrades
-with distance from that moment (Barkley). What it says is recognition, never
-a demand. The design commitments behind it are fixed in
-[ANNOTATIONS.md](ANNOTATIONS.md).
+- **You open a project cold.** It greets you with the branch, your last landed
+  commit, and the one file to pick back up. The re-orientation tax is gone.
+- **You circle the same two options for three turns without editing anything.**
+  It states one move that breaks the loop. Ignorable, no yes required.
+- **You say "I don't know where to start."** It hands back exactly one smallest
+  next move. Never a list.
+- **You dread the boring plumbing.** It reframes the task as something you can
+  speed-run.
+- **A test goes red and you reach for `git reset --hard`.** It puts one beat in
+  the way: the red is a heat spike, and the smaller move is to bank what still
+  works before you burn it.
+- **You have been heads-down two hours with nothing committed.** It offers,
+  once, to bank the work. Ignoring the offer is also a move.
 
-- **The thread.** Every session opens with an anchor: the branch you were on,
-  the last commit you authored, what was mid-change. Picking a project back
-  up stops costing a re-orientation tax.
-- **The recognition bell.** Silent by default; the gate is the point. When a
-  commit of yours lands mid-session, it says one line, at most twice a
-  session:
+It never counts days, never mentions a streak, never shames. The anti-nag stance
+is a mechanism. A nag lays a brick that raises tomorrow's wall (Mahan, the Wall
+of Awful), and streak-shaming apps manufacture the failure they claim to fix.
+Clutch fires on zero movement, never on slowness. Slow is legal. You are allowed
+to think.
 
-  > Landed: 'parser runs clean'. Smallest next move: one commit.
+## It engages itself now
 
-  It names what moved and the smallest next step. It never asks for the
-  finish: demanding the far side of the wall lays a brick (Mahan), and the
-  bell's whole job is to prevent one. No day-counts, no streak language, no
-  nag, ever.
-- **smallest-move.** A skill that triggers on "stuck", "too big", "where do I
-  even start" and returns exactly one named smallest legal move. Never a list.
-- **sprint.** A fixed 20-minute timebox on one named shippable, with the bell
-  surfacing the remaining time.
+Older versions were a manual transmission. The mechanisms were all there, but you
+had to remember to reach for them, and remembering is the exact part that is
+broken.
+
+v1.3 is automatic. It reads the session and engages the right mechanism itself,
+and it stays silent when it is not sure. The silence is the design. A wrong nudge
+is worse than no nudge, so when the read is ambiguous it says nothing.
 
 ## Install
 
@@ -55,71 +60,61 @@ Two commands inside Claude Code:
 /plugin install clutch@clutch
 ```
 
-No settings, no env vars, no modes. The opinions are the product.
+No settings, no env vars, no modes. Zero configuration. The opinions are the
+product.
 
-Two known limits. Concurrent sessions on the same repo share `.clutch/` state, last writer wins.
-The hooks emit at most two visible lines per session by design.
+## Where it runs
 
-## The library so far
+Clutch is a Claude Code plugin, so it runs in any Claude Code session: a personal
+side project, a family project, or a work repo.
 
-7 sources digested, weighted, and annotated. Its foundation is a weighted,
-queryable library of the ADHD research that actually resonates, built [one
-coherent source at a time](#the-canonical-spine-one-coherent-source-at-a-time-not-all-at-once),
-in public.
+It carries nothing personal and reads nothing but your git state and the
+conversation in front of it. It writes a local `.clutch/` folder and adds that
+folder to git's ignore list. Nothing leaves your machine, and you can verify
+that: no script in it makes a network call
+(`grep -rE 'curl|wget|/dev/tcp|nc ' scripts/` returns nothing).
 
-- [GLOSSARY.md](GLOSSARY.md): every private term this repo leans on, defined
-  and attributed.
-- [ANNOTATIONS.md](ANNOTATIONS.md): the editorial layer over the canon. What
-  to trust, what to quarantine, how the claims connect.
+It is read-mostly and fails open, so it sits underneath whatever else you run. On
+a repo with stricter guardrails, the strictest rule wins: Clutch's
+pause-before-force-push defers to a hard block if your setup has one. It
+composes. It does not fight.
 
-The library ships one source at a time because the corpus can't be abandoned
-that way: each source is small, self-contained, and committed the day it's
-added. If the tool meant to help me finish things can't finish itself, it
-doesn't work. This repo is the product's first test.
+## Who it's for
 
-## The one rule (walking-pace floor)
+The smart-but-stuck profile Brown calls coast-to-collapse. Intelligence masks the
+deficit until the wall, and makes the crash more shame-laden, because "you're so
+smart" was the standing explanation the whole way down. If launching is easy and
+finishing is where your projects die, it is aimed at you.
 
-**One source → one clean file → one commit.** Never "ingest everything, ship
-when done." The streak can't hit zero: the smallest legal move is adding a
-single source. Add the next one when the streak needs feeding, not before.
+## The canon underneath
 
-## How it's stored
+The wording carries seven digested sources of ADHD research (Barkley, Brown,
+Dodson, Mahan, Hallowell), weighted and annotated. Nothing reads the corpus at
+runtime: the judgment is baked into the mechanisms as fixed wording and
+constants.
 
-Plain markdown, one file per source in `sources/`, with frontmatter:
+- [GLOSSARY.md](GLOSSARY.md): every private term this repo leans on, defined and
+  attributed.
+- [ANNOTATIONS.md](ANNOTATIONS.md): the editorial layer over the canon. What to
+  trust, what to quarantine, how the claims connect.
 
-```yaml
-author: "Russell Barkley"
-title: "30 Essential Ideas — full series"
-type: lecture          # lecture | lecture-series | book | article | podcast
-source: https://...
-resonance: high        # high | med | low — how much it maps to MY condition
-```
+**Why the library looks empty.** `sources/` carries no text on GitHub. The
+transcripts and book texts are third-party copyrighted material and stay local by
+design. What is public is the editorial layer (the resonance weights,
+ANNOTATIONS, GLOSSARY) and the harness built on it. The authoring scaffold is
+documented in [tools/ingest/](tools/ingest/README.md); it is not part of the
+plugin.
 
-`resonance` is the "weight": hand-assigned, not learned. No vector DB yet. A
-folder of markdown *is* the database; an agent or LLM greps and reads it
-directly, reasoning over it without a query layer in between.
+**How it was built.** One source, one clean file, one commit, in public. Never
+"ingest everything, ship when done." If the tool meant to help me finish things
+could not finish itself, it would not work. This repo was its first test. Plain
+markdown, one file per source in `sources/`, hand-assigned resonance weight, no
+vector DB.
 
 <!-- ponytail: markdown corpus; add embeddings (sqlite-vec) only when grep+read
      measurably falls short, i.e. when the corpus outgrows a context window. -->
 
-## Ingest a source
-
-Moved to [tools/ingest/](tools/ingest/README.md). The ingester is the
-authoring scaffold behind the library, not part of the plugin.
-
-## Why the library looks empty
-
-`sources/` carries no text on GitHub. The transcripts and book texts are
-third-party copyrighted material and stay local by design. What's public is
-the editorial layer (the resonance weights, [ANNOTATIONS.md](ANNOTATIONS.md),
-[GLOSSARY.md](GLOSSARY.md)) and the harness built on it. The ingester is my
-private canon-authoring scaffold, documented in [tools/ingest/](tools/ingest/);
-the public layer is the editorial one.
-
-## The canonical spine (one coherent source at a time, not all at once)
-
-A *source* is a whole work. A lecture series chopped into parts is one source:
-digest it as one file, not N stubs.
+The seven that cleared the bar, plus the one I dropped and why:
 
 | Source | Resonance | Status |
 |--------|-----------|--------|
@@ -132,22 +127,14 @@ digest it as one file, not N stubs.
 | Dodson, *Defining Features of ADHD* (ADDitude lecture: interest-based nervous system, RSD, hyperarousal) | high | done |
 | Mahan, *the Wall of Awful* (StudyPro "Unlocking ADHD" webinar) | high | done |
 
-## Where this goes
+**Is this abandoned?** Finished is a deliberate state for an opinionated tool. No
+news is stability. The version bumps for exactly three reasons: new research
+clears the bar, wording fails in the wild, or the plugin API drifts.
 
-It already went. The harness is the plugin shipping in this repo, neither a
-planner nor a tracker. The mechanisms carry the canon's distilled judgment in
-fixed wording and baked constants; nothing reads the corpus at runtime. The
-weighted library stays as the authoring substrate: when new research clears
-the bar, its yield gets distilled into the next wording. Just-in-time
-recognition, never a dashboard reviewed later.
+**Some things stay manual on purpose.** When a task did not happen, it asks
+whether you flinched or forgot, because guessing wrong there does harm. It will
+not pretend to read your mind.
 
-## Is this abandoned?
-
-Finished is a deliberate state for an opinionated tool. No news is stability.
-The version bumps for exactly three reasons: new research clears the bar,
-wording fails in the wild, or the plugin API drifts.
-
-No script makes a network call. Verify:
-`grep -rE 'curl|wget|/dev/tcp|nc ' scripts/` returns nothing.
-
-Built in public, with AI assistance (Claude).
+Built in public, with AI assistance (Claude). I have ADHD and built this by making
+it ship itself one commit at a time. It runs in my own development sessions, so if
+it breaks, I am the first it bites. That is the warranty.
