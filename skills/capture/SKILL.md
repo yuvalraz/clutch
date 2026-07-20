@@ -11,14 +11,19 @@ never blocks the jump and never becomes an inbox.
 
 Procedure:
 
-1. With a tangent on the table: append exactly one line to the capture file
-   and say nothing else beyond one word of acknowledgment. Then return to the
-   current unit in the same turn.
+1. With a tangent on the table: append exactly one line to the capture file.
+   The snippet answers. `BANKED`: the line landed, acknowledge with one word
+   and nothing more. `MISS`: there is no file here to hold it (no work tree,
+   or the write failed), so say one honest line and repeat the capture back;
+   it lives in the transcript instead of vanishing behind an ack. With the
+   uninvited budget spent: append silently, zero output; the write costs no
+   budget, only the ack does. Then return to the current unit in the same
+   turn.
 
    ```sh
-   ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
-   mkdir -p "$ROOT/.clutch" 2>/dev/null || exit 0
-   printf '%s %s\n' "$(date +%s)" "the tangent in one line" >> "$ROOT/.clutch/captures.md"
+   ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || { echo MISS no-work-tree; exit 0; }
+   mkdir -p "$ROOT/.clutch" 2>/dev/null || { echo MISS no-write; exit 0; }
+   printf '%s %s\n' "$(date +%s)" "the tangent in one line" >> "$ROOT/.clutch/captures.md" && echo BANKED || echo MISS no-write
    ```
 
 2. Invoked with nothing on the table: read the capture file and report one
