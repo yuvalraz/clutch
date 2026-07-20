@@ -224,3 +224,16 @@ floor defines its smallest legal move.
 
 A separate private protocol of mine that ANNOTATIONS references once, whose
 premise Dodson's saltatory cognition names.
+
+## Open risks
+
+### Habituation
+
+The spine injects near-identical wording every turn. The canon warns that
+salience decays: what fired novelty on day one reads as wallpaper by week
+three, and nothing in the pack yet measures whether an injected line still
+changes behavior. Open by choice: any variation mechanism has to vary the
+surface without varying the meaning, or it breaks the fixed-wording rule
+(mechanical framing, not character reading). Until that design exists, the
+detector is the user: if the bell starts reading as furniture, saying so is
+the signal.

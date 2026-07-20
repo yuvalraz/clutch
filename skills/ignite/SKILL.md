@@ -1,6 +1,6 @@
 ---
 name: ignite
-description: Manufacture a non-fear igniter before a boring or mechanical unit of work the user already understands. Use when the user names dread at the threshold of starting, "ugh now the tests", "this is tedious", "boring plumbing", or "I know what to do, I just can't start it". Not for work already in motion, which is venting rather than a stall.
+description: Manufacture a non-fear igniter before a boring or mechanical unit of work the user already understands. Use when the user names dread at the threshold of starting, "ugh now the tests", "this is tedious", "boring plumbing", or "I know what to do, it's just boring". Not for work already in motion, which is venting rather than a stall.
 ---
 
 # Ignite
@@ -13,7 +13,9 @@ dread becomes the fallback fuel.
 Procedure:
 
 1. Take the unit about to start. If it is not on the table, ask one question:
-   "What is the unit?" One answer, then proceed.
+   "What is the unit?" One answer, then proceed. If the dread reads emotional
+   rather than boring or mechanical, this is not ignite's moment: route to
+   /clutch:triage and its one question.
 
 2. Emit one lever line: recast the unit as a concrete challenge with a
    countable edge. The default frame is the speed run or the golf score:

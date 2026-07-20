@@ -1,6 +1,6 @@
 ---
 name: retrace
-description: Walk back a fast session and hand back a map of what actually happened. Use when the user says "what did we just do", "what did we build", "I've lost track", "wait, what just happened", "I'm lost", "reorient me", or a long session has produced a lot of changes and the thread of it is gone.
+description: Walk back a fast session and hand back a map of what actually happened. Use when the user says "what did we just do", "what did we build", "I've lost track", "wait, what just happened", "I'm lost", or "reorient me".
 ---
 
 # Retrace
@@ -13,8 +13,9 @@ Ground it in what is on disk, never in a memory of the chat:
 
 1. Read the real record. What landed: `git log` since the session began, the
    commits, oldest first. What is still open: `git status` and `git diff
-   --stat`, the uncommitted and the unpushed. Which files were touched, and any
-   `.clutch/` captures waiting to be pulled.
+   --stat`, the uncommitted and the unpushed. Which files were touched, and the
+   count of `.clutch/` captures held (count only; pulling stays the user's
+   move).
 
 2. Walk it back as a breadcrumb path, in order, plain. Each step is one
    concrete deliverable, named for what it is and not for the conversation

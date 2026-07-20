@@ -25,8 +25,11 @@ Procedure:
 
 3. Never came to mind: it is inattention. No emotional intervention, no
    examination of feelings; the fix is a cue at the point of performance.
-   Place one line where tomorrow's work actually starts, so the task enters
-   awareness at the moment action is possible. Done.
+   Place one line at the top of the file where tomorrow's work starts (or the
+   project README when no file is obvious), shaped like
+   "<- start here: finish the parser test", so the task enters awareness at
+   the moment action is possible. One placed cue is a prosthesis; a list of
+   them would be a pending list, which the constitution bans. Done.
 
 There is no third branch. "It's complicated" resolves by asking the one
 question again about the most recent single miss, not the pattern. Each branch

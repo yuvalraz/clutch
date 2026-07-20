@@ -1,6 +1,6 @@
 ---
 name: smallest-move
-description: Name one smallest legal move when work stalls, stated as an ignorable recognition line rather than a demand. Use when the user is stuck, says the task is too big or overwhelming, can't start, doesn't know where to begin, or asks "where do I even start" or "I don't know where to begin". Route on a real stall in the current work, not a quoted or rhetorical one.
+description: Name one smallest legal move when work stalls, stated as an ignorable recognition line rather than a demand. Use when the user is stuck at starting or resuming (not on a technical problem they are actively working), says the task is too big or overwhelming and hesitates, can't start because there is no obvious first step, or asks "where do I even start" or "I don't know where to begin". A known step with no ignition belongs to ignite. Route on a real stall in the current work, not a quoted or rhetorical one.
 ---
 
 # Smallest move

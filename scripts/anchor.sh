@@ -53,7 +53,7 @@ SUBJECT=$(clutch_last_authored %s) || SUBJECT=""
 [ -n "$SUBJECT" ] && printf "Last landed: '%s'\n" "$SUBJECT"
 if [ -s "$CLUTCH_DIR/captures.md" ]; then
   NCAP=$(grep -c . "$CLUTCH_DIR/captures.md" 2>/dev/null) || NCAP=0
-  [ "$NCAP" -gt 0 ] 2>/dev/null && printf 'Captures waiting: %s. Pull with /clutch:capture when you choose.\n' "$NCAP"
+  [ "$NCAP" -gt 0 ] 2>/dev/null && printf 'Captures held: %s.\n' "$NCAP"
 fi
 if [ -n "$RECENT_PATH" ]; then
   printf 'Smallest move to resume: finish or bank the change in %s.\n' "$RECENT_PATH"
