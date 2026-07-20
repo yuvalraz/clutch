@@ -1,6 +1,6 @@
 {
   "name": "clutch",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "description": "An opinionated ADHD execution harness that fires at the point of performance: it names what moved and one smallest next move, never a nag.",
   "author": {
     "name": "Yuval Raz"
