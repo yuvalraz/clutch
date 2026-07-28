@@ -55,11 +55,32 @@ if [ -f "$SPRINT" ]; then
   esac
 fi
 
+# Engaged gear: carry the session shape to the model every turn as posture.
+# Closed vocabulary doubles as the injection guard: anything but the five
+# gear words (after whitespace-stripping) collapses to silence. Model-facing
+# only, never a user-visible line; no anti-nag budget is spent here.
+TEMPOLINE=""
+TEMPOF="$CLUTCH_DIR/tempo"
+if [ -f "$TEMPOF" ]; then
+  GEAR=$(head -c 32 "$TEMPOF" 2>/dev/null | tr -d '[:space:]') || GEAR=""
+  SHAPE=""
+  case "$GEAR" in
+    espresso) SHAPE="tight convergence, one divergent pulse" ;;
+    craft) SHAPE="converge-dominant, regular divergent pulses" ;;
+    ballmer) SHAPE="fast divergence, periodic convergence checkpoints" ;;
+    freefall) SHAPE="pure divergence, rate afterwards" ;;
+    ferment) SHAPE="slow deliberate divergence, long pulses" ;;
+    *) GEAR="" ;;
+  esac
+  [ -n "$GEAR" ] && TEMPOLINE="tempo gear: ${GEAR} (${SHAPE}). Pace divergent and convergent pulses to this gear; on a sustained shape mismatch the dispatch spine's gear-shift row applies, budget and all.
+"
+fi
+
 # The dispatch spine, compressed to a few model-facing lines. Silence is the
 # terminal row and the default. The only non-fixed text in this block is the
 # sprint goal, operator-authored at sprint start and passed through the JSON
 # encoder below.
-CTX="${SPRINTLINE}clutch dispatch spine (read and obey; route on the primary thing being done, not the first keyword; quoted or rhetorical stalls do not count): spoken stall -> smallest-move; too-big goal stated as the next action WITH hesitation -> offer smallest-move (never an unhesitant big goal); pre-dread at the threshold of boring or mechanical work already understood -> ignite (never on work already in motion, that is venting); the same options circling across 3+ turns with no narrowing and no edits -> STATE one smallest move as an ignorable recognition line that needs no yes; tangent or leap mid-task -> capture, one line then return, pull-only, never surface waiting captures; a task that did not happen with cause unclear -> triage, ask the one disambiguating question first and engage nothing until answered, never auto-classify; an explicit timebox request -> sprint.
+CTX="${TEMPOLINE}${SPRINTLINE}clutch dispatch spine (read and obey; route on the primary thing being done, not the first keyword; quoted or rhetorical stalls do not count): spoken stall -> smallest-move; too-big goal stated as the next action WITH hesitation -> offer smallest-move (never an unhesitant big goal); pre-dread at the threshold of boring or mechanical work already understood -> ignite (never on work already in motion, that is venting); the same options circling across 3+ turns with no narrowing and no edits -> STATE one smallest move as an ignorable recognition line that needs no yes; tangent or leap mid-task -> capture, one line then return, pull-only, never surface waiting captures; a task that did not happen with cause unclear -> triage, ask the one disambiguating question first and engage nothing until answered, never auto-classify; an explicit timebox request -> sprint; a sustained shape mismatch (the work's shape changed and held across turns; a single tangent is a capture, a single terse reply is nothing) -> offer one gear shift as one ignorable line, and a downshift offer asks triage's wall-vs-inattention question first and engages nothing until answered.
 TERMINAL ROW: anything unmatched or uncertain, and any session with no clearly established focus -> SILENCE, do nothing. This is the default and the safe state. A miss is free; a wrong shift lays a brick.
 Self-cap: at most 2 uninvited lines per session, shared across every channel. clutch-budget: ${EMITS}/2 spent (hook lines and recorded model lines together). Record, then speak: before any uninvited line, append 'emit model <epoch seconds>' to .clutch/session-state, then say the line; when the 2 are spent, stay silent even on a matched signal."
 

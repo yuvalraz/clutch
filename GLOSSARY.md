@@ -187,6 +187,32 @@ a tracker. When the trigger fires, the bell recognizes what actually moved
 and names the smallest next step. It never demands the far side of the wall,
 because a nag lays a brick and the bell exists to prevent one.
 
+### Tempo / the gearbox
+
+The shape of a session: the ratio and rhythm of divergent and convergent
+pulses, plus the checkpoint policy, engaged via /clutch:tempo. A gear ratio,
+never a fuel tank: Brown's "motivation is not gas in the tank" and the
+ego-depletion quarantine (ledger entry 1) both bar reading slow output as an
+empty reserve. Slow output means wrong gear.
+
+### The five gears
+
+The gearbox's closed vocabulary: espresso (tight convergence), craft
+(converge-dominant with regular divergent pulses), ballmer (fast divergence
+with periodic checkpoints), freefall (pure divergence), ferment (slow
+deliberate wandering). One word in .clutch/tempo; the heartbeat carries the
+engaged gear to the model each turn as posture.
+
+### Shape mismatch
+
+The gear-shift dispatch trigger: the shape of the work has changed and held
+across turns (a single tangent is a capture; a single terse reply is
+nothing). Read as lock or stall, never laziness: hyperfocus is a locked
+gear, the wall is a disengaged clutch. Drift is affective data, the
+interest-based nervous system (Dodson) re-pricing the task, and a sudden
+leap is saltatory cognition in motion, captured and traced back rather than
+corrected.
+
 ## The method
 
 ### Quarantine ledger

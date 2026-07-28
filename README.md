@@ -18,8 +18,8 @@ It is a transmission. It gets your existing intent to the wheels.
 
 Every mechanism fires at the point of performance, while you are working and
 could act, because the effect degrades with distance from that moment (Barkley).
-It speaks at most twice a session, and what it says is recognition. Thirteen
-mechanisms ship. Here are eight of the moments they catch.
+It speaks at most twice a session, and what it says is recognition.
+Fourteen mechanisms ship. Here are nine of the moments they catch.
 
 - **You open a project cold.** It greets you with the branch, your last landed
   commit, and the one file to pick back up. The re-orientation tax is gone.
@@ -41,6 +41,10 @@ mechanisms ship. Here are eight of the moments they catch.
   identical red with no edit between, it puts one line in front of you: the red
   is the first half of the loop, not a verdict, and the smaller move is to make
   just the one failing thing pass. It never counts the failures out loud.
+- **You came in to land one fix and have been weighing architectures for three
+  turns.** The session changed shape. It offers one gear shift, once, as an
+  ignorable line; declining closes the question, and `/clutch:tempo` puts the
+  gearbox in your hand either way.
 
 It never counts days, never mentions a streak, never shames. The anti-nag stance
 is a mechanism. A nag lays a brick that raises tomorrow's wall (Mahan, the Wall

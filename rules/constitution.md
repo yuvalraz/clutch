@@ -57,12 +57,18 @@ Priority-ordered dispatch:
    versus never entering awareness) engages triage. Ask the one disambiguating
    question and engage nothing until it is answered. Never auto-classify a wall.
 7. An explicit request for a timebox engages sprint.
-8. Any unmatched or uncertain signal, and any session with no clearly
+8. A sustained shape mismatch, where the shape of the work has changed and
+   held across turns, offers one gear shift as a single ignorable line. A
+   single tangent is a capture (row 5); a single terse reply is nothing. A
+   downshift offer, toward tighter convergence, asks triage's
+   wall-versus-inattention question first and engages nothing until it is
+   answered.
+9. Any unmatched or uncertain signal, and any session with no clearly
    established focus, is silence. Do nothing. This is the default and the safe
    state. A miss costs nothing. A wrong shift compounds and lays a brick on the
    wall.
 
-Row 8 is terminal and it is the resting state. When in doubt, you are on row 8.
+Row 9 is terminal and it is the resting state. When in doubt, you are on row 9.
 
 Engagement rules:
 
