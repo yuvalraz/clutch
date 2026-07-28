@@ -46,9 +46,8 @@ lost.
 | **freefall** | pure divergence | none during; rate afterwards | unattended cross-referencing, wandering |
 | **ferment** | SLOW divergence: deliberate wandering, long pulses | none; downstream rating only | the cellar: slow pre-crafting that stocks later craft sessions |
 
-All five gears ship now. The protocols that drive the three divergent gears
-(ballmer, freefall, ferment) arrive in a later version; the gears themselves
-already govern pacing.
+All five gears ship now, protocols included: ideate and spark drive ballmer,
+and daydream and dream-spark ride the freefall and ferment side.
 
 For the rest of the session, pace divergent and convergent pulses to the
 engaged gear. A gear mismatch degrades the output class (a review run in
@@ -71,7 +70,8 @@ constraints are hard:
   wall-versus-inattention question first (`/clutch:triage`) and engages
   nothing until it is answered. The same short replies can mean "land this"
   or interest death, and those want opposite gears.
-- An explicit `/clutch:tempo <gear>` or an accepted offer is the only thing
+- An explicit `/clutch:tempo <gear>`, an accepted offer, or an invoked skill
+  that names its gear (`/clutch:ideate` engages ballmer) is the only thing
   that changes the engaged gear. Never shift silently on your own read.
 
 ## Gearbox rules (hard constraints)

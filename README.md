@@ -19,7 +19,7 @@ It is a transmission. It gets your existing intent to the wheels.
 Every mechanism fires at the point of performance, while you are working and
 could act, because the effect degrades with distance from that moment (Barkley).
 It speaks at most twice a session, and what it says is recognition.
-Fourteen mechanisms ship. Here are nine of the moments they catch.
+Twenty mechanisms ship. Here are nine of the moments they catch.
 
 - **You open a project cold.** It greets you with the branch, your last landed
   commit, and the one file to pick back up. The re-orientation tax is gone.
@@ -52,6 +52,29 @@ of Awful), and streak-shaming apps manufacture the failure they claim to fix.
 Clutch fires on zero movement, never on slowness. Slow is legal. You are allowed
 to think.
 
+## The divergent half
+
+Six more mechanisms are commands you reach for. None of them fires uninvited —
+divergence is always invited.
+
+- **`/clutch:fomo`** — the tab you can't close, banked in one line with its
+  why. No processing, no titles.
+- **`/clutch:delve`** — you sit down to absorb what you captured. It reads
+  each item for why it pulled you and hands back a verdict: absorb, park, or
+  release.
+- **`/clutch:spark`** — you want to riff. A chain-reaction protocol: ignition,
+  ping-pong hops, a trace-back at the end so the wandering banks.
+- **`/clutch:daydream`** — something connects mid-focus. Whisper it; a
+  background pass runs a few hops and banks the result while you keep working.
+- **`/clutch:dream-spark`** — you stock the cellar. A cross-referencing pass
+  over everything the pool holds, hunting what connects that nobody's watching.
+- **`/clutch:ideate`** — you put the whole session in divergent mode: the pool
+  loads, ballmer engages, and anti-convergence holds until you land it.
+
+They share the pool: a local `.clutch/` folder the skills stock and draw from,
+repo-scoped by design. And ignite is not spark: ignite recasts dread as a
+challenge; spark runs divergence.
+
 ## It engages itself now
 
 Older versions were a manual transmission. The mechanisms were all there, but you
@@ -79,10 +102,13 @@ product.
 Clutch is a Claude Code plugin, so it runs in any Claude Code session: a personal
 side project, a family project, or a work repo.
 
-It carries nothing personal and reads nothing but your git state and the
-conversation in front of it. It writes a local `.clutch/` folder and adds that
-folder to git's ignore list. Nothing leaves your machine, and you can verify
-that: no script in it makes a network call
+It carries nothing personal and reads nothing but your git state, its own
+`.clutch/` folder, and the conversation in front of it. It writes that local
+`.clutch/` folder and adds it to git's ignore list. The divergent skills can
+reach out — delve fetches a captured link, and a spark, daydream, or
+dream-spark pass may run a web search — but only when you invoke them;
+nothing here touches the network on its own. You can verify that: no script
+in it makes a network call
 (`grep -rE 'curl|wget|/dev/tcp|nc ' scripts/` returns nothing).
 
 It is read-mostly and fails open, so it sits underneath whatever else you run. On

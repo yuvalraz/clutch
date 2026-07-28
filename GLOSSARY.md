@@ -213,6 +213,39 @@ interest-based nervous system (Dodson) re-pricing the task, and a sudden
 leap is saltatory cognition in motion, captured and traced back rather than
 corrected.
 
+### Spark
+
+The divergent protocol, run via /clutch:spark: ignition, chain reaction,
+cool-down with trace-back. Saltatory cognition (Dodson) names its premise —
+the jump is the native gait, and the protocol gives it a track instead of
+correcting it back onto the rails.
+
+### The pool
+
+The repo-scoped `.clutch/` stock the divergent skills write and read:
+cross-reference entries, spark session logs, idea files, the shared capture
+intake. Repo-scoped by design; lifting repo pools into anything larger is a
+named later step, not a missing feature.
+
+### Dream-spark
+
+The invoked cross-referencing pass over the whole pool, run via
+/clutch:dream-spark. The cellar framing: what it writes stocks later
+sessions. It is never a recharge — the fuel-tank reading stays barred here
+too.
+
+### Resonance
+
+Why a capture pulled you, examined at absorption. A question or an
+assertion, never a summary: if nothing surprises you, that honesty IS the
+verdict, and the pull is released.
+
+### The two doors
+
+One intake, two doors. Capture catches the leap mid-task; fomo catches the
+thing from outside — a link, a reference, a tab. Both land in the same
+file, and delve absorbs both.
+
 ## The method
 
 ### Quarantine ledger
@@ -248,8 +281,9 @@ floor defines its smallest legal move.
 
 ### Spark-protocol
 
-A separate private protocol of mine that ANNOTATIONS references once, whose
-premise Dodson's saltatory cognition names.
+The protocol ANNOTATIONS references once, whose premise Dodson's saltatory
+cognition names. Once a separate private protocol; it now ships here as
+/clutch:spark.
 
 ## Open risks
 
