@@ -35,8 +35,9 @@ Twenty mechanisms ship. Here are ten of the moments they catch.
 - **You have been heads-down two hours with nothing committed.** It offers,
   once, to bank the work. Ignoring the offer is also a move.
 - **You look up after a fast session and cannot tell what you built.**
-  `/clutch:retrace` walks it back from git, not memory: what landed, what is in
-  flight, what to be aware of, and one move to regain control.
+  `/clutch:retrace` walks it back from git and the capture pool, not memory:
+  what landed, what is in flight, what pulled at you, what to be aware of, and
+  one move to regain control.
 - **A test fails, you change nothing, and run it again.** On the second
   identical red with no edit between, it puts one line in front of you: the red
   is the first half of the loop, not a verdict, and the smaller move is to make
@@ -47,7 +48,7 @@ Twenty mechanisms ship. Here are ten of the moments they catch.
   gearbox in your hand either way.
 - **An idea yanks you sideways mid-task.** `/clutch:capture` banks it in one
   line and you are back, nothing lost. When you sit down to explore, the banked
-  lines are the anchors.
+  lines are the anchors, and a retrace hands back the ones from its window.
 
 It never counts days, never mentions a streak, never shames. The anti-nag stance
 is a mechanism. A nag lays a brick that raises tomorrow's wall (Mahan, the Wall
