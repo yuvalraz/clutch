@@ -19,7 +19,7 @@ It is a transmission. It gets your existing intent to the wheels.
 Every mechanism fires at the point of performance, while you are working and
 could act, because the effect degrades with distance from that moment (Barkley).
 It speaks at most twice a session, and what it says is recognition.
-Twenty mechanisms ship. Here are nine of the moments they catch.
+Twenty mechanisms ship. Here are ten of the moments they catch.
 
 - **You open a project cold.** It greets you with the branch, your last landed
   commit, and the one file to pick back up. The re-orientation tax is gone.
@@ -45,6 +45,9 @@ Twenty mechanisms ship. Here are nine of the moments they catch.
   turns.** The session changed shape. It offers one gear shift, once, as an
   ignorable line; declining closes the question, and `/clutch:tempo` puts the
   gearbox in your hand either way.
+- **An idea yanks you sideways mid-task.** `/clutch:capture` banks it in one
+  line and you are back, nothing lost. When you sit down to explore, the banked
+  lines are the anchors.
 
 It never counts days, never mentions a streak, never shames. The anti-nag stance
 is a mechanism. A nag lays a brick that raises tomorrow's wall (Mahan, the Wall
