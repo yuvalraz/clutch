@@ -195,6 +195,16 @@ never a fuel tank: Brown's "motivation is not gas in the tank" and the
 ego-depletion quarantine (ledger entry 1) both bar reading slow output as an
 empty reserve. Slow output means wrong gear.
 
+### Intent
+
+The declared focus of a session, build or ideate, set via /clutch:intent.
+Declaring it externalizes the intention the transmission couples, at the
+moment it matters (see "Point of performance" above), which is why the
+session-start anchor asks when no gear is declared. Build engages craft and
+speaks the maker posture; ideate hands the session to the divergent mode.
+The plugin's name is completed here: a clutch couples intention to action,
+and intent is the intention, declared.
+
 ### The five gears
 
 The gearbox's closed vocabulary: espresso (tight convergence), craft

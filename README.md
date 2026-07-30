@@ -19,10 +19,13 @@ It is a transmission. It gets your existing intent to the wheels.
 Every mechanism fires at the point of performance, while you are working and
 could act, because the effect degrades with distance from that moment (Barkley).
 It speaks at most twice a session, and what it says is recognition.
-Twenty mechanisms ship. Here are ten of the moments they catch.
+Twenty-one mechanisms ship. Here are eleven of the moments they catch.
 
 - **You open a project cold.** It greets you with the branch, your last landed
   commit, and the one file to pick back up. The re-orientation tax is gone.
+- **You open a session with no gear declared.** The greeting ends with one
+  question, the only one of the day: build or ideate? `/clutch:intent` sets
+  the frame; ignoring the question is also an answer, and it never asks twice.
 - **You circle the same two options for three turns without editing anything.**
   It states one move that breaks the loop. Ignorable, no yes required.
 - **You say "I don't know where to start."** It hands back exactly one smallest

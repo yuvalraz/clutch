@@ -15,7 +15,7 @@ SURFACES="rules/constitution.md README.md GLOSSARY.md ANNOTATIONS.md"
 
 # One home per pattern: the sweep and the self-check grep the SAME strings.
 # A typo here breaks both at once, and the self-check catches it.
-PAT_A='javos|knowledge-ops|aipaper|daylog|MEMORY\.md|trust ledger|trust-ledger|\.claude/tempo'
+PAT_A='javos|knowledge-ops|aipaper|daylog|MEMORY\.md|trust ledger|trust-ledger|\.claude/tempo|config/intents'
 PAT_B='[['
 PAT_C='/intent\b|intent default'
 PAT_D='/(spark|ideate|daydream|dream-spark|fomo|delve|memory|loop)\b'
@@ -85,6 +85,22 @@ probe_hit "E"  -iE "$PAT_E"
 probe_hit "F"  -iE "$PAT_F"
 probe_hit "G1" -E  "$PAT_G1"
 probe_hit "G2" -E  "$PAT_G2"
+
+# Alternate-specific probes: each restored/added shape must trip on its own,
+# never by riding a sibling alternate in the same pattern.
+printf 'set the intent default here\n' > "$T/probe-c2"
+grep -E "$PAT_C" "$T/probe-c2" >/dev/null 2>&1 \
+  || { echo "FAIL: self-check missed probe for C (intent default)"; fail=1; }
+printf 'see config/intents/dev.md\n' > "$T/probe-a2"
+grep -iE "$PAT_A" "$T/probe-a2" >/dev/null 2>&1 \
+  || { echo "FAIL: self-check missed probe for A (config/intents)"; fail=1; }
+
+# Negative probe: the prefixed form is clutch's own vocabulary and must never
+# trip pattern C. Same PAT_C variable as the sweep, never a copy.
+printf 'x /clutch:intent y\n' > "$T/negprobe"
+if grep -E "$PAT_C" "$T/negprobe" >/dev/null 2>&1; then
+  echo "FAIL: pattern C wrongly trips on /clutch:intent"; fail=1
+fi
 
 [ "$fail" -eq 0 ] || exit 1
 echo PASS

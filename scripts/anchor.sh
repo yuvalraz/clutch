@@ -23,15 +23,17 @@ PRELUDE=$(dirname "$0")/prelude.sh
 # continuing, and an unrecognized, empty, or malformed source is treated the
 # same way: preserve existing state. A wrongly preserved counter is mild; a
 # wrongly reset one re-arms the emission cap mid-session.
+FRESH=0
 case "$INPUT" in
   *'"source":"startup"'* | *'"source": "startup"'* | \
     *'"source":"resume"'* | *'"source": "resume"'* | \
     *'"source":"clear"'* | *'"source": "clear"'*)
+    FRESH=1
     if clutch_ensure_dir; then
       NOW=$(date +%s)
       BASE=$(clutch_last_authored %H) || BASE=""
       [ -n "$BASE" ] || BASE="-"
-      printf 'start %s\nbase %s\n' "$NOW" "$BASE" > "$CLUTCH_DIR/session-state" 2>/dev/null
+      printf 'start %s\nbase %s\n' "$NOW" "$BASE" 2>/dev/null > "$CLUTCH_DIR/session-state"
       # A sprint never legitimately spans a session boundary.
       rm -f "$CLUTCH_DIR/sprint-start" 2>/dev/null
     fi
@@ -59,6 +61,30 @@ if [ -n "$RECENT_PATH" ]; then
   printf 'Smallest move to resume: finish or bank the change in %s.\n' "$RECENT_PATH"
 else
   printf 'Smallest legal move: one commit.\n'
+fi
+
+# Intent ask: one final line, only at a true session boundary (the same
+# startup|resume|clear gate that resets the clock; a compaction is the same
+# session continuing) and only when no gear is declared. Declared means the
+# heartbeat's exact predicate: the tempo file reads as one of the five gear
+# words. Empty, truncated, or invalid content is not a declaration and the
+# question fires. Fail-open: the question fires only on a positive read of
+# "no gear" (readable state, no valid gear); an unreadable .clutch means
+# silence, the safe state.
+ASK=0
+if [ "$FRESH" = 1 ]; then
+  if [ ! -e "$CLUTCH_DIR" ]; then
+    ASK=1
+  elif ls "$CLUTCH_DIR" >/dev/null 2>&1; then
+    GEAR=$(head -c 32 "$CLUTCH_DIR/tempo" 2>/dev/null | tr -d '[:space:]') || GEAR=""
+    case "$GEAR" in
+      espresso | craft | ballmer | freefall | ferment) ;;
+      *) ASK=1 ;;
+    esac
+  fi
+fi
+if [ "$ASK" = 1 ]; then
+  printf 'Intent for this session: build or ideate? /clutch:intent sets the frame.\n'
 fi
 
 exit 0
