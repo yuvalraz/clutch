@@ -54,6 +54,8 @@ pin "$S" "skill: posture no silent"   'Nothing fails silently'
 pin "$S" "skill: posture scope check" 'a scope check, not more polish'
 pin "$S" "skill: ideate handoff"      'run /clutch:ideate'
 pin "$S" "skill: once-only law"       'never re-asks uninvited'
+pin "$S" "skill: session-scoped gear" 'The gear is session-scoped'
+pin "$S" "skill: resume inherits"     'resume and compaction inherit'
 pin "$S" "skill: unknown arg"         'one line naming the two focuses'
 pin "$S" "skill: two focuses fixed"   'no third and no config'
 pin "$S" "skill: description trigger" 'answers the session-start intent question'
@@ -129,16 +131,46 @@ OUT_JUNK=$(cd "$T/repo" && printf '%s' "$JSON" | sh "$RUN"); RC=$?
 printf '%s\n' "$OUT_JUNK" | grep -qF "$Q" \
   || { echo "FAIL: junk tempo treated as a declared gear (no question)"; exit 1; }
 
-# gear declared -> no question, and the output is byte-identical to the
-# no-gear output minus its one question line (the question is the only delta)
+# The gear is session-scoped. startup with a declared gear -> the anchor
+# wipes the gear before the ask evaluation: the file goes, the question fires.
 printf 'craft\n' > "$T/repo/.clutch/tempo"
 OUT_PRESENT=$(cd "$T/repo" && printf '%s' "$JSON" | sh "$RUN"); RC=$?
-[ "$RC" = 0 ] || { echo "FAIL: anchor exited $RC with gear declared"; exit 1; }
+[ "$RC" = 0 ] || { echo "FAIL: anchor exited $RC with gear declared on startup"; exit 1; }
 printf '%s\n' "$OUT_PRESENT" | grep -qF "$Q" \
-  && { echo "FAIL: gear-declared branch still asks the intent question"; exit 1; }
+  || { echo "FAIL: startup with a declared gear kept the gear (no question)"; exit 1; }
+[ ! -e "$T/repo/.clutch/tempo" ] \
+  || { echo "FAIL: startup left .clutch/tempo in place"; exit 1; }
+
+# clear with a declared gear -> same wipe, same question
+printf 'craft\n' > "$T/repo/.clutch/tempo"
+OUT_CLEAR=$(cd "$T/repo" && printf '%s' '{"source":"clear"}' | sh "$RUN"); RC=$?
+[ "$RC" = 0 ] || { echo "FAIL: anchor exited $RC with gear declared on clear"; exit 1; }
+printf '%s\n' "$OUT_CLEAR" | grep -qF "$Q" \
+  || { echo "FAIL: clear with a declared gear kept the gear (no question)"; exit 1; }
+[ ! -e "$T/repo/.clutch/tempo" ] \
+  || { echo "FAIL: clear left .clutch/tempo in place"; exit 1; }
+
+# resume with a declared gear -> a continued conversation inherits its gear:
+# no question, file intact, and the output is byte-identical to the no-gear
+# output minus its one question line (the question is the only delta)
+printf 'craft\n' > "$T/repo/.clutch/tempo"
+OUT_RESUME=$(cd "$T/repo" && printf '%s' '{"source":"resume"}' | sh "$RUN"); RC=$?
+[ "$RC" = 0 ] || { echo "FAIL: anchor exited $RC with gear declared on resume"; exit 1; }
+printf '%s\n' "$OUT_RESUME" | grep -qF "$Q" \
+  && { echo "FAIL: resume with a declared gear still asks the intent question"; exit 1; }
+grep -q '^craft$' "$T/repo/.clutch/tempo" \
+  || { echo "FAIL: resume wiped or mangled .clutch/tempo"; exit 1; }
 EXPECT=$(printf '%s\n' "$OUT_ABSENT" | grep -vF "$Q")
-[ "$OUT_PRESENT" = "$EXPECT" ] \
-  || { echo "FAIL: gear-declared output differs beyond the question line"; exit 1; }
+[ "$OUT_RESUME" = "$EXPECT" ] \
+  || { echo "FAIL: resume gear-declared output differs beyond the question line"; exit 1; }
+
+# compact with a declared gear -> same session continuing: no question, file intact
+OUT_CGEAR=$(cd "$T/repo" && printf '%s' '{"source":"compact"}' | sh "$RUN"); RC=$?
+[ "$RC" = 0 ] || { echo "FAIL: anchor exited $RC with gear declared on compact"; exit 1; }
+printf '%s\n' "$OUT_CGEAR" | grep -qF "$Q" \
+  && { echo "FAIL: compact with a declared gear asks the intent question"; exit 1; }
+grep -q '^craft$' "$T/repo/.clutch/tempo" \
+  || { echo "FAIL: compact wiped or mangled .clutch/tempo"; exit 1; }
 
 # unreadable .clutch -> fail-open: no question, rc=0, and a silent stderr
 # (no mask here: a leak from the anchor's own redirects must stay visible)

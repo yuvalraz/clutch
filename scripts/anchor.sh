@@ -29,6 +29,16 @@ case "$INPUT" in
     *'"source":"resume"'* | *'"source": "resume"'* | \
     *'"source":"clear"'* | *'"source": "clear"'*)
     FRESH=1
+    # The gear is session-scoped: a brand-new session (startup or clear)
+    # opens in neutral, so the intent ask below always fires at a fresh
+    # start. A resume is a continued conversation and inherits its gear;
+    # a compaction never reaches this branch. Fail-open: rc pinned.
+    case "$INPUT" in
+      *'"source":"startup"'* | *'"source": "startup"'* | \
+        *'"source":"clear"'* | *'"source": "clear"'*)
+        rm -f "$CLUTCH_DIR/tempo" 2>/dev/null || :
+        ;;
+    esac
     if clutch_ensure_dir; then
       NOW=$(date +%s)
       BASE=$(clutch_last_authored %H) || BASE=""

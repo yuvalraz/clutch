@@ -29,7 +29,9 @@ printf '%s\n' "<gear>" 2>/dev/null > "$ROOT/.clutch/tempo" || exit 0
 ```
 
 <!-- ponytail: one shared .clutch/tempo per repo, so concurrent sessions on
-     the same repo share a gear -- the same accepted ceiling as sprint-start.
+     the same repo share a gear -- the same accepted ceiling as sprint-start,
+     and last-write-wins now includes the anchor's startup wipe (a new
+     session opening on the repo resets the gear to neutral).
      Per-session state only if it ever bites. -->
 
 If the write fails, skip silently: the declaration still governs the live

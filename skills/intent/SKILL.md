@@ -58,3 +58,7 @@ The session-start ask happens once, in the anchor's greeting, and only when no
 gear is declared. Ignoring it and starting to work is an answer that closes
 the matter; the skill never re-asks uninvited. Declaring later stays open by
 invoking /clutch:intent at any time.
+
+The gear is session-scoped: a new session (startup or /clear) opens in
+neutral, so the ask fires at every fresh start; resume and compaction inherit
+the declared gear.
