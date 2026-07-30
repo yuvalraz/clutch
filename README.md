@@ -113,8 +113,9 @@ side project, a family project, or a work repo.
 It carries nothing personal and reads nothing but your git state, its own
 `.clutch/` folder, and the conversation in front of it. It writes that local
 `.clutch/` folder and adds it to git's ignore list. The divergent skills can
-reach out — delve fetches a captured link, and a spark, daydream, or
-dream-spark pass may run a web search — but only when you invoke them;
+reach out — delve fetches a captured link, and a spark, daydream,
+dream-spark, or ideate pass may run a web search — but only when you invoke
+them;
 nothing here touches the network on its own. You can verify that: no script
 in it makes a network call
 (`grep -rE 'curl|wget|/dev/tcp|nc ' scripts/` returns nothing).
