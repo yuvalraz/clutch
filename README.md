@@ -80,7 +80,11 @@ divergence is always invited.
   loads, ballmer engages, and anti-convergence holds until you land it.
 
 They share the pool: a local `.clutch/` folder the skills stock and draw from,
-repo-scoped by design. And ignite is not spark: ignite recasts dread as a
+writes repo-scoped by design.
+Keep a `~/.clutch` folder and it becomes the brain, the second pool level
+the readers all sweep; only the absorb verdict in /clutch:delve
+promotes an item up into it.
+And ignite is not spark: ignite recasts dread as a
 challenge; spark runs divergence.
 
 ## It engages itself now
@@ -111,8 +115,12 @@ Clutch is a Claude Code plugin, so it runs in any Claude Code session: a persona
 side project, a family project, or a work repo.
 
 It carries nothing personal and reads nothing but your git state, its own
-`.clutch/` folder, and the conversation in front of it. It writes that local
-`.clutch/` folder and adds it to git's ignore list. The divergent skills can
+`.clutch/` folder, your `~/.clutch` brain if you keep one, and the
+conversation in front of it. A brain entry banked at home surfaces in
+whatever repo you run these skills in, a work repo included; whether that
+mix is fine is your call. It writes that local
+`.clutch/` folder, plus your brain on an absorb verdict, and adds the local
+folder to git's ignore list. The divergent skills can
 reach out — delve fetches a captured link, and a spark, daydream,
 dream-spark, or ideate pass may run a web search — but only when you invoke
 them;

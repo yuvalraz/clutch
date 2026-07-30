@@ -232,10 +232,13 @@ correcting it back onto the rails.
 
 ### The pool
 
-The repo-scoped `.clutch/` stock the divergent skills write and read:
-cross-reference entries, spark session logs, idea files, the shared capture
-intake. Repo-scoped by design; lifting repo pools into anything larger is a
-named later step, not a missing feature.
+The `.clutch/` stock the divergent skills write and read: cross-reference
+entries, spark session logs, idea files, the shared capture intake. Two
+levels: the repo pool, where every write lands, and the brain, a user-level pool
+at `~/.clutch/` that every reader also sweeps, its items labeled [brain].
+Writes stay repo-scoped; promotion upward is the absorb verdict in
+/clutch:delve, one item at a time. No brain, no change: everything reads
+exactly as before.
 
 ### Dream-spark
 

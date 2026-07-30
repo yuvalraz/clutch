@@ -108,6 +108,21 @@ pinf "$CAPTURE" "capture: captures count"      'its captures count in too'
 pinf "$CAPTURE" "capture: brain label"         '\[brain\]'
 pinf "$CAPTURE" "capture: count-floor honesty" 'only repo lines delve'
 
+# --- README and GLOSSARY pins: the docs tell the two-level truth ---
+pinf "$README" "README: pool gains a brain"    'it becomes the brain'
+pinf "$README" "README: second pool level"     'the second pool level'
+pinf "$README" "README: reads-list brain"      'brain if you keep one'
+pinf "$README" "README: honesty, work repo"    'a work repo included'
+pinf "$README" "README: honesty, your call"    'is your call'
+pinf "$GLOSSARY" "GLOSSARY: user-level pool"   'user-level pool'
+pinf "$GLOSSARY" "GLOSSARY: promotion door"    'promotion upward is the absorb verdict'
+pinf "$GLOSSARY" "GLOSSARY: no-brain identity" 'No brain, no change'
+# Stale-claim negative check: the "named later step" sentence must be gone.
+# Non-vacuous by construction: a BASE GLOSSARY replay counts 1 and goes red.
+N=$(grep -c 'named later step' "$GLOSSARY")
+[ "$N" = "0" ] \
+  || { echo "FAIL: GLOSSARY still carries the stale repo-scoped claim ($N hit)"; fail=1; }
+
 # --- live door probes: extract the snippet from the shipped skill and run it ---
 T=$(mktemp -d)
 trap 'chmod -R u+w "$T" 2>/dev/null; rm -rf "$T"' EXIT
@@ -221,6 +236,42 @@ printf '%s\n' "$HITS" | sed -n 1p | grep -q 'repo probe entry' \
   || { echo "FAIL: P5 repo entry not reached from the repo cwd"; fail=1; }
 printf '%s\n' "$HITS" | sed -n 2p | grep -q 'brain probe entry' \
   || { echo "FAIL: P5 brain entry not reached via HOME resolution"; fail=1; }
+
+# P6 suite-under-scratch-HOME: the whole sibling suite passes with no brain
+# (byte-identity with 1.9.0) and with a seeded brain (presence breaks
+# nothing). Self-exclusion by filename is the recursion guard.
+# Env hygiene: every sibling invocation clears the twelve-name override-var
+# scrub list (Durable Decision 8) via ONE subshell unset line below -- the
+# nine vars this file takes plus the siblings' own SPRINT_SKILL INTENT_SKILL
+# ANCHOR_SH. Any new override var added to this file or a sibling suite MUST
+# be added to that unset line in the same edit. Without the scrub, a BASE
+# replay's poisoned var (e.g. README_FILE) inherits into the children and
+# lights sibling suites red.
+run_scrubbed() {
+  ( unset DELVE_SKILL SPARK_SKILL IDEATE_SKILL DAYDREAM_SKILL DREAMSPARK_SKILL RETRACE_SKILL CAPTURE_SKILL README_FILE GLOSSARY_FILE SPRINT_SKILL INTENT_SKILL ANCHOR_SH
+    HOME="$1" sh "$2" >/dev/null )
+}
+mkdir "$T/h6"
+mkdir -p "$T/h7/.clutch/ideas"
+printf '### [dream] seeded (2026-01-01)\n' > "$T/h7/.clutch/dream-sparks.md"
+for t in "$HERE"/*.test.sh; do
+  [ "$t" = "$HERE/brain.test.sh" ] && continue
+  run_scrubbed "$T/h6" "$t" \
+    || { echo "FAIL: no-brain suite: $t"; fail=1; }
+done
+for t in "$HERE"/*.test.sh; do
+  [ "$t" = "$HERE/brain.test.sh" ] && continue
+  run_scrubbed "$T/h7" "$t" \
+    || { echo "FAIL: with-brain suite: $t"; fail=1; }
+done
+# Scrub-proof assert: with a poisoned README_FILE set in this script's own
+# environment, a sibling invoked through the scrubbed form still PASSes; a
+# var that survived the scrub would go red, so this proves the scrub strips.
+README_FILE=/dev/null
+export README_FILE
+run_scrubbed "$T/h6" "$HERE/sprint-pool.test.sh" \
+  || { echo "FAIL: P6 scrub-proof -- poisoned README_FILE leaked into a sibling"; fail=1; }
+unset README_FILE
 
 # Canary (runs last, always): no probe may leak into the real HOME.
 [ ! -e "$ORIG_HOME/.clutch/ideas/brain-probe-slug.md" ] \
