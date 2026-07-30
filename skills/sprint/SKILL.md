@@ -21,8 +21,23 @@ Twenty minutes, one shippable. The duration is fixed; there is no parameter.
    ```
 
 3. Work turn by turn, present tense, on that one shippable only. When scope
-   tries to grow, deflect: note the new idea in one line and return. One line,
-   then back to the shippable.
+   tries to grow, deflect: bank the new idea through the capture door, then
+   speak one deflection line and return to the shippable in the same turn.
+   The write is silent and costs no budget;
+   the deflection line is the whole utterance.
+   The banked line is what the divergent skills draw later: the sprint stays
+   scope-locked and the idea survives.
+
+   ```sh
+   ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || { echo MISS no-work-tree; exit 0; }
+   mkdir -p "$ROOT/.clutch" 2>/dev/null || { echo MISS no-write; exit 0; }
+   printf '%s %s\n' "$(date +%s)" "the deflected idea in one line" >> "$ROOT/.clutch/captures.md" && echo BANKED || echo MISS no-write
+   ```
+
+   `MISS` (no work tree, or the write failed): say one honest line and
+   repeat the idea back, so it lives in the transcript instead of vanishing
+   behind a failed silent write. That honest line replaces the deflection
+   line: still exactly one spoken line, never two.
 
 4. Close at 20 minutes. The heartbeat carries the clock each turn (sprint
    clock: N min left); when it reads time is up, stop and name what shipped,

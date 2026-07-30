@@ -47,8 +47,9 @@ Twenty mechanisms ship. Here are ten of the moments they catch.
   ignorable line; declining closes the question, and `/clutch:tempo` puts the
   gearbox in your hand either way.
 - **An idea yanks you sideways mid-task.** `/clutch:capture` banks it in one
-  line and you are back, nothing lost. When you sit down to explore, the banked
-  lines are the anchors, and a retrace hands back the ones from its window.
+  line and you are back, nothing lost. A sprint's deflected ideas bank
+  through the same door. When you sit down to explore, the banked lines are
+  the anchors, and a retrace hands back the ones from its window.
 
 It never counts days, never mentions a streak, never shames. The anti-nag stance
 is a mechanism. A nag lays a brick that raises tomorrow's wall (Mahan, the Wall
