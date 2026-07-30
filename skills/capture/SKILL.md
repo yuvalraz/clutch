@@ -29,6 +29,9 @@ Procedure:
 2. Invoked with nothing on the table: read the capture file and report one
    line, count plus the newest entry. Never a digest, never a review queue,
    never "you should process these". The user pulls; nothing pushes.
+   With a brain at $HOME/.clutch, its captures count in too,
+   and a newest entry drawn from the brain carries a [brain] label.
+   Brain captures ride the count, but only repo lines delve: the brain's lines are already absorbed knowledge, not a queue.
 
 3. Trace-back, on request only: when the user wants the reasoning behind a
    leap they already took, back-fill the ladder from where they were to where

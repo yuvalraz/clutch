@@ -46,6 +46,10 @@ Ground it in what is on disk, never in a memory of the chat:
      when in-window is ambiguous at the entry level the narrower rule holds:
      omit rather than guess. Where a line or session carries a timestamp, it
      interleaves with the commits in the breadcrumb walk.
+     The brain at $HOME/.clutch is read the same way when one exists:
+     in-window brain entries ride along labeled [brain],
+     the narrower rule binds them too, and a missing brain skips silently on
+     its own.
 
    Each pool file that is missing or unreadable skips silently on its own; the
    group is absent and nothing is said about it only when no in-window activity

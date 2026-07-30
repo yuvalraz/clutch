@@ -17,10 +17,22 @@ ORIG_HOME=$HOME
 
 HERE=$(cd "$(dirname "$0")" && pwd)
 DELVE=${DELVE_SKILL:-$HERE/../skills/delve/SKILL.md}
+SPARK=${SPARK_SKILL:-$HERE/../skills/spark/SKILL.md}
+DAYDREAM=${DAYDREAM_SKILL:-$HERE/../skills/daydream/SKILL.md}
+DREAMSPARK=${DREAMSPARK_SKILL:-$HERE/../skills/dream-spark/SKILL.md}
+IDEATE=${IDEATE_SKILL:-$HERE/../skills/ideate/SKILL.md}
+RETRACE=${RETRACE_SKILL:-$HERE/../skills/retrace/SKILL.md}
+CAPTURE=${CAPTURE_SKILL:-$HERE/../skills/capture/SKILL.md}
 README=${README_FILE:-$HERE/../README.md}
 GLOSSARY=${GLOSSARY_FILE:-$HERE/../GLOSSARY.md}
 
 [ -f "$DELVE" ] || { echo "FAIL: missing $DELVE"; exit 1; }
+[ -f "$SPARK" ] || { echo "FAIL: missing $SPARK"; exit 1; }
+[ -f "$DAYDREAM" ] || { echo "FAIL: missing $DAYDREAM"; exit 1; }
+[ -f "$DREAMSPARK" ] || { echo "FAIL: missing $DREAMSPARK"; exit 1; }
+[ -f "$IDEATE" ] || { echo "FAIL: missing $IDEATE"; exit 1; }
+[ -f "$RETRACE" ] || { echo "FAIL: missing $RETRACE"; exit 1; }
+[ -f "$CAPTURE" ] || { echo "FAIL: missing $CAPTURE"; exit 1; }
 [ -f "$README" ] || { echo "FAIL: missing $README"; exit 1; }
 [ -f "$GLOSSARY" ] || { echo "FAIL: missing $GLOSSARY"; exit 1; }
 
@@ -50,6 +62,51 @@ pinf "$DELVE" "delve: direct-URL rule"         'stop before the marker leg'
 pinf "$DELVE" "delve: two-pool boundary"       "the pool's two levels"
 pinf "$DELVE" "delve: marker ownership"        'never mark by hand alongside it'
 pinf "$DELVE" "delve: slug charset"            'lowercase letters, digits, and hyphens only'
+
+# --- reader pins, batch 1: both-level sweeps (spark, daydream, dream-spark,
+# --- and delve's step 2 cross-reference) ---
+pinf "$DELVE" "delve: sweep both levels"       'the same files under .HOME/\.clutch when a brain exists'
+pinf "$DELVE" "delve: merge order"             'Repo items come first'
+pinf "$DELVE" "delve: brain label"             '\[brain\]'
+pinf "$DELVE" "delve: brain skip"              'a missing brain skips silently'
+pinf "$SPARK" "spark: brain path literal"      'HOME/\.clutch'
+pinf "$SPARK" "spark: brain skip"              'a missing brain skips silently'
+pinf "$SPARK" "spark: merge order"             'Repo items come first'
+pinf "$SPARK" "spark: brain label"             '\[brain\]'
+pinf "$SPARK" "spark: deep sweep both levels"  'both levels of the pool'
+pinf "$DAYDREAM" "daydream: brain path literal" 'HOME/\.clutch'
+pinf "$DAYDREAM" "daydream: brain skip"        'a missing brain skips silently'
+pinf "$DAYDREAM" "daydream: merge order"       'Repo items come first'
+pinf "$DAYDREAM" "daydream: brain label"       '\[brain\]'
+pinf "$DAYDREAM" "daydream: scaffold reads brain" 'Also read .HOME/\.clutch'
+pinf "$DAYDREAM" "daydream: scaffold labels"   'Label brain finds \[brain\]'
+pinf "$DREAMSPARK" "dream-spark: brain path literal" 'HOME/\.clutch'
+pinf "$DREAMSPARK" "dream-spark: brain skip"   'a missing brain skips silently'
+pinf "$DREAMSPARK" "dream-spark: merge order"  'Repo items come first'
+pinf "$DREAMSPARK" "dream-spark: brain label"  '\[brain\]'
+pinf "$DREAMSPARK" "dream-spark: sources label" 'carry the \[brain\] label in the Sources line'
+
+# --- ideate pins: both-level load, scoring, and the bell draw ---
+pinf "$IDEATE" "ideate: brain path literal"    'HOME/\.clutch'
+pinf "$IDEATE" "ideate: brain skip"            'a missing brain skips silently'
+pinf "$IDEATE" "ideate: merge order"           'Repo items come first'
+pinf "$IDEATE" "ideate: brain label"           '\[brain\]'
+pinf "$IDEATE" "ideate: draw phrase"           'The draw may hand back a brain item'
+pinf "$IDEATE" "ideate: scoring label"         'keeps its \[brain\] label through scoring'
+pinf "$IDEATE" "ideate: captures count"        'its captures count in too'
+pinf "$IDEATE" "ideate: count-floor honesty"   'only repo lines delve'
+
+# --- retrace pins: the Pulled-at-you window admits labeled brain entries ---
+pinf "$RETRACE" "retrace: brain path literal"  'HOME/\.clutch'
+pinf "$RETRACE" "retrace: window entries"      'in-window brain entries'
+pinf "$RETRACE" "retrace: narrower rule"       'narrower rule binds them too'
+pinf "$RETRACE" "retrace: brain label"         '\[brain\]'
+
+# --- capture pins: the step-2 report form counts both levels ---
+pinf "$CAPTURE" "capture: brain path literal"  'HOME/\.clutch'
+pinf "$CAPTURE" "capture: captures count"      'its captures count in too'
+pinf "$CAPTURE" "capture: brain label"         '\[brain\]'
+pinf "$CAPTURE" "capture: count-floor honesty" 'only repo lines delve'
 
 # --- live door probes: extract the snippet from the shipped skill and run it ---
 T=$(mktemp -d)
@@ -142,6 +199,28 @@ OUT=$(cd "$T/repowrong" && HOME="$T/hwrong" sh "$T/door-wrong.sh")
   || { echo "FAIL: NOMATCH expected MISS marker-no-match, got: $OUT"; fail=1; }
 grep -q '\[delved' "$T/repowrong/.clutch/captures.md" \
   && { echo "FAIL: NOMATCH marked a line on a no-match epoch"; fail=1; }
+
+# P5 both-level reachability (live): from a repo cwd, the documented union
+# (repo files, then the same names under $HOME/.clutch) reaches both levels,
+# and the repo file comes before the brain file in the documented order.
+mkdir "$T/repo5"; mkrepo "$T/repo5"
+printf '### [dream] repo probe entry (2026-01-01)\n' > "$T/repo5/.clutch/dream-sparks.md"
+mkdir -p "$T/h5/.clutch"
+printf '### [dream] brain probe entry (2026-01-01)\n' > "$T/h5/.clutch/dream-sparks.md"
+WALK=$(cd "$T/repo5" && HOME="$T/h5" sh -c '
+  for f in .clutch/dream-sparks.md "$HOME/.clutch/dream-sparks.md"; do
+    [ -f "$f" ] && printf "%s\n" "$f"
+  done')
+[ "$(printf '%s\n' "$WALK" | sed -n 1p)" = ".clutch/dream-sparks.md" ] \
+  || { echo "FAIL: P5 union did not list the repo file first"; fail=1; }
+[ "$(printf '%s\n' "$WALK" | sed -n 2p)" = "$T/h5/.clutch/dream-sparks.md" ] \
+  || { echo "FAIL: P5 union did not reach the brain file second"; fail=1; }
+HITS=$(cd "$T/repo5" && HOME="$T/h5" sh -c \
+  'grep -h "probe entry" .clutch/dream-sparks.md "$HOME/.clutch/dream-sparks.md" 2>/dev/null')
+printf '%s\n' "$HITS" | sed -n 1p | grep -q 'repo probe entry' \
+  || { echo "FAIL: P5 repo entry not reached from the repo cwd"; fail=1; }
+printf '%s\n' "$HITS" | sed -n 2p | grep -q 'brain probe entry' \
+  || { echo "FAIL: P5 brain entry not reached via HOME resolution"; fail=1; }
 
 # Canary (runs last, always): no probe may leak into the real HOME.
 [ ! -e "$ORIG_HOME/.clutch/ideas/brain-probe-slug.md" ] \

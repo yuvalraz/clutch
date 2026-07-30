@@ -33,6 +33,9 @@ Read everything; missing files skip silently:
 3. `.clutch/captures.md` — processed and not
 4. Recent `.clutch/sparks/` logs
 5. Git history: `git log`, unmerged branches, stashes
+6. The brain: the same files under $HOME/.clutch when a brain exists; a missing brain skips silently.
+   Repo items come first; brain items ride behind them, labeled [brain].
+   Brain sources carry the [brain] label in the Sources line.
 
 Then write a **context anchor** as plain text — long passes evict the
 earliest file reads from the model's view, and this block is what the later

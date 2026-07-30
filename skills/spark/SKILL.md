@@ -34,9 +34,11 @@ Quick sweep (default):
    `git stash list`, and dirty uncommitted files. Abandoned work is ignition
    stock: the branch that died mid-thought is an anchor nobody else has.
    Read-only, always fail-open.
+6. The brain: the same files under $HOME/.clutch when a brain exists; a missing brain skips silently.
+   Repo items come first; brain items ride behind them, labeled [brain].
 
-Deep sweep (for a dedicated session) adds: grep the pool for anchor
-keywords, and WebSearch the anchor topic.
+Deep sweep (for a dedicated session) adds: grep both levels of the pool for
+anchor keywords, and WebSearch the anchor topic.
 
 **Anchor the context (compaction survival).** Long sessions silently evict
 the oldest tool results, and the sweep is the first thing to go. After the

@@ -35,6 +35,8 @@ unavailable, run the same pass in the foreground; same output contract.
 1. **Lightweight sweep** (speed over depth; missing files skip silently):
    `.clutch/dream-sparks.md`, `.clutch/captures.md`, grep `.clutch/ideas/`
    for whisper keywords, recent `git log` for related work.
+   The brain: the same files under $HOME/.clutch when a brain exists; a missing brain skips silently.
+   Repo items come first; brain items ride behind them, labeled [brain].
 
 2. **3–5 associative hops**, starting from the whisper. Each hop pulls from
    the sweep, a web search, or prior work in the repo. Stop at five — this
@@ -90,6 +92,8 @@ Your whisper: "<whisper>"
 1. Read .clutch/dream-sparks.md and .clutch/captures.md (skip silently if
    missing)
 2. Grep .clutch/ideas/ and recent git log for the whisper's key terms
+   Also read $HOME/.clutch/dream-sparks.md and grep $HOME/.clutch/ideas/ when a brain exists; skip silently if missing.
+   Label brain finds [brain].
 3. Starting from the whisper, make 3-5 associative hops. Each hop pulls
    from what you found, prior work, or a web search. Follow the chain —
    don't converge, don't judge.

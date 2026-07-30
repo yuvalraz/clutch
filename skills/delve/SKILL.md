@@ -57,8 +57,10 @@ and keep going.
    original context, that's a fact, not a pattern.
 
 2. **Cross-reference.** Grep `.clutch/dream-sparks.md`, `.clutch/ideas/`,
-   `.clutch/sparks/`, and recent `git log` for the pattern's keywords.
-   Missing files skip silently.
+   `.clutch/sparks/`, recent `git log` for the pattern's keywords,
+   and the same files under $HOME/.clutch when a brain exists.
+   Missing files skip silently; a missing brain skips silently on its own.
+   Repo items come first; brain items ride behind them, labeled [brain].
 
 3. **Write the resonance.** Why did YOUR filter flag this, given what you're
    building? Never a summary: if the first sentence could appear in a search

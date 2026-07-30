@@ -45,6 +45,10 @@ Speed over completeness; missing files skip silently:
 2. `.clutch/captures.md` — count the unprocessed lines (no `[delved` token)
 3. The most recent `.clutch/sparks/` log — the cross-session snowball
 4. `.clutch/ideas/` — scan titles
+5. The brain: the same files under $HOME/.clutch when a brain exists; a missing brain skips silently.
+   Repo items come first; brain items ride behind them, labeled [brain].
+   With a brain present, its captures count in too: the unprocessed count in item 2 reads both levels.
+   Brain captures ride the count, but only repo lines delve: the brain's lines are already absorbed knowledge, not a queue.
 
 ### Step 1.5: Surface what's hot
 
@@ -56,7 +60,8 @@ Score each idea file by recent signal so the primer offers what's ripe.
 | High | a `[dream]`, `[daydream]`, or `[delve]` entry from the last 7 days references the idea (parse the `(YYYY-MM-DD)` headers) | 2x |
 | Medium | idea file modified in the last 7 days | 1x |
 
-Procedure: glob `.clutch/ideas/*.md`, extract each title (first `#` line)
+Procedure: glob `.clutch/ideas/*.md` and `$HOME/.clutch/ideas/*.md`; a brain idea keeps its [brain] label through scoring and the primer.
+Extract each title (first `#` line)
 and 3–5 key terms, count matches per tier, score, sort descending. Top 3
 with score > 0 get ONE provocative question each, connecting the idea to
 its fresh signal. Anti-convergence rewrite: a question starting "How does"
@@ -77,6 +82,7 @@ If the pool has entries:
    the line.
 2. **Draw exactly ONE pre-warmed item** from the pool and offer it as the
    session anchor.
+   The draw may hand back a brain item, labeled [brain]; ties go to the repo item, nearest context wins.
 
 Constraints (HARD): the offer is an invitation the user can freely ignore —
 never a demand. Exactly one item, never a digest. The offer never mentions
