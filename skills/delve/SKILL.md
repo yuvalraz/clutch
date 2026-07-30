@@ -71,6 +71,8 @@ and keep going.
    - **absorb** — it enriches the work. Route to `.clutch/ideas/<slug>.md`:
      append to the matching idea file, or create one with the first `#` line
      as its title.
+     Slugs are lowercase letters, digits, and hyphens only; nothing else.
+     With a brain present, absorb into the brain: the item and its why go up through the door snippet below; the repo ideas route above runs only when no brain exists.
    - **park** — processed, might ignite later.
    - **release** — nothing you were missing. The pull was noise, and the
      fear is resolved.
@@ -93,12 +95,38 @@ and keep going.
 
    - Mark the captures line processed: insert `[delved YYYY-MM-DD]` as the
      first token after the epoch.
+     When the brain door runs, it performs this marker itself; never mark by hand alongside it.
 
      <!-- ponytail: rewriting captures.md in place while capture appends to
           the same shared file can race -- the same accepted ceiling as
           tempo's shared gear file. A lock or sidecar done-list only if it
           ever bites. -->
-   - Verdict absorb → the ideas route above.
+   - Verdict absorb → the ideas route above when no brain exists. With a
+     brain at `$HOME/.clutch`, the door snippet runs instead, filling the
+     slots from the entry; the `<epoch>` slot is filled only for captured entries.
+     A direct-URL delve has no captures line: run the door through the heredoc append only, stop before the marker leg, and report its outcome; the marker leg belongs to captured entries alone.
+
+```sh
+ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || { echo MISS no-work-tree; exit 0; }
+[ -d "$HOME/.clutch" ] || { echo SKIP no-brain; exit 0; }
+mkdir -p "$HOME/.clutch/ideas" 2>/dev/null || { echo MISS brain-no-write; exit 0; }
+cat 2>/dev/null >> "$HOME/.clutch/ideas/<slug>.md" <<'EOF' || { echo MISS brain-no-write; exit 0; }
+# <idea title>
+**Absorbed:** <YYYY-MM-DD> from <repo name or "direct">
+**Why it pulled:** <the resonance>
+**Core pattern:** <the extractable trade-off>
+EOF
+[ -f "$ROOT/.clutch/captures.md" ] || { echo ABSORBED; exit 0; }
+awk -v e="<epoch>" -v m="[delved <YYYY-MM-DD>]" '!done && $1 == e && index($0, "[delved") == 0 { sub("^" e " ", e " " m " "); done=1; found=1 } !found && $1 == e && index($0, "[delved") > 0 { found=1 } { print } END { if (!found) exit 1 }' "$ROOT/.clutch/captures.md" 2>/dev/null > "$ROOT/.clutch/.captures.tmp"; rc=$?
+[ "$rc" -eq 1 ] && { rm -f "$ROOT/.clutch/.captures.tmp" 2>/dev/null; echo MISS marker-no-match; exit 0; }
+[ "$rc" -eq 0 ] && mv "$ROOT/.clutch/.captures.tmp" "$ROOT/.clutch/captures.md" 2>/dev/null && echo ABSORBED || { rm -f "$ROOT/.clutch/.captures.tmp" 2>/dev/null; echo MISS marker-no-write; }
+```
+
+     The brain append lands before the marker; any MISS leaves the line unmarked, so the capture retries next delve.
+     SKIP no-brain is not a failure: it means the repo route ran instead.
+     MISS marker-no-match means the filled epoch matched no unmarked captures line: the brain append landed, nothing was marked; check the epoch before retrying.
+     A retried absorb may append to the brain twice; duplicate-over-lost is
+     the direction the ordering law above already chose.
 
 6. **Summary.** Processed count plus verdict counts, one line. Nothing else.
 
@@ -111,7 +139,7 @@ what connects, why it matters to this repo.
 - Run on its own — you invoke it
 - Produce action items (it produces resonance and a verdict; the verdict is
   the routing)
-- Touch any file outside the `.clutch/` pool
+- Touch any file outside the pool's two levels: the repo `.clutch/` and, when a brain exists, the brain at `$HOME/.clutch`
 
 Why this works: see "Resonance" and "The two doors" in
 [GLOSSARY.md](../../GLOSSARY.md). The fear of missing out is resolved by

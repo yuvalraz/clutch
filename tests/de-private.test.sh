@@ -102,5 +102,23 @@ if grep -E "$PAT_C" "$T/negprobe" >/dev/null 2>&1; then
   echo "FAIL: pattern C wrongly trips on /clutch:intent"; fail=1
 fi
 
+# Negative probe: the brain vocabulary is clutch's own and must trip no
+# pattern. Same PAT_ variables as the sweep, never copies.
+printf 'the brain at ~/.clutch, read via $HOME/.clutch, labeled [brain]\n' > "$T/negprobe-brain"
+neg_brain() {
+  label=$1; shift
+  if grep "$@" "$T/negprobe-brain" >/dev/null 2>&1; then
+    echo "FAIL: pattern $label wrongly trips on brain vocabulary"; fail=1
+  fi
+}
+neg_brain "A"  -iE "$PAT_A"
+neg_brain "B"  -F  "$PAT_B"
+neg_brain "C"  -E  "$PAT_C"
+neg_brain "D"  -E  "$PAT_D"
+neg_brain "E"  -iE "$PAT_E"
+neg_brain "F"  -iE "$PAT_F"
+neg_brain "G1" -E  "$PAT_G1"
+neg_brain "G2" -E  "$PAT_G2"
+
 [ "$fail" -eq 0 ] || exit 1
 echo PASS
