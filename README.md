@@ -2,193 +2,222 @@
 
 *The coupling between intention and action.*
 
-Clutch is a Claude Code plugin that catches you at the moment a task stalls and
-hands back the next small move.
+Not a gift. Not a deficit. A different transmission.
 
-ADHD is a performance disorder, not a knowledge one. The gap is execution at the
-point of performance, the moment you actually have to act. Most productivity
-tools work on knowledge: a better planner, another app, one more system to
-remember. Clutch works on performance. It moves the intervention into the moment
-you are at the machine, in your editor, where it can act on you whether or not
-your attention showed up.
+Clutch is a Claude Code plugin. It catches the stall the moment it happens and
+hands you one small move. It banks the idea that pulled you away and turns it
+into fuel for later sessions. Both halves are built on the ADHD research, not
+productivity folklore.
 
-It is a transmission. It gets your existing intent to the wheels.
+ADHD is a performance disorder, not a knowledge one. You already know the next
+step. The gap opens at the point of performance, the moment you have to act.
+Most productivity tools work on knowledge: a better planner, another app, one
+more system to remember. Clutch works on performance, in your editor, whether or
+not your attention showed up.
 
-## What it does on a normal day
+It gets your existing intent to the wheels.
 
-Every mechanism fires at the point of performance, while you are working and
-could act, because the effect degrades with distance from that moment (Barkley).
-It speaks at most twice a session, and what it says is recognition.
-Twenty-one mechanisms ship. Here are eleven of the moments they catch.
+## You know these moments
+
+Twenty-one mechanisms ship. Each fires while you can still act, because the
+effect degrades with distance from that moment (Barkley). What it says is
+recognition, and it says it at most twice a session.
 
 - **You open a project cold.** It greets you with the branch, your last landed
   commit, and the one file to pick back up. The re-orientation tax is gone.
-- **You open a session with no gear declared.** The greeting ends with one
-  question, the only one of the day: build or ideate? `/clutch:intent` sets
-  the frame; ignoring the question is also an answer, and it never asks twice.
+- **A fresh session opens, nothing declared.** The greeting ends with one
+  question, the only one of the day: build or ideate? Ignoring it is also an
+  answer, and it never asks twice.
+- **You say "I don't know where to start."** One smallest next move. Never a
+  list.
 - **You circle the same two options for three turns without editing anything.**
-  It states one move that breaks the loop. Ignorable, no yes required.
-- **You say "I don't know where to start."** It hands back exactly one smallest
-  next move. Never a list.
-- **You dread the boring plumbing.** It reframes the task as something you can
+  It states the move that breaks the loop. Ignorable, no yes required.
+- **You dread the boring plumbing.** It recasts the task as something you can
   speed-run.
-- **A test goes red and you reach for `git reset --hard`.** It puts one beat in
+- **A test goes red and you reach for `git reset --hard`.** One beat lands in
   the way: the red is a heat spike, and the smaller move is to bank what still
   works before you burn it.
+- **A test fails, you change nothing, and run it again.** On the second
+  identical red with no edit between, the red is the first half of the loop,
+  not a verdict. Make the one failing thing pass. It never counts failures out
+  loud.
 - **You have been heads-down two hours with nothing committed.** It offers,
   once, to bank the work. Ignoring the offer is also a move.
 - **You look up after a fast session and cannot tell what you built.**
   `/clutch:retrace` walks it back from git and the capture pool, not memory:
-  what landed, what is in flight, what pulled at you, what to be aware of, and
-  one move to regain control.
-- **A test fails, you change nothing, and run it again.** On the second
-  identical red with no edit between, it puts one line in front of you: the red
-  is the first half of the loop, not a verdict, and the smaller move is to make
-  just the one failing thing pass. It never counts the failures out loud.
-- **You came in to land one fix and have been weighing architectures for three
-  turns.** The session changed shape. It offers one gear shift, once, as an
-  ignorable line; declining closes the question, and `/clutch:tempo` puts the
-  gearbox in your hand either way.
+  what landed, what is in flight, what pulled at you, and one move to regain
+  control.
 - **An idea yanks you sideways mid-task.** `/clutch:capture` banks it in one
-  line and you are back, nothing lost. A sprint's deflected ideas bank
-  through the same door. When you sit down to explore, the banked lines are
-  the anchors, and a retrace hands back the ones from its window.
+  line and you are back, nothing lost.
+  A sprint's deflected ideas bank through the same door.
+  When you sit down to explore, the banked lines are the anchors,
+  and a retrace hands back the ones from its window.
 
 It never counts days, never mentions a streak, never shames. The anti-nag stance
-is a mechanism. A nag lays a brick that raises tomorrow's wall (Mahan, the Wall
-of Awful), and streak-shaming apps manufacture the failure they claim to fix.
-Clutch fires on zero movement, never on slowness. Slow is legal. You are allowed
-to think.
+is a mechanism. A nag lays a brick that raises tomorrow's wall
+(Mahan, the Wall of Awful), and streak-shaming apps manufacture the failure they
+claim to fix. Clutch fires on zero movement, never on slowness. Slow is legal.
+You are allowed to think.
 
-## The divergent half
+## Same heartbeat, opposite directions
 
-Six more mechanisms are commands you reach for. None of them fires uninvited —
-divergence is always invited.
+Half of it catches you when work stops moving. Half of it banks what pulls you
+and hands it back as ignition. Fifteen commands, split by direction, and one
+lever over both: `/clutch:intent` declares whether this is a build session or an
+ideate one, and engages the matching gear.
 
-- **`/clutch:fomo`** — the tab you can't close, banked in one line with its
-  why. No processing, no titles.
-- **`/clutch:delve`** — you sit down to absorb what you captured. It reads
-  each item for why it pulled you and hands back a verdict: absorb, park, or
-  release.
-- **`/clutch:spark`** — you want to riff. A chain-reaction protocol: ignition,
-  ping-pong hops, a trace-back at the end so the wandering banks.
-- **`/clutch:daydream`** — something connects mid-focus. Whisper it; a
-  background pass runs a few hops and banks the result while you keep working.
-- **`/clutch:dream-spark`** — you stock the cellar. A cross-referencing pass
-  over everything the pool holds, hunting what connects that nobody's watching.
-- **`/clutch:ideate`** — you put the whole session in divergent mode: the pool
-  loads, ballmer engages, and anti-convergence holds until you land it.
+**The catch, the pain side.** `/clutch:smallest-move` names one move you can
+finish in one sitting. `/clutch:sprint` puts a fixed 20 minutes on one shippable
+and banks whatever the sprint deflects. `/clutch:ignite` frames work you already
+understand as a speed-run. `/clutch:triage` asks the one question that separates
+a wall from forgetting. `/clutch:retrace` rebuilds a blurred session from git.
+`/clutch:tempo` hands you the gearbox. `/clutch:status` reports whether the
+hooks are alive.
 
-They share the pool: a local `.clutch/` folder the skills stock and draw from,
-writes repo-scoped by design.
-Keep a `~/.clutch` folder and it becomes the brain, the second pool level
-the readers all sweep; only the absorb verdict in /clutch:delve
-promotes an item up into it.
-And ignite is not spark: ignite recasts dread as a
-challenge; spark runs divergence.
+**The spark, the bliss side.** `/clutch:fomo` banks the tab you cannot close,
+one line, with its why. `/clutch:delve` reads each banked item for what pulled
+you and returns a verdict: absorb, park, or release. `/clutch:spark` runs a
+chain reaction: one anchor, ping-pong hops, a trace-back at the end so the
+wandering banks. `/clutch:daydream` takes a whispered connection and runs a few
+hops in the background while you keep working. `/clutch:dream-spark`
+cross-references everything the pool holds. `/clutch:ideate` puts the whole
+session in divergent mode and holds anti-convergence until you land it.
 
-## It engages itself now
+Ignite is not spark. Ignite recasts dread as a challenge; spark runs divergence.
 
-Older versions were a manual transmission. The mechanisms were all there, but you
-had to remember to reach for them, and remembering is the exact part that is
-broken.
+## The catch may reach first. The spark only answers.
 
-v1.3 is automatic. It reads the session and engages the right mechanism itself,
-and it stays silent when it is not sure. The silence is the design. A wrong nudge
-is worse than no nudge, so when the read is ambiguous it says nothing.
+Two layers watch where a stall shows up: your git state, and what you are
+saying. When the read is clear, the right mechanism is already there. When it is
+unclear, nothing happens.
 
-## Install
+Silence is the default state, and it is the anti-nag law made visible. A wrong
+nudge costs more than a missed one. Two mechanisms stay on manual for the same
+reason: triage asks before it guesses, and capture never surfaces on its own.
+The spark side goes further. None of it fires uninvited. Divergence is always
+invited.
 
-Two commands inside Claude Code:
+## Your repo grows a memory
+
+Mid-task, an idea yanks you sideways. One line banks it and you are back,
+nothing lost, no tab graveyard. When you sit down to explore, those banked lines
+are the anchors: the idea that almost derailed Tuesday becomes Friday's spark
+session.
+
+1. **Two doors, one intake.** `/clutch:capture` takes the mid-task leap and
+   hands you back. A tab from outside goes through `/clutch:fomo`, banked with
+   why it pulled you. Both land in the same file.
+2. **You sit down to absorb.** `/clutch:delve` pulls the oldest capture and
+   reads it for its pull: absorb, park, or release.
+3. **The pool holds it.** A local `.clutch/` folder your repo owns:
+   cross-references, spark logs, idea files. Writes stay repo-scoped by design.
+4. **The brain compounds it.**
+   Keep a `~/.clutch` folder and it becomes the brain,
+   the second pool level every reader sweeps, across all your repos.
+   Nothing enters it ambiently: one door up, the absorb verdict in
+   `/clutch:delve`. The idea a work session almost lost feeds a family-project
+   spark next week.
+5. **You come back to riff.** `/clutch:spark` and `/clutch:ideate` draw from
+   that same pool.
+
+The brain is a plain directory. Point it wherever you like, including inside a
+git repo you sync yourself. Clutch never moves it for you.
+
+## Seven sources, a citations file, a quarantine list
+
+The wording carries seven digested sources of ADHD research: Barkley, Brown,
+Dodson, Mahan, Hallowell. Each has a hand-assigned weight and an annotated place
+in the argument. Nothing reads the corpus at runtime. The judgment is baked into
+fixed wording and constants.
+
+- [GLOSSARY.md](GLOSSARY.md): every private term this repo leans on, defined and
+  attributed.
+- [ANNOTATIONS.md](ANNOTATIONS.md): the editorial layer. What to trust, what is
+  quarantined, how the claims connect.
+
+The quarantine list is the part most tools skip. Ego depletion, the idea that
+willpower is a fuel tank you refill with glucose and breaks, is in the canon and
+kept out of the product. It is a replication-crisis casualty, and a fuel model
+inside a performance frame contradicts both Barkley and this tool.
+
+The seven that cleared the bar, plus the one dropped and why:
+
+| Source | Resonance | Status |
+|--------|-----------|--------|
+| Barkley, *30 Essential Ideas You Should Know about ADHD* (27-part lecture, one digest) | high | done |
+| Thomas E. Brown, *Emotions and Motivation in ADHD* (CHADD lecture) | high | done |
+| Hallowell & Ratey, *ADHD 2.0* webinar | med | done |
+| Barkley, *ADHD and the Nature of Self-Control* (1997 book) | n/a | dropped: no e-book edition exists; its model matured into *Executive Functions* (2012), already digested |
+| Barkley, *Executive Functions* (2012 book, Guilford DRM-free ePub) | high | done |
+| Thomas E. Brown, *Smart but Stuck* (Burnett Seminar lecture, 2014: the high-IQ coast-to-collapse pattern) | high | done: the lecture stands in for the book, which has no DRM-free edition |
+| Dodson, *Defining Features of ADHD* (ADDitude lecture: interest-based nervous system, RSD, hyperarousal) | high | done |
+| Mahan, *the Wall of Awful* (StudyPro "Unlocking ADHD" webinar) | high | done |
+
+**Why the library looks empty.** `sources/` carries no text on GitHub. The
+transcripts and book texts are third-party copyrighted material and stay local
+by design. What is public is the editorial layer and the harness built on it.
+
+## Install it on a work repo without a second thought
+
+Clutch runs in any Claude Code session: a side project, a family project, or a
+work repo.
+
+It carries nothing personal. It reads your git state, its own `.clutch/` folder,
+your `~/.clutch` brain if you keep one, and the conversation in front of it. One
+thing to know before you mix contexts: a brain entry banked at home surfaces in
+whatever repo you run these skills in, a work repo included. Whether that is
+fine is your call.
+
+It writes the local `.clutch/` folder, plus your brain on an absorb verdict, and
+adds the local folder to git's ignore list. The divergent skills can reach out
+(`/clutch:delve` fetches a captured link, and a spark, daydream, dream-spark, or
+ideate pass may run a web search) but only when you invoke them. Nothing here
+touches the network on its own, and you can verify it:
+
+```
+grep -rE 'curl|wget|/dev/tcp|nc ' scripts/
+```
+
+That returns nothing.
+
+It is read-mostly and fails open, so it sits underneath whatever else you run.
+On a repo with stricter guardrails, the strictest rule wins: the
+pause-before-force-push defers to a hard block if your setup has one. It
+composes. It does not fight.
+
+## Two commands. Zero configuration.
 
 ```
 /plugin marketplace add yuvalraz/clutch
 /plugin install clutch@clutch
 ```
 
-No settings, no env vars, no modes. Zero configuration. The opinions are the
-product.
-
-## Where it runs
-
-Clutch is a Claude Code plugin, so it runs in any Claude Code session: a personal
-side project, a family project, or a work repo.
-
-It carries nothing personal and reads nothing but your git state, its own
-`.clutch/` folder, your `~/.clutch` brain if you keep one, and the
-conversation in front of it. A brain entry banked at home surfaces in
-whatever repo you run these skills in, a work repo included; whether that
-mix is fine is your call. It writes that local
-`.clutch/` folder, plus your brain on an absorb verdict, and adds the local
-folder to git's ignore list. The divergent skills can
-reach out — delve fetches a captured link, and a spark, daydream,
-dream-spark, or ideate pass may run a web search — but only when you invoke
-them;
-nothing here touches the network on its own. You can verify that: no script
-in it makes a network call
-(`grep -rE 'curl|wget|/dev/tcp|nc ' scripts/` returns nothing).
-
-It is read-mostly and fails open, so it sits underneath whatever else you run. On
-a repo with stricter guardrails, the strictest rule wins: Clutch's
-pause-before-force-push defers to a hard block if your setup has one. It
-composes. It does not fight.
+No settings, no env vars, no modes. The opinions are the product.
 
 ## Who it's for
 
-The smart-but-stuck profile Brown calls coast-to-collapse. Intelligence masks the
-deficit until the wall, and makes the crash more shame-laden, because "you're so
-smart" was the standing explanation the whole way down. If launching is easy and
-finishing is where your projects die, it is aimed at you.
+The smart-but-stuck profile Brown calls coast-to-collapse. Intelligence masks
+the deficit until the wall, and makes the crash more shame-laden, because
+"you're so smart" was the standing explanation the whole way down. If launching
+is easy and finishing is where your projects die, it is aimed at you.
 
-## The canon underneath
+## How it was built
 
-The wording carries seven digested sources of ADHD research (Barkley, Brown,
-Dodson, Mahan, Hallowell), weighted and annotated. Nothing reads the corpus at
-runtime: the judgment is baked into the mechanisms as fixed wording and
-constants.
-
-- [GLOSSARY.md](GLOSSARY.md): every private term this repo leans on, defined and
-  attributed.
-- [ANNOTATIONS.md](ANNOTATIONS.md): the editorial layer over the canon. What to
-  trust, what to quarantine, how the claims connect.
-
-**Why the library looks empty.** `sources/` carries no text on GitHub. The
-transcripts and book texts are third-party copyrighted material and stay local by
-design. What is public is the editorial layer (the resonance weights,
-ANNOTATIONS, GLOSSARY) and the harness built on it. The authoring scaffold is
-documented in [tools/ingest/](tools/ingest/README.md); it is not part of the
-plugin.
-
-**How it was built.** One source, one clean file, one commit, in public. Never
-"ingest everything, ship when done." If the tool meant to help me finish things
-could not finish itself, it would not work. This repo was its first test. Plain
-markdown, one file per source in `sources/`, hand-assigned resonance weight, no
-vector DB.
+One source, one clean file, one commit, in public. Never "ingest everything,
+ship when done." If the tool meant to help me finish things could not finish
+itself, it would not work. This repo was its first test. Plain markdown, one
+file per source, hand-assigned resonance weight, no vector DB.
 
 <!-- ponytail: markdown corpus; add embeddings (sqlite-vec) only when grep+read
      measurably falls short, i.e. when the corpus outgrows a context window. -->
 
-The seven that cleared the bar, plus the one I dropped and why:
-
-| Source | Resonance | Status |
-|--------|-----------|--------|
-| Barkley, *30 Essential Ideas You Should Know about ADHD* (full 27-part lecture → one digest) | high | done |
-| Thomas E. Brown, *Emotions and Motivation in ADHD* (CHADD lecture) | high | done |
-| Hallowell & Ratey, *ADHD 2.0* webinar | med | done |
-| Barkley, *ADHD and the Nature of Self-Control* (1997 book) | n/a | dropped: no e-book edition exists; its model matured into *Executive Functions* (2012), already digested |
-| Barkley, *Executive Functions* (2012 book, Guilford DRM-free ePub) | high | done |
-| Thomas E. Brown, *Smart but Stuck* (Burnett Seminar lecture, 2014: the high-IQ coast-to-collapse pattern) | high | done: lecture stands in for the book, which has no DRM-free edition |
-| Dodson, *Defining Features of ADHD* (ADDitude lecture: interest-based nervous system, RSD, hyperarousal) | high | done |
-| Mahan, *the Wall of Awful* (StudyPro "Unlocking ADHD" webinar) | high | done |
-
-**Is this abandoned?** Finished is a deliberate state for an opinionated tool. No
-news is stability. The version bumps for exactly three reasons: new research
+**Is this abandoned?** Finished is a deliberate state for an opinionated tool.
+No news is stability. The version bumps for exactly three reasons: new research
 clears the bar, wording fails in the wild, or the plugin API drifts.
 
 **Some things stay manual on purpose.** When a task did not happen, it asks
 whether you flinched or forgot, because guessing wrong there does harm. It will
 not pretend to read your mind.
 
-Built in public, with AI assistance (Claude). I have ADHD and built this by making
-it ship itself one commit at a time. It runs in my own development sessions, so if
-it breaks, I am the first it bites. That is the warranty.
+Built in public, with AI assistance. It runs in my own development sessions, so
+if it breaks, I am the first it bites. That is the warranty.
