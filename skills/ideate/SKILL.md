@@ -48,7 +48,7 @@ Speed over completeness; missing files skip silently:
 5. The brain: the same files under $HOME/.clutch when a brain exists; a missing brain skips silently.
    Repo items come first; brain items ride behind them, labeled [brain].
    With a brain present, its captures count in too: the unprocessed count in item 2 reads both levels.
-   Brain captures ride the count, but only repo lines delve: the brain's lines are already absorbed knowledge, not a queue.
+   Brain captures ride the count, but only repo lines get read: the brain's lines are already absorbed knowledge, not a queue.
 
 ### Step 1.5: Surface what's hot
 
@@ -57,8 +57,11 @@ Score each idea file by recent signal so the primer offers what's ripe.
 | Tier | Signal | Weight |
 |------|--------|--------|
 | Highest | the idea's key terms appear in `.clutch/captures.md` lines | 3x |
-| High | a `[dream]`, `[daydream]`, or `[delve]` entry from the last 7 days references the idea (parse the `(YYYY-MM-DD)` headers) | 2x |
+| High | a `[dream]`, `[daydream]`, or `[fomo]` entry from the last 7 days references the idea (parse the `(YYYY-MM-DD)` headers) | 2x |
 | Medium | idea file modified in the last 7 days | 1x |
+
+Pools written before the fomo merge carry `[delve]` entries; score them exactly
+as `[fomo]`. An old tag is old vocabulary, not a weaker signal.
 
 Procedure: glob `.clutch/ideas/*.md` and `$HOME/.clutch/ideas/*.md`; a brain idea keeps its [brain] label through scoring and the primer.
 Extract each title (first `#` line)
@@ -161,7 +164,7 @@ for 5+ exchanges:
 | `/clutch:spark <anchor>` | full protocol: ignition, chain, cool-down |
 | `/clutch:daydream <whisper>` | background micro-spark |
 | `/clutch:dream-spark` | cross-referencing pass over the pool |
-| `/clutch:fomo <content>` | quick capture, absorbed later |
+| `/clutch:fomo <content>` | banked in one line, read and absorbed in the background |
 
 All outputs accumulate; routing happens at session close.
 

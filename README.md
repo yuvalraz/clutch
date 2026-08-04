@@ -47,8 +47,8 @@ recognition, and it says it at most twice a session.
   `/clutch:retrace` walks it back from git and the capture pool, not memory:
   what landed, what is in flight, what pulled at you, and one move to regain
   control.
-- **An idea yanks you sideways mid-task.** `/clutch:capture` banks it in one
-  line and you are back, nothing lost.
+- **An idea yanks you sideways mid-task.** `/clutch:fomo` banks it in one
+  line and you are back, nothing lost, while a background pass reads it.
   A sprint's deflected ideas bank through the same door.
   When you sit down to explore, the banked lines are the anchors,
   and a retrace hands back the ones from its window.
@@ -62,7 +62,7 @@ You are allowed to think.
 ## Same heartbeat, opposite directions
 
 Half of it catches you when work stops moving. Half of it banks what pulls you
-and hands it back as ignition. Fifteen commands, split by direction, and one
+and hands it back as ignition. Thirteen commands, split by direction, and one
 lever over both: `/clutch:intent` declares whether this is a build session or an
 ideate one, and engages the matching gear.
 
@@ -74,9 +74,10 @@ a wall from forgetting. `/clutch:retrace` rebuilds a blurred session from git.
 `/clutch:tempo` hands you the gearbox. `/clutch:status` reports whether the
 hooks are alive.
 
-**The spark, the bliss side.** `/clutch:fomo` banks the tab you cannot close,
-one line, with its why. `/clutch:delve` reads each banked item for what pulled
-you and returns a verdict: absorb, park, or release. `/clutch:spark` runs a
+**The spark, the bliss side.** `/clutch:fomo` takes the tab you cannot close or
+the leap you cannot chase, banks it in one line, and sends a background pass to
+read it, cross-reference the pool, and hand back a verdict: absorb, park, or
+release. `/clutch:spark` runs a
 chain reaction: one anchor, ping-pong hops, a trace-back at the end so the
 wandering banks. `/clutch:daydream` takes a whispered connection and runs a few
 hops in the background while you keep working. `/clutch:dream-spark`
@@ -93,7 +94,7 @@ unclear, nothing happens.
 
 Silence is the default state, and it is the anti-nag law made visible. A wrong
 nudge costs more than a missed one. Two mechanisms stay on manual for the same
-reason: triage asks before it guesses, and capture never surfaces on its own.
+reason: triage asks before it guesses, and fomo never surfaces on its own.
 The spark side goes further. None of it fires uninvited. Divergence is always
 invited.
 
@@ -104,18 +105,20 @@ nothing lost, no tab graveyard. When you sit down to explore, those banked lines
 are the anchors: the idea that almost derailed Tuesday becomes Friday's spark
 session.
 
-1. **Two doors, one intake.** `/clutch:capture` takes the mid-task leap and
-   hands you back. A tab from outside goes through `/clutch:fomo`, banked with
-   why it pulled you. Both land in the same file.
-2. **You sit down to absorb.** `/clutch:delve` pulls the oldest capture and
-   reads it for its pull: absorb, park, or release.
+1. **One door, one intake.** `/clutch:fomo` takes the mid-task leap and the tab
+   from outside alike, banks the line, and hands you straight back. The split
+   by source was always thin; both land in the same file.
+2. **It absorbs itself.** The same `/clutch:fomo` sends a background pass that
+   reads the thing, cross-references the pool, and returns a verdict — absorb,
+   park, or release — plus the one thing worth knowing. Nothing waits on you
+   remembering to process a backlog.
 3. **The pool holds it.** A local `.clutch/` folder your repo owns:
    cross-references, spark logs, idea files. Writes stay repo-scoped by design.
 4. **The brain compounds it.**
    Keep a `~/.clutch` folder and it becomes the brain,
    the second pool level every reader sweeps, across all your repos.
    Nothing enters it ambiently: one door up, the absorb verdict in
-   `/clutch:delve`. The idea a work session almost lost feeds a family-project
+   `/clutch:fomo`. The idea a work session almost lost feeds a family-project
    spark next week.
 5. **You come back to riff.** `/clutch:spark` and `/clutch:ideate` draw from
    that same pool.
@@ -170,7 +173,7 @@ fine is your call.
 
 It writes the local `.clutch/` folder, plus your brain on an absorb verdict, and
 adds the local folder to git's ignore list. The divergent skills can reach out
-(`/clutch:delve` fetches a captured link, and a spark, daydream, dream-spark, or
+(`/clutch:fomo` fetches a banked link, and a spark, daydream, dream-spark, or
 ideate pass may run a web search) but only when you invoke them. Nothing here
 touches the network on its own, and you can verify it:
 

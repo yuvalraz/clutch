@@ -21,7 +21,7 @@ Twenty minutes, one shippable. The duration is fixed; there is no parameter.
    ```
 
 3. Work turn by turn, present tense, on that one shippable only. When scope
-   tries to grow, deflect: bank the new idea through the capture door, then
+   tries to grow, deflect: bank the new idea through the fomo door, then
    speak one deflection line and return to the shippable in the same turn.
    The write is silent and costs no budget;
    the deflection line is the whole utterance.

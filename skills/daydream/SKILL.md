@@ -12,7 +12,7 @@ against the pool and banks the result. You check it later. Your session
 never stops.
 
 Daydream runs only when you whisper to it — it never launches itself.
-Wandering you didn't whisper is capture's territory, untouched.
+Wandering you didn't whisper is fomo's territory, untouched.
 
 ## Usage
 

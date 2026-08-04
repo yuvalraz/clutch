@@ -49,8 +49,10 @@ Priority-ordered dispatch:
    turns with no narrowing and no edits, states one smallest move. Do not ask,
    state. Require the confirmed three-turn pattern. A single re-plan is
    legitimate design depth, not a stall.
-5. A tangent or leap mid-task engages capture. One line, then return. Pull-only:
-   never auto-surface waiting captures, never push "you have N captures". One
+5. A tangent or leap mid-task engages fomo. One line, then return. Auto-engaged
+   here, fomo banks only: the background read runs when the user fires it, never
+   off a row-5 match, because a gist the user never asked for is a push. Pull-only:
+   never auto-surface waiting entries, never push "you have N banked". One
    carve-out: the session-start anchor may state the held count, count only,
    never a prompt to pull.
 6. A task that did not happen with the cause unclear (a flinch at the wall
@@ -59,7 +61,7 @@ Priority-ordered dispatch:
 7. An explicit request for a timebox engages sprint.
 8. A sustained shape mismatch, where the shape of the work has changed and
    held across turns, offers one gear shift as a single ignorable line. A
-   single tangent is a capture (row 5); a single terse reply is nothing. A
+   single tangent is a fomo (row 5); a single terse reply is nothing. A
    downshift offer, toward tighter convergence, asks triage's
    wall-versus-inattention question first and engages nothing until it is
    answered.

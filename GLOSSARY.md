@@ -216,7 +216,7 @@ engaged gear to the model each turn as posture.
 ### Shape mismatch
 
 The gear-shift dispatch trigger: the shape of the work has changed and held
-across turns (a single tangent is a capture; a single terse reply is
+across turns (a single tangent is a fomo; a single terse reply is
 nothing). Read as lock or stall, never laziness: hyperfocus is a locked
 gear, the wall is a disengaged clutch. Drift is affective data, the
 interest-based nervous system (Dodson) re-pricing the task, and a sudden
@@ -237,7 +237,7 @@ entries, spark session logs, idea files, the shared capture intake. Two
 levels: the repo pool, where every write lands, and the brain, a user-level pool
 at `~/.clutch/` that every reader also sweeps, its items labeled [brain].
 Writes stay repo-scoped; promotion upward is the absorb verdict in
-/clutch:delve, one item at a time. No brain, no change: everything reads
+/clutch:fomo, one item at a time. No brain, no change: everything reads
 exactly as before.
 
 ### Dream-spark
@@ -249,15 +249,19 @@ too.
 
 ### Resonance
 
-Why a capture pulled you, examined at absorption. A question or an
+Why a banked item pulled you, examined after the read. A question or an
 assertion, never a summary: if nothing surprises you, that honesty IS the
-verdict, and the pull is released.
+verdict, and the pull is released. It is an output, not an input — you rarely
+know why something grabbed you until you have dug in.
 
-### The two doors
+### The one door
 
-One intake, two doors. Capture catches the leap mid-task; fomo catches the
-thing from outside — a link, a reference, a tab. Both land in the same
-file, and delve absorbs both.
+One intake, one door. /clutch:fomo takes the leap from inside and the tab from
+outside alike; the split by source was always thin. It banks the line
+instantly and sends a background pass to read it, cross-reference the pool,
+and hand back the gist. Catching and metabolizing are one act: a bank whose
+absorption is a separate skill you must remember to run is a producer with no
+consumer, which is how a pool reaches hundreds of entries and zero ignitions.
 
 ## The method
 

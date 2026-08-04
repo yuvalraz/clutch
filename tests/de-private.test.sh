@@ -10,7 +10,7 @@ HERE=$(cd "$(dirname "$0")" && pwd)
 cd "$HERE/.." || { echo "FAIL: cannot cd to repo root"; exit 1; }
 
 SCOPE="skills rules README.md GLOSSARY.md ANNOTATIONS.md"
-SIX="skills/fomo/SKILL.md skills/delve/SKILL.md skills/spark/SKILL.md skills/daydream/SKILL.md skills/dream-spark/SKILL.md skills/ideate/SKILL.md"
+FIVE="skills/fomo/SKILL.md skills/spark/SKILL.md skills/daydream/SKILL.md skills/dream-spark/SKILL.md skills/ideate/SKILL.md"
 SURFACES="rules/constitution.md README.md GLOSSARY.md ANNOTATIONS.md"
 
 # One home per pattern: the sweep and the self-check grep the SAME strings.
@@ -18,7 +18,7 @@ SURFACES="rules/constitution.md README.md GLOSSARY.md ANNOTATIONS.md"
 PAT_A='javos|knowledge-ops|aipaper|daylog|MEMORY\.md|trust ledger|trust-ledger|\.claude/tempo|config/intents'
 PAT_B='[['
 PAT_C='/intent\b|intent default'
-PAT_D='/(spark|ideate|daydream|dream-spark|fomo|delve|memory|loop)\b'
+PAT_D='/(spark|ideate|daydream|dream-spark|fomo|memory|loop)\b'
 PAT_E='fuel'
 PAT_F='daemon|launchd|cron|nightly|overnight|schedul|auto-trigger'
 PAT_G1='\(20[0-9]{2}-[0-9]{2}-[0-9]{2} '
@@ -27,7 +27,7 @@ PAT_G2='HH:MM|YYYY-MM-DD HH'
 fail=0
 
 # A sweep over a missing surface proves nothing.
-for f in $SIX $SURFACES; do
+for f in $FIVE $SURFACES; do
   [ -f "$f" ] || { echo "FAIL: missing $f"; fail=1; }
 done
 [ "$fail" -eq 0 ] || exit 1
@@ -58,12 +58,12 @@ check_empty "C intent" -rnE "$PAT_C" $SCOPE
 # Pattern D: unprefixed command forms (cross-references use /clutch:<name>).
 check_empty "D unprefixed-commands" -rnE "$PAT_D" $SCOPE
 # Pattern E: fuel-tank language (six divergent skills only).
-check_empty "E fuel" -niE "$PAT_E" $SIX
+check_empty "E fuel" -niE "$PAT_E" $FIVE
 # Pattern F: uninvited/daemon language (six divergent skills only).
-check_empty "F daemon" -niE "$PAT_F" $SIX
+check_empty "F daemon" -niE "$PAT_F" $FIVE
 # Pattern G: pool date-format leak (six divergent skills only).
-check_empty "G1 datetime" -nE "$PAT_G1" $SIX
-check_empty "G2 template" -nE "$PAT_G2" $SIX
+check_empty "G1 datetime" -nE "$PAT_G1" $FIVE
+check_empty "G2 template" -nE "$PAT_G2" $FIVE
 
 # Self-check: every pattern variable must still catch a planted probe. Same
 # variables as the sweep, so a typo'd or broken pattern fails here. The probe
