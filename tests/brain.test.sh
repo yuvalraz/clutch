@@ -99,6 +99,8 @@ pinf "$FOMO" "fomo: slug charset"              'lowercase letters, digits, and h
 
 # --- merge pins: one door, banked first, metabolized in the background ---
 pinf "$FOMO" "fomo: bank snippet target"       'captures\.md'
+pinf "$FOMO" "fomo: --brain destination"       'clutch:fomo --brain'
+pinf "$FOMO" "fomo: brain is chosen"           'never a silent fallback'
 pinf "$FOMO" "fomo: bank honesty token"        'echo BANKED'
 pinf "$FOMO" "fomo: background pass"           'background sub-agent'
 pinf "$FOMO" "fomo: foreground fallback"       'backgrounding is unavailable'

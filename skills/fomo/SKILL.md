@@ -21,6 +21,10 @@ never surfaces what is already banked unless you pull.
 - `/clutch:fomo <url>` — bank the link, then read it in the background
 - `/clutch:fomo <free text>` — a tangent, a leap, a thought with no URL
 - `/clutch:fomo <url> #tag` — same, with a loose tag riding along
+- `/clutch:fomo --brain <url | thought>` — bank straight to the brain at
+  `$HOME/.clutch/captures.md` instead of the repo pool. For a thing that
+  belongs to you rather than to this repo, and the only route that works
+  outside a work tree at all.
 - `/clutch:fomo` — nothing handed over: report one line, count plus the
   newest entry. Never a digest, never a review queue, never "you should
   process these". The user pulls; nothing pushes.
@@ -40,10 +44,17 @@ Append exactly one line, then answer in one line and go back to the work in the
 same turn. The snippet answers, not you.
 
 ```sh
-ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || { echo MISS no-work-tree; exit 0; }
-mkdir -p "$ROOT/.clutch" 2>/dev/null || { echo MISS no-write; exit 0; }
-printf '%s fomo: %s\n' "$(date +%s)" "<the thing and why, one line>" >> "$ROOT/.clutch/captures.md" && echo BANKED || echo MISS no-write
+DEST=$(git rev-parse --show-toplevel 2>/dev/null) || DEST=""
+[ "<brain>" = yes ] && DEST=$HOME
+[ -n "$DEST" ] || { echo MISS no-work-tree; exit 0; }
+mkdir -p "$DEST/.clutch" 2>/dev/null || { echo MISS no-write; exit 0; }
+printf '%s fomo: %s\n' "$(date +%s)" "<the thing and why, one line>" >> "$DEST/.clutch/captures.md" && echo BANKED || echo MISS no-write
 ```
+
+Fill `<brain>` with `yes` for `--brain`, anything else otherwise. Outside a work
+tree with no `--brain`, the honest answer is still `MISS no-work-tree` — the
+brain is a destination you choose, never a silent fallback, because a line that
+lands somewhere the user did not name is a line they will not find again.
 
 `BANKED`: acknowledge with one line and nothing more, then launch Step 2 in the
 background. `MISS`: say one honest line and repeat the thing back — it lives in
@@ -154,7 +165,9 @@ keep going.
      A fomo whose Step 1 returned MISS has no captures line: run the door through the heredoc append only, stop before the marker leg, and report its outcome; the marker leg belongs to banked entries alone.
 
 ```sh
-ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || { echo MISS no-work-tree; exit 0; }
+POOL=$(git rev-parse --show-toplevel 2>/dev/null) || POOL=""
+[ "<brain>" = yes ] && POOL=$HOME
+[ -n "$POOL" ] || { echo MISS no-work-tree; exit 0; }
 [ -d "$HOME/.clutch" ] || { echo SKIP no-brain; exit 0; }
 mkdir -p "$HOME/.clutch/ideas" 2>/dev/null || { echo MISS brain-no-write; exit 0; }
 cat 2>/dev/null >> "$HOME/.clutch/ideas/<slug>.md" <<'EOF' || { echo MISS brain-no-write; exit 0; }
@@ -163,10 +176,10 @@ cat 2>/dev/null >> "$HOME/.clutch/ideas/<slug>.md" <<'EOF' || { echo MISS brain-
 **Why it pulled:** <the resonance>
 **Core pattern:** <the extractable trade-off>
 EOF
-[ -f "$ROOT/.clutch/captures.md" ] || { echo ABSORBED; exit 0; }
-awk -v e="<epoch>" -v m="[delved <YYYY-MM-DD>]" '!done && $1 == e && index($0, "[delved") == 0 { sub("^" e " ", e " " m " "); done=1; found=1 } !found && $1 == e && index($0, "[delved") > 0 { found=1 } { print } END { if (!found) exit 1 }' "$ROOT/.clutch/captures.md" 2>/dev/null > "$ROOT/.clutch/.captures.tmp"; rc=$?
-[ "$rc" -eq 1 ] && { rm -f "$ROOT/.clutch/.captures.tmp" 2>/dev/null; echo MISS marker-no-match; exit 0; }
-[ "$rc" -eq 0 ] && mv "$ROOT/.clutch/.captures.tmp" "$ROOT/.clutch/captures.md" 2>/dev/null && echo ABSORBED || { rm -f "$ROOT/.clutch/.captures.tmp" 2>/dev/null; echo MISS marker-no-write; }
+[ -f "$POOL/.clutch/captures.md" ] || { echo ABSORBED; exit 0; }
+awk -v e="<epoch>" -v m="[delved <YYYY-MM-DD>]" '!done && $1 == e && index($0, "[delved") == 0 { sub("^" e " ", e " " m " "); done=1; found=1 } !found && $1 == e && index($0, "[delved") > 0 { found=1 } { print } END { if (!found) exit 1 }' "$POOL/.clutch/captures.md" 2>/dev/null > "$POOL/.clutch/.captures.tmp"; rc=$?
+[ "$rc" -eq 1 ] && { rm -f "$POOL/.clutch/.captures.tmp" 2>/dev/null; echo MISS marker-no-match; exit 0; }
+[ "$rc" -eq 0 ] && mv "$POOL/.clutch/.captures.tmp" "$POOL/.clutch/captures.md" 2>/dev/null && echo ABSORBED || { rm -f "$POOL/.clutch/.captures.tmp" 2>/dev/null; echo MISS marker-no-write; }
 ```
 
      The brain append lands before the marker; any MISS leaves the line unmarked, so the entry retries on the next fomo against it.

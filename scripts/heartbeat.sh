@@ -80,9 +80,18 @@ fi
 # terminal row and the default. The only non-fixed text in this block is the
 # sprint goal, operator-authored at sprint start and passed through the JSON
 # encoder below.
-CTX="${TEMPOLINE}${SPRINTLINE}clutch dispatch spine (read and obey; route on the primary thing being done, not the first keyword; quoted or rhetorical stalls do not count): spoken stall -> smallest-move; too-big goal stated as the next action WITH hesitation -> offer smallest-move (never an unhesitant big goal); pre-dread at the threshold of boring or mechanical work already understood -> ignite (never on work already in motion, that is venting); the same options circling across 3+ turns with no narrowing and no edits -> STATE one smallest move as an ignorable recognition line that needs no yes; tangent or leap mid-task -> fomo, BANK ONLY (auto-engaged fomo never runs its background read; a gist nobody asked for is a push), one line then return, pull-only, never surface waiting entries; a task that did not happen with cause unclear -> triage, ask the one disambiguating question first and engage nothing until answered, never auto-classify; an explicit timebox request -> sprint; a sustained shape mismatch (the work's shape changed and held across turns; a single tangent is a fomo, a single terse reply is nothing) -> offer one gear shift as one ignorable line, and a downshift offer asks triage's wall-vs-inattention question first and engages nothing until answered.
-TERMINAL ROW: anything unmatched or uncertain, and any session with no clearly established focus -> SILENCE, do nothing. This is the default and the safe state. A miss is free; a wrong shift lays a brick.
-Self-cap: at most 2 uninvited lines per session, shared across every channel. clutch-budget: ${EMITS}/2 spent (hook lines and recorded model lines together). Record, then speak: before any uninvited line, append 'emit model <epoch seconds>' to .clutch/session-state, then say the line; when the 2 are spent, stay silent even on a matched signal. One named carve-out: the session-start intent ask (build or ideate) rides the anchor's greeting, at session start only, only when no gear is declared, asked once, never counted against the budget, never re-asked in-session; ignoring it is a legal answer."
+#
+# Audited 2026-08-05. This block ships every turn, so its wording is a per-turn
+# tax and gets held to that standard. Cut in that pass: the parenthetical
+# justifications ("a miss is free; a wrong shift lays a brick", "never an
+# unhesitant big goal", the full carve-out recital). Those argued the rules to a
+# model that needed persuading; the routing mapping is what a turn actually
+# consumes. Every row, the terminal row, and the budget survive verbatim in
+# behaviour. Rationale lives in the constitution, which loads once at
+# SessionStart and is the place to explain rather than repeat.
+CTX="${TEMPOLINE}${SPRINTLINE}clutch dispatch spine (route on the primary activity, not the first keyword; quoted stalls do not count): spoken stall -> smallest-move; too-big next step WITH hesitation -> offer smallest-move; pre-dread before understood boring work -> ignite (not work already in motion, that is venting); same options circling 3+ turns with no edits -> STATE one smallest move, no yes needed; tangent or leap mid-task -> fomo, BANK ONLY (no background read, no auto-surfacing); undone task with cause unclear -> triage, ask the one question first; explicit timebox -> sprint; sustained shape mismatch (a single tangent is a fomo, a single terse reply is nothing) -> offer one gear shift.
+TERMINAL: anything else, or no established focus -> SILENCE. The default and the safe state.
+clutch-budget: ${EMITS}/2 spent. Before any uninvited line append 'emit model <epoch seconds>' to .clutch/session-state; at 2, stay silent even on a match. One carve-out: the session-start intent ask (build or ideate), at session start only and only when no gear is declared, asked once, never counted against the budget; ignoring it is a legal answer."
 
 # JSON-encode the body: drop control chars, escape backslash then double quote,
 # fold newlines to spaces so the value is a single JSON string.

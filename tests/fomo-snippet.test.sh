@@ -68,4 +68,25 @@ chmod 755 "$T/repo4/.clutch"
 [ ! -s "$T/repo4/.clutch/captures.md" ] \
   || { echo "FAIL: reported MISS but wrote content anyway"; exit 1; }
 
+# --brain destination: <brain> filled with yes banks to $HOME, not the repo.
+sed 's/<brain>/yes/' "$T/snippet.sh" > "$T/brain.sh"
+mkdir "$T/repo5"
+git -C "$T/repo5" init -q
+mkdir -p "$T/h5"
+OUT=$(cd "$T/repo5" && HOME="$T/h5" sh "$T/brain.sh")
+[ "$OUT" = "BANKED" ] || { echo "FAIL: --brain expected BANKED, got: $OUT"; exit 1; }
+grep -q 'fomo: test fomo why' "$T/h5/.clutch/captures.md" \
+  || { echo "FAIL: --brain did not bank into the brain"; exit 1; }
+[ ! -e "$T/repo5/.clutch" ] \
+  || { echo "FAIL: --brain also wrote the repo pool"; exit 1; }
+
+# --brain works with no work tree at all; plain fomo there still MISSes.
+mkdir "$T/plain5"
+mkdir -p "$T/h6"
+OUT=$(cd "$T/plain5" && HOME="$T/h6" sh "$T/brain.sh")
+[ "$OUT" = "BANKED" ] || { echo "FAIL: --brain outside a repo expected BANKED, got: $OUT"; exit 1; }
+OUT=$(cd "$T/plain5" && HOME="$T/h6" sh "$T/snippet.sh")
+[ "$OUT" = "MISS no-work-tree" ] \
+  || { echo "FAIL: plain fomo outside a repo must not fall back to the brain, got: $OUT"; exit 1; }
+
 echo PASS
