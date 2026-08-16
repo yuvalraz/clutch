@@ -1,7 +1,6 @@
 ---
 name: ideate
-description: Put the session in divergent mode — load the pool, engage ballmer, hold anti-convergence for everything that follows. Use when the user says "ideate", "divergent mode", or "let's explore".
-disable-model-invocation: true
+description: Put the session in divergent mode — load the pool, engage ballmer, hold anti-convergence for everything that follows. Use ONLY when the user explicitly asks to ideate ("ideate", "divergent mode", "let's explore") or when /clutch:intent hands off after an "ideate" answer. A passing mention of exploring mid-conversation is not a trigger.
 ---
 
 # Ideate
