@@ -126,6 +126,21 @@ session.
 The brain is a plain directory. Point it wherever you like, including inside a
 git repo you sync yourself. Clutch never moves it for you.
 
+## The other brain gets maintenance
+
+Two more moves work the assistant's own memory directory — the auto-memory
+brain your harness loads every session — not the pool:
+
+- `/clutch:dream` reads that whole brain and hands back a consolidation
+  report: what proved out, what went stale, what sits orphaned, what to merge.
+  You pick what applies; a pruning pass always runs, and the index leaves
+  shorter than it arrived.
+- `/clutch:interview` reads the same brain for thin spots and asks a handful
+  of concrete questions in one batch. Answers land as memories stamped
+  human-confirmed. Ignoring a question is a legal answer.
+
+Both fire only when you fire them.
+
 ## Seven sources, a citations file, a quarantine list
 
 The wording carries seven digested sources of ADHD research: Barkley, Brown,
@@ -196,6 +211,22 @@ composes. It does not fight.
 ```
 
 No settings, no env vars, no modes. The opinions are the product.
+
+One exception, and it is deliberate: the two day anchors below. The core
+carries opinions; your day carries facts — which days you work, where your
+focuses live, what to read first. `/clutch:rituals` asks for them once and
+writes `~/.clutch/rituals.md`. Everything else stays zero-config.
+
+## Two anchors for the day
+
+`/clutch:morning` opens the day: a focus check, a deep ping over what changed,
+one divergent beat from the pool, one quick win, then the single first move on
+focus #1. `/clutch:eod` closes it: a mini-retro that names what moved without
+shame, tomorrow's focuses set before you stop, and one banked item explored
+for fun. Both are user-fired anchors — they fire when you fire them, at
+whatever anchor time your config names. Set up once with `/clutch:rituals`,
+which asks for your day's facts in one batch and writes `~/.clutch/rituals.md`;
+run it again any time to change them.
 
 ## Who it's for
 
