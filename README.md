@@ -253,5 +253,11 @@ clears the bar, wording fails in the wild, or the plugin API drifts.
 whether you flinched or forgot, because guessing wrong there does harm. It will
 not pretend to read your mind.
 
+**It is tested two ways.** `tests/` pins the wording and the hook behavior in
+plain sh. `evals/` checks the routing itself: each case runs once with clutch
+and once without, and the score is the difference. A stall that gets one move
+with clutch and a numbered plan without it is the whole point, measured.
+`claude plugin eval .` runs it.
+
 Built in public, with AI assistance. It runs in my own development sessions, so
 if it breaks, I am the first it bites. That is the warranty.
