@@ -27,7 +27,10 @@ does the rest.
 ### Step 1: Acknowledge and background
 
 Respond with one line — `Daydreaming on: "<whisper>"` — then launch a
-background sub-agent and return to the work. If backgrounding is
+background sub-agent and return to the work. Run it on `fable` (the Agent
+tool's `model` parameter): a micro-spark is speed over depth, and the pass
+should cost the session close to nothing. If the model choice is
+unavailable, inherit the session's. If backgrounding is
 unavailable, run the same pass in the foreground; same output contract.
 
 ### Step 2: The micro-spark (sub-agent)

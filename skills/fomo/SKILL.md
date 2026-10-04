@@ -78,7 +78,10 @@ demanding its reasoning up front.
 
 ### Step 2: Metabolize (background sub-agent)
 
-Launch a background sub-agent and return to the work.
+Launch a background sub-agent and return to the work. Run it on `sonnet`
+(the Agent tool's `model` parameter): extracting the trade-off and ruling a
+verdict is judgment work, and a smaller model summarizes where this pass
+must extract. If the model choice is unavailable, inherit the session's.
 If backgrounding is unavailable, run the same pass in the foreground; same output contract.
 
 <!-- ponytail: concurrent fomos run blind to each other, same isolate-everything
