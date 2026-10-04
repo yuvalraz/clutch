@@ -1,6 +1,8 @@
 ---
 name: daydream
-description: Whisper a fragment mid-focus; a background pass runs 3–5 associative hops and banks the result without breaking your flow. Use when the user says "daydream", "hold this thought", or "something connects".
+description: Whisper a fragment mid-focus; a background pass runs 3–5 associative hops and banks the result without breaking your flow.
+when_to_use: Use when the user says "daydream", "hold this thought", or "something connects".
+argument-hint: "<whisper>"
 disable-model-invocation: true
 ---
 

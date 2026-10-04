@@ -1,6 +1,7 @@
 ---
 name: eod
-description: Close the day at your own anchor — mini-retro over today's focuses, set tomorrow's, one fun slot, close-out — read from ~/.clutch/rituals.md. Use when the user says "/clutch:eod", "run the end-of-day routine", "close the day", or "evening retro".
+description: Close the day at your own anchor — mini-retro over today's focuses, set tomorrow's, one fun slot, close-out — read from ~/.clutch/rituals.md.
+when_to_use: Use when the user says "/clutch:eod", "run the end-of-day routine", "close the day", or "evening retro".
 disable-model-invocation: true
 ---
 

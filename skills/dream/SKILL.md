@@ -1,6 +1,7 @@
 ---
 name: dream
-description: A full consolidation pass over the auto-memory brain — read everything, report what holds and what drifted, prune, and hand back a shorter index. Use when the user says "dream", "consolidate the brain", "clean up memory", "dream pass".
+description: A full consolidation pass over the auto-memory brain — read everything, report what holds and what drifted, prune, and hand back a shorter index.
+when_to_use: Use when the user says "dream", "consolidate the brain", "clean up memory", "dream pass".
 disable-model-invocation: true
 ---
 

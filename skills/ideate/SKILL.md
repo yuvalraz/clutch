@@ -1,6 +1,8 @@
 ---
 name: ideate
-description: Put the session in divergent mode — load the pool, engage ballmer, hold anti-convergence for everything that follows. Use ONLY when the user explicitly asks to ideate ("ideate", "divergent mode", "let's explore") or when /clutch:intent hands off after an "ideate" answer. A passing mention of exploring mid-conversation is not a trigger.
+description: Put the session in divergent mode — load the pool, engage ballmer, hold anti-convergence for everything that follows.
+when_to_use: Use ONLY when the user explicitly asks to ideate ("ideate", "divergent mode", "let's explore") or when /clutch:intent hands off after an "ideate" answer. A passing mention of exploring mid-conversation is not a trigger.
+argument-hint: "[anchor]"
 ---
 
 # Ideate

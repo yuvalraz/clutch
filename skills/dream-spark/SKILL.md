@@ -1,6 +1,7 @@
 ---
 name: dream-spark
-description: An unfocused cross-referencing pass over everything the pool holds — what connects that nobody's watching. Use when the user says "dream-spark", "cross-reference the pool", or "stock the cellar".
+description: An unfocused cross-referencing pass over everything the pool holds — what connects that nobody's watching.
+when_to_use: Use when the user says "dream-spark", "cross-reference the pool", or "stock the cellar".
 disable-model-invocation: true
 ---
 

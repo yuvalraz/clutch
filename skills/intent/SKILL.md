@@ -1,6 +1,8 @@
 ---
 name: intent
-description: Declare the session's focus, build or ideate, and engage the matching gear and posture. Use ONLY when the user answers the session-start intent question (a plain "build" or "ideate" counts as an answer) or explicitly asks to set the session's focus. A passing mention of building or ideating mid-conversation is not a trigger.
+description: Declare the session's focus, build or ideate, and engage the matching gear and posture.
+when_to_use: Use ONLY when the user answers the session-start intent question (a plain "build" or "ideate" counts as an answer) or explicitly asks to set the session's focus. A passing mention of building or ideating mid-conversation is not a trigger.
+argument-hint: "[build | ideate]"
 ---
 
 # Intent

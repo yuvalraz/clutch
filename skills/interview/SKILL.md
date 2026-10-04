@@ -1,6 +1,7 @@
 ---
 name: interview
-description: Batch-interview the user to fill the gaps the auto-memory brain doesn't know it has, then route the answers into memory. Use when the user says "interview me", "fill the gaps", "what don't you know about me".
+description: Batch-interview the user to fill the gaps the auto-memory brain doesn't know it has, then route the answers into memory.
+when_to_use: Use when the user says "interview me", "fill the gaps", "what don't you know about me".
 disable-model-invocation: true
 ---
 

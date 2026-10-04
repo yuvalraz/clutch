@@ -1,6 +1,7 @@
 ---
 name: sprint
-description: Run a fixed 20-minute sprint on one minimal shippable. Use when the user explicitly asks for a timebox: "sprint", "timebox", "give me 20 minutes", or "set a clock".
+description: Run a fixed 20-minute sprint on one minimal shippable.
+when_to_use: 'Use when the user explicitly asks for a timebox: "sprint", "timebox", "give me 20 minutes", or "set a clock".'
 ---
 
 # Sprint

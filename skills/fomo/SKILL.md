@@ -1,6 +1,8 @@
 ---
 name: fomo
-description: Bank a link or a thought in one line, then return. Fired explicitly, a background pass also reads it, cross-references the pool, and hands back the gist; auto-engaged on a mid-task tangent it banks only and never reports back. Use when the user says "fomo", "capture this", "save this link", "note this for later", "oh wait, idea", "tab I can't close", or jumps to an unrelated idea mid-task.
+description: Bank a link or a thought in one line, then return. Fired explicitly, a background pass also reads it, cross-references the pool, and hands back the gist; auto-engaged on a mid-task tangent it banks only and never reports back.
+when_to_use: Use when the user says "fomo", "capture this", "save this link", "note this for later", "oh wait, idea", "tab I can't close", or jumps to an unrelated idea mid-task.
+argument-hint: "[--brain] <url | thought> [#tag]"
 ---
 
 # Fomo

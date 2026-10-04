@@ -1,6 +1,8 @@
 ---
 name: spark
-description: Run the divergent chain-reaction protocol — ignition, ping-pong hops, cool-down with trace-back. Use when the user says "spark", "riff on this", or "chain reaction".
+description: Run the divergent chain-reaction protocol — ignition, ping-pong hops, cool-down with trace-back.
+when_to_use: Use when the user says "spark", "riff on this", or "chain reaction".
+argument-hint: "<anchor>"
 disable-model-invocation: true
 ---
 

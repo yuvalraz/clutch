@@ -1,6 +1,7 @@
 ---
 name: rituals
-description: One batch interview that captures your day's facts — workdays, focus file, prep commands, integrations — and writes ~/.clutch/rituals.md for the morning and close-of-day anchors. Use when the user says "/clutch:rituals", "set up my rituals", "set up my morning", or "change my ritual config".
+description: One batch interview that captures your day's facts — workdays, focus file, prep commands, integrations — and writes ~/.clutch/rituals.md for the morning and close-of-day anchors.
+when_to_use: Use when the user says "/clutch:rituals", "set up my rituals", "set up my morning", or "change my ritual config".
 disable-model-invocation: true
 ---
 

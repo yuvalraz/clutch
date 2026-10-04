@@ -1,6 +1,7 @@
 ---
 name: status
-description: Report whether the Clutch hooks are alive in this repo and this session. Use when the user asks "is clutch working", "did the hooks fire", "why is the bell silent", "why no anchor", or as a check right after installing.
+description: Report whether the Clutch hooks are alive in this repo and this session.
+when_to_use: Use when the user asks "is clutch working", "did the hooks fire", "why is the bell silent", "why no anchor", or as a check right after installing.
 ---
 
 # Status

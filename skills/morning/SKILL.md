@@ -1,6 +1,7 @@
 ---
 name: morning
-description: Open the day at your own anchor — focus check, deep ping, one divergent beat, one quick win, day prep — read from ~/.clutch/rituals.md. Use when the user says "/clutch:morning", "run the morning routine", "open the day", or "morning ritual".
+description: Open the day at your own anchor — focus check, deep ping, one divergent beat, one quick win, day prep — read from ~/.clutch/rituals.md.
+when_to_use: Use when the user says "/clutch:morning", "run the morning routine", "open the day", or "morning ritual".
 disable-model-invocation: true
 ---
 

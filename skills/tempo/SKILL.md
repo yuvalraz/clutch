@@ -1,6 +1,8 @@
 ---
 name: tempo
-description: Set or report the session gear. Tempo is the shape of the session, the ratio and rhythm of divergent and convergent pulses plus the checkpoint policy. Five gears: espresso, craft, ballmer, freefall, ferment. Use when the user says "tempo", "gear", "shift gears", "downshift", "upshift", or names the session shape.
+description: Set or report the session gear. Tempo is the shape of the session, the ratio and rhythm of divergent and convergent pulses plus the checkpoint policy. Five gears: espresso, craft, ballmer, freefall, ferment.
+when_to_use: Use when the user says "tempo", "gear", "shift gears", "downshift", "upshift", or names the session shape.
+argument-hint: "[espresso | craft | ballmer | freefall | ferment]"
 disable-model-invocation: true
 ---
 
