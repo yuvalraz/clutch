@@ -11,3 +11,6 @@ sources/*
 
 # Local agent-session contract (operator-private, never committed)
 CLAUDE.local.md
+
+# plugin eval run output (local, regenerated each run)
+evals/results/

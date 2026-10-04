@@ -1,6 +1,7 @@
 ---
 name: interview
-description: Batch-interview the user to fill the gaps the auto-memory brain doesn't know it has, then route the answers into memory. Use when the user says "interview me", "fill the gaps", "what don't you know about me".
+description: Batch-interview the user to fill the gaps the auto-memory brain doesn't know it has, then route the answers into memory.
+when_to_use: Use when the user says "interview me", "fill the gaps", "what don't you know about me".
 disable-model-invocation: true
 ---
 
@@ -21,9 +22,13 @@ Interview runs only when the user fires it. It never launches itself.
 
 ### Step 1: Resolve the brain
 
-Same resolution as `/clutch:dream`: read `autoMemoryDirectory` from
-`~/.claude/settings.json`. If the key is absent, say so and stop. Never guess
-a path. Never hardcode one.
+Same resolution as `/clutch:dream`, first hit wins: the
+`autoMemoryDirectory` override in `~/.claude/settings.json`; else the
+auto-memory path this session's memory instructions name; else
+the `memory` folder inside `~/.claude/projects/<project-key>` (the
+project's absolute path with every `/` replaced by `-`). Confirm the directory exists. If none resolves,
+or auto memory is off, name the path checked, say so, and stop. Never guess
+beyond these three. Never hardcode a path.
 
 ### Step 2: Find the gaps
 
@@ -72,4 +77,4 @@ user asks for one.
 - Read every file body — the index and file names are the gap map
 - Drip questions one at a time — one batch, then route
 - Press for answers — silence on a question closes it
-- Guess or hardcode the brain path — no `autoMemoryDirectory`, no interview
+- Guess or hardcode the brain path — no resolved, existing brain, no interview

@@ -1,6 +1,8 @@
 ---
 name: daydream
-description: Whisper a fragment mid-focus; a background pass runs 3–5 associative hops and banks the result without breaking your flow. Use when the user says "daydream", "hold this thought", or "something connects".
+description: Whisper a fragment mid-focus; a background pass runs 3–5 associative hops and banks the result without breaking your flow.
+when_to_use: Use when the user says "daydream", "hold this thought", or "something connects".
+argument-hint: "<whisper>"
 disable-model-invocation: true
 ---
 
@@ -27,7 +29,10 @@ does the rest.
 ### Step 1: Acknowledge and background
 
 Respond with one line — `Daydreaming on: "<whisper>"` — then launch a
-background sub-agent and return to the work. If backgrounding is
+background sub-agent and return to the work. Run it on `fable` (the Agent
+tool's `model` parameter): a micro-spark is speed over depth, and the pass
+should cost the session close to nothing. If the model choice is
+unavailable, inherit the session's. If backgrounding is
 unavailable, run the same pass in the foreground; same output contract.
 
 ### Step 2: The micro-spark (sub-agent)

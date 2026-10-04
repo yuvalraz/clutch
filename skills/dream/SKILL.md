@@ -1,6 +1,7 @@
 ---
 name: dream
-description: A full consolidation pass over the auto-memory brain — read everything, report what holds and what drifted, prune, and hand back a shorter index. Use when the user says "dream", "consolidate the brain", "clean up memory", "dream pass".
+description: A full consolidation pass over the auto-memory brain — read everything, report what holds and what drifted, prune, and hand back a shorter index.
+when_to_use: Use when the user says "dream", "consolidate the brain", "clean up memory", "dream pass".
 disable-model-invocation: true
 ---
 
@@ -22,10 +23,23 @@ Dream runs only when the user fires it. It never launches itself.
 
 ### Step 1: Resolve the brain
 
-Read `autoMemoryDirectory` from `~/.claude/settings.json`. That value is the
-brain directory. If the key is absent, say so plainly — "no
-`autoMemoryDirectory` in `~/.claude/settings.json`; there is no brain to
-dream on" — and stop. Never guess a path. Never hardcode one.
+The brain is wherever Claude Code's auto memory lives for this session.
+Resolve it in this order and take the first hit:
+
+1. **The override.** `autoMemoryDirectory` in `~/.claude/settings.json`.
+   When set, that value is the brain directory.
+2. **The session's own memory path.** Without the override, auto memory
+   lives in its per-project default, and Claude Code names that directory in
+   this session's memory instructions. Use the path stated there.
+3. **The default, derived.** If the session context does not name it:
+   the `memory` folder inside `~/.claude/projects/<project-key>`, where
+   `<project-key>` is the project's absolute path with
+   every `/` replaced by `-` (`/Users/me/app` → `-Users-me-app`).
+
+Confirm the resolved directory exists before reading. If none of the three
+yields an existing directory, or auto memory is off for this session, say so
+plainly — name the path checked, "there is no brain to dream on" — and stop.
+Never guess beyond these three. Never hardcode a path.
 
 ### Step 2: Read everything
 
@@ -115,5 +129,5 @@ Two conventions this skill enforces across the brain:
 - Delete anything the user did not pick — review-due is a flag, not a purge
 - Index `archives/` — unindexed by design, scanned directly when history
   matters
-- Guess or hardcode the brain path — no `autoMemoryDirectory`, no dream
+- Guess or hardcode the brain path — no resolved, existing brain, no dream
 - Run on its own — it is fired, every time

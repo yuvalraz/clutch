@@ -1,6 +1,7 @@
 ---
 name: retrace
-description: Walk back a fast session and hand back a map of what actually happened. Use when the user says "what did we just do", "what did we build", "I've lost track", "wait, what just happened", "I'm lost", or "reorient me".
+description: Walk back a fast session and hand back a map of what actually happened.
+when_to_use: Use when the user says "what did we just do", "what did we build", "I've lost track", "wait, what just happened", "I'm lost", or "reorient me".
 ---
 
 # Retrace

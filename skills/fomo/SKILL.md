@@ -1,6 +1,8 @@
 ---
 name: fomo
-description: Bank a link or a thought in one line, then return. Fired explicitly, a background pass also reads it, cross-references the pool, and hands back the gist; auto-engaged on a mid-task tangent it banks only and never reports back. Use when the user says "fomo", "capture this", "save this link", "note this for later", "oh wait, idea", "tab I can't close", or jumps to an unrelated idea mid-task.
+description: Bank a link or a thought in one line, then return. Fired explicitly, a background pass also reads it, cross-references the pool, and hands back the gist; auto-engaged on a mid-task tangent it banks only and never reports back.
+when_to_use: Use when the user says "fomo", "capture this", "save this link", "note this for later", "oh wait, idea", "tab I can't close", or jumps to an unrelated idea mid-task.
+argument-hint: "[--brain] <url | thought> [#tag]"
 ---
 
 # Fomo
@@ -78,7 +80,10 @@ demanding its reasoning up front.
 
 ### Step 2: Metabolize (background sub-agent)
 
-Launch a background sub-agent and return to the work.
+Launch a background sub-agent and return to the work. Run it on `sonnet`
+(the Agent tool's `model` parameter): extracting the trade-off and ruling a
+verdict is judgment work, and a smaller model summarizes where this pass
+must extract. If the model choice is unavailable, inherit the session's.
 If backgrounding is unavailable, run the same pass in the foreground; same output contract.
 
 <!-- ponytail: concurrent fomos run blind to each other, same isolate-everything

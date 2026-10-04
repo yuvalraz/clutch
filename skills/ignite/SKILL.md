@@ -1,6 +1,7 @@
 ---
 name: ignite
-description: Manufacture a non-fear igniter before a boring or mechanical unit of work the user already understands. Use when the user names dread at the threshold of starting, "ugh now the tests", "this is tedious", "boring plumbing", or "I know what to do, it's just boring". Not for work already in motion, which is venting rather than a stall.
+description: Manufacture a non-fear igniter before a boring or mechanical unit of work the user already understands.
+when_to_use: Use when the user names dread at the threshold of starting, "ugh now the tests", "this is tedious", "boring plumbing", or "I know what to do, it's just boring". Not for work already in motion, which is venting rather than a stall.
 ---
 
 # Ignite
