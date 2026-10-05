@@ -19,15 +19,15 @@ It gets your existing intent to the wheels.
 
 ## You know these moments
 
-Twenty-one mechanisms ship. Each fires while you can still act, because the
+Twenty-two mechanisms ship. Each fires while you can still act, because the
 effect degrades with distance from that moment (Barkley). What it says is
 recognition, and it says it at most twice a session.
 
 - **You open a project cold.** It greets you with the branch, your last landed
   commit, and the one file to pick back up. The re-orientation tax is gone.
 - **A fresh session opens, nothing declared.** The greeting ends with one
-  question, the only one of the day: build or ideate? Ignoring it is also an
-  answer, and it never asks twice.
+  question, the only one of the day: build, ideate, or ops? Ignoring it is
+  also an answer, and it never asks twice.
 - **You say "I don't know where to start."** One smallest next move. Never a
   list.
 - **You circle the same two options for three turns without editing anything.**
@@ -62,9 +62,9 @@ You are allowed to think.
 ## Same heartbeat, opposite directions
 
 Half of it catches you when work stops moving. Half of it banks what pulls you
-and hands it back as ignition. Thirteen commands, split by direction, and one
-lever over both: `/clutch:intent` declares whether this is a build session or an
-ideate one, and engages the matching gear.
+and hands it back as ignition. Fourteen commands, split by direction, and one
+lever over both: `/clutch:intent` declares whether this is a build session, an
+ideate one, or an ops one, and engages the matching gear.
 
 **The catch, the pain side.** `/clutch:smallest-move` names one move you can
 finish in one sitting. `/clutch:sprint` puts a fixed 20 minutes on one shippable
@@ -83,6 +83,11 @@ wandering banks. `/clutch:daydream` takes a whispered connection and runs a few
 hops in the background while you keep working. `/clutch:dream-spark`
 cross-references everything the pool holds. `/clutch:ideate` puts the whole
 session in divergent mode and holds anti-convergence until you land it.
+
+**The day in between.** `/clutch:ops` puts the session in operations mode for
+the day that is meetings, people, and threads rather than a repo: one sweep of
+the tools you named, the situation in a few lines, then one loop closed at a
+time, each outward step on a yes.
 
 Ignite is not spark. Ignite recasts dread as a challenge; spark runs divergence.
 
