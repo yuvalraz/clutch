@@ -44,14 +44,15 @@ lost.
 
 | Gear | Shape | Checkpoints | For |
 |------|-------|-------------|-----|
-| **espresso** | tight convergence, ONE divergent pulse (blast-radius check) | continuous | bug fixes, review, mechanical edits |
+| **espresso** | tight convergence, ONE divergent pulse (blast-radius check) | continuous | bug fixes, review, mechanical edits, the day's operations |
 | **craft** | converge-dominant, regular divergent pulses: explore, then commit | at each commit point | architecture, design, planning |
 | **ballmer** | fast divergence, periodic convergence checkpoints | periodic, to avoid a noise spiral | ideation, exploration |
 | **freefall** | pure divergence | none during; rate afterwards | unattended cross-referencing, wandering |
 | **ferment** | SLOW divergence: deliberate wandering, long pulses | none; downstream rating only | the cellar: slow pre-crafting that stocks later craft sessions |
 
 All five gears ship now, protocols included: ideate and spark drive ballmer,
-and daydream and dream-spark ride the freefall and ferment side.
+ops drives espresso, and daydream and dream-spark ride the freefall and
+ferment side.
 
 For the rest of the session, pace divergent and convergent pulses to the
 engaged gear. A gear mismatch degrades the output class (a review run in
@@ -75,8 +76,9 @@ constraints are hard:
   nothing until it is answered. The same short replies can mean "land this"
   or interest death, and those want opposite gears.
 - An explicit `/clutch:tempo <gear>`, an accepted offer, or an invoked skill
-  that names its gear (`/clutch:ideate` engages ballmer) is the only thing
-  that changes the engaged gear. Never shift silently on your own read.
+  that names its gear (`/clutch:ideate` engages ballmer,
+  `/clutch:ops` engages espresso) is the only thing that changes the
+  engaged gear. Never shift silently on your own read.
 
 ## Gearbox rules (hard constraints)
 

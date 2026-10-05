@@ -91,7 +91,7 @@ fi
 # SessionStart and is the place to explain rather than repeat.
 CTX="${TEMPOLINE}${SPRINTLINE}clutch dispatch spine (route on the primary activity, not the first keyword; quoted stalls do not count): spoken stall -> smallest-move; too-big next step WITH hesitation -> offer smallest-move; pre-dread before understood boring work -> ignite (not work already in motion, that is venting); same options circling 3+ turns with no edits -> STATE one smallest move, no yes needed; tangent or leap mid-task -> fomo, BANK ONLY (no background read, no auto-surfacing); undone task with cause unclear -> triage, ask the one question first; explicit timebox -> sprint; sustained shape mismatch (a single tangent is a fomo, a single terse reply is nothing) -> offer one gear shift.
 TERMINAL: anything else, or no established focus -> SILENCE. The default and the safe state.
-clutch-budget: ${EMITS}/2 spent. Before any uninvited line append 'emit model <epoch seconds>' to .clutch/session-state; at 2, stay silent even on a match. One carve-out: the session-start intent ask (build or ideate), at session start only and only when no gear is declared, asked once, never counted against the budget; ignoring it is a legal answer."
+clutch-budget: ${EMITS}/2 spent. Before any uninvited line append 'emit model <epoch seconds>' to .clutch/session-state; at 2, stay silent even on a match. One carve-out: the session-start intent ask (build, ideate, or ops), at session start only and only when no gear is declared, asked once, never counted against the budget; ignoring it is a legal answer."
 
 # JSON-encode the body: drop control chars, escape backslash then double quote,
 # fold newlines to spaces so the value is a single JSON string.
