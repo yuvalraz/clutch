@@ -99,6 +99,11 @@ Per connection, append to `.clutch/dream-sparks.md` (create it if missing):
 One block: passes run, connections found by signal, top 3 titles. Nothing
 else — no ratios, no counts of what's sitting in the pool. This block is your final reply and all the session sees.
 
+If any append fails, the block also carries one line per unbanked connection, the one thing "Nothing else" allows:
+`Dream-spark couldn't bank "<short title>" — <item A> × <item B>: <connection>` — the transcript holds what the pool couldn't.
+
+Never report a bank that didn't land.
+
 ## Quality guidelines
 
 - **Non-obvious only.** Already explicit → skip.

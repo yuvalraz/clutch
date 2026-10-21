@@ -79,6 +79,9 @@ pin "$DD" "guard: daydream noise line"    'Daydream: noise on "'
 # --- (vii) dream-spark body: blind pass, summary block is the reply
 pin "$DS" "dream-spark: pass sees no conversation" 'sees none of the conversation'
 pin "$DS" "dream-spark: summary is the reply"      'This block is your final reply'
+pin "$DS" "dream-spark: append-failed line on one line" "Dream-spark couldn't bank \"<short title>\" — <item A> × <item B>: <connection>"
+pin "$DS" "dream-spark: failure line allowed in the block" 'If any append fails, the block also carries one line per unbanked connection'
+pin "$DS" "dream-spark: never report a missing bank" "Never report a bank that didn't land."
 
 [ "$fail" -eq 0 ] || exit 1
 echo PASS
