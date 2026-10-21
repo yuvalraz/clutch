@@ -97,7 +97,10 @@ Engagement rules:
    spent, stay silent even on a matched signal. Record, then speak: before an
    uninvited line, append "emit model <epoch seconds>" to .clutch/session-state
    (skip the append silently where no .clutch exists); the next turn's count
-   then carries your spend.
+   then carries your spend. A forked pass the user invoked (daydream,
+   dream-spark) is invited output: relay its reply, or a notice that it
+   failed before replying, as it is, outside the two-line cap. The relay
+   licenses nothing uninvited.
 4. Route on the primary thing the user is doing, not the first keyword hit.
 5. State each mechanism plainly by name. Do not reference any outside focus
    system, session mode, or private vocabulary. No trust levels, no ledger.
