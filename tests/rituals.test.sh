@@ -116,7 +116,7 @@ check_empty "G template (rituals trio)" -nF  "$PAT_T" "$R" "$M" "$E"
 
 # Self-check: both mirrored patterns must still catch a planted probe, so a
 # typo'd pattern fails here instead of passing vacuously.
-T=$(mktemp -d)
+T=$(mktemp -d) || exit 1
 trap 'rm -rf "$T"' EXIT
 printf 'a daemon fires at HH:MM\n' > "$T/probe"
 grep -iE "$PAT_F" "$T/probe" >/dev/null 2>&1 \

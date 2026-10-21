@@ -3,6 +3,8 @@ name: dream-spark
 description: An unfocused cross-referencing pass over everything the pool holds — what connects that nobody's watching.
 when_to_use: Use when the user says "dream-spark", "cross-reference the pool", or "stock the cellar".
 disable-model-invocation: true
+context: fork
+background: true
 ---
 
 # Dream-spark
@@ -12,14 +14,17 @@ cross-referencing pass over the whole pool and the repo's git history,
 appending what it finds to `.clutch/dream-sparks.md`. What it writes today
 stocks tomorrow's sessions: the cellar, not a recharge.
 
+The harness runs this skill as a forked pass in the background, and the
+session keeps going. The pass sees none of the conversation and takes no
+argument, so everything below works from the files alone.
+
 ## Usage
 
 `/clutch:dream-spark` — one mode, invoked.
 
-This is a ferment-gear pass: slow, deliberate wandering. Engaging
-`/clutch:tempo ferment` for it fits — a suggestion only; this skill never
-changes the gear itself. Run it when you stock the cellar: after a run of
-captures, before an ideate session.
+The pass carries its own slow, deliberate ferment shape; the session's gear does not reach it.
+Run it when you stock the cellar: after a run of captures, before an ideate
+session.
 
 <!-- ponytail: unbounded append; add a trim pass only when the pool outgrows one read -->
 
@@ -90,8 +95,14 @@ Per connection, append to `.clutch/dream-sparks.md` (create it if missing):
 
 ### Step 5: Summary
 
-One block: passes run, connections found by signal, top 3 titles. Nothing
-else — no ratios, no counts of what's sitting in the pool.
+One block, exactly: passes run, connections found by signal, and
+up to 3 titles of connections that banked. Nothing else: no gloss beside a title, no Sources list,
+no ratios, no count or size of the pool, in digits or in words. This block is your final reply and all the session sees.
+
+If any append fails, the block also carries one line per unbanked connection, the one thing "Nothing else" allows:
+`Dream-spark couldn't bank "<short title>" — <item A> × <item B>: <connection>` — the transcript holds what the pool couldn't.
+
+Never report a bank that didn't land.
 
 ## Quality guidelines
 

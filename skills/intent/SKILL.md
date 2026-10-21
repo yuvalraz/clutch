@@ -73,4 +73,4 @@ invoking /clutch:intent at any time.
 
 The gear is session-scoped: a new session (startup or /clear) opens in
 neutral, so the ask fires at every fresh start; resume and compaction inherit
-the declared gear.
+the declared gear. A fork inherits the declared gear too.

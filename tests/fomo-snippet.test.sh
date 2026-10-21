@@ -6,7 +6,7 @@
 # second is the absorb door, executed live by brain.test.sh.
 set -u
 
-T=$(mktemp -d)
+T=$(mktemp -d) || exit 1
 trap 'chmod -R u+w "$T" 2>/dev/null; rm -rf "$T"' EXIT
 HERE=$(cd "$(dirname "$0")" && pwd)
 FOMO=${FOMO_SKILL:-$HERE/../skills/fomo/SKILL.md}

@@ -12,16 +12,18 @@ them distinguishable: it prints facts and changes nothing.
 
 Procedure:
 
-1. Run the status script that ships with this plugin. The harness names this
-   skill's base directory when it loads; the script lives two levels up from
-   there. Substitute the literal path and run:
+1. Run the status script that ships with this plugin; the harness substitutes its path when it loads this skill:
 
    ```sh
-   sh <base-directory>/../../scripts/status.sh
+   sh "${CLAUDE_PLUGIN_ROOT}/scripts/status.sh"
    ```
 
-   Never locate it with $0 or $BASH_SOURCE; under a harness Bash tool those
+   Never locate it with \$0 or $BASH_SOURCE; under a harness Bash tool those
    name the shell binary, not this file.
+
+   If the command fails because the path did not resolve (`/scripts/status.sh` not found),
+   show the error verbatim, say clutch is not loaded as a plugin in this session,
+   and stop: do not search for the script.
 
 2. Show the report verbatim. Do not summarize it away; the lines are the
    evidence.

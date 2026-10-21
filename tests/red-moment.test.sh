@@ -13,7 +13,7 @@ pass() { PASS=$((PASS + 1)); printf 'ok   - %s\n' "$1"; }
 fail() { FAIL=$((FAIL + 1)); printf 'FAIL - %s\n     expected %s, got: [%s]\n' "$1" "$2" "$3"; }
 
 fresh_repo() {
-  REPO=$(mktemp -d)
+  REPO=$(mktemp -d) || exit 1
   ( cd "$REPO" && git init -q && git config user.email t@t.t && git config user.name t \
     && echo v1 > f.txt && git add f.txt && git commit -qm init ) >/dev/null 2>&1
 }
@@ -76,7 +76,7 @@ out=$(run PostToolUseFailure "pytest")
 [ -z "$out" ] && pass "cap spent stays silent" || fail "cap spent stays silent" "empty" "$out"
 
 # 9. non-git dir -> exit 0 silent
-DIR=$(mktemp -d)
+DIR=$(mktemp -d) || exit 1
 out=$(run PostToolUseFailure "pytest")
 [ -z "$out" ] && pass "non-git dir is silent" || fail "non-git dir is silent" "empty" "$out"
 unset DIR

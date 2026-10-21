@@ -195,7 +195,7 @@ N=$(grep -c 'named later step' "$GLOSSARY")
   || { echo "FAIL: GLOSSARY still carries the stale repo-scoped claim ($N hit)"; fail=1; }
 
 # --- live door probes: extract the snippet from the shipped skill and run it ---
-T=$(mktemp -d)
+T=$(mktemp -d) || exit 1
 trap 'chmod -R u+w "$T" 2>/dev/null; rm -rf "$T"' EXIT
 
 # Fomo carries two sh blocks since the merge: block 1 banks the line, block 2

@@ -1,12 +1,12 @@
 #!/bin/sh
-# clutch anchor: SessionStart hook (startup|resume|clear|compact).
+# clutch anchor: SessionStart hook (startup|resume|clear|compact|fork).
 # Injects the constitution plus at most 3 lines of thread context.
 # Outside a git work tree: constitution only. Fail-open everywhere.
 
-# Hook input JSON arrives on stdin; only the source field matters here.
+# Hook input JSON arrives on stdin; only the source field matters here, plus seconds_since_last_response on a fork (read, never printed).
 INPUT=$(cat 2>/dev/null) || INPUT=""
 
-# The constitution rides every session start, resume, clear, and compaction.
+# The constitution rides every session start, resume, clear, compaction, and fork.
 CONST="${CLAUDE_PLUGIN_ROOT:-}/rules/constitution.md"
 if [ ! -f "$CONST" ]; then
   CONST=$(dirname "$0")/../rules/constitution.md
@@ -22,33 +22,46 @@ PRELUDE=$(dirname "$0")/prelude.sh
 # boundary: startup, resume, or clear. A compaction is the same session
 # continuing, and an unrecognized, empty, or malformed source is treated the
 # same way: preserve existing state. A wrongly preserved counter is mild; a
-# wrongly reset one re-arms the emission cap mid-session.
+# wrongly reset one re-arms the emission cap mid-session. A fork is the same
+# session continuing too, unless its parent has been silent >= 5400 s: a cold
+# fork, reset like resume. A missing or odd seconds value preserves.
+COLD=0
+case "$INPUT" in
+  *'"source":"fork"'* | *'"source": "fork"'*)
+    SECS=$(printf '%s' "$INPUT" | sed -n 's/.*"seconds_since_last_response": *\([0-9][0-9]*\).*/\1/p')
+    [ -n "$SECS" ] && [ "$SECS" -ge 5400 ] 2>/dev/null && COLD=1
+    ;;
+esac
 FRESH=0
 case "$INPUT" in
   *'"source":"startup"'* | *'"source": "startup"'* | \
     *'"source":"resume"'* | *'"source": "resume"'* | \
     *'"source":"clear"'* | *'"source": "clear"'*)
     FRESH=1
-    # The gear is session-scoped: a brand-new session (startup or clear)
-    # opens in neutral, so the intent ask below always fires at a fresh
-    # start. A resume is a continued conversation and inherits its gear;
-    # a compaction never reaches this branch. Fail-open: rc pinned.
-    case "$INPUT" in
-      *'"source":"startup"'* | *'"source": "startup"'* | \
-        *'"source":"clear"'* | *'"source": "clear"'*)
-        rm -f "$CLUTCH_DIR/tempo" 2>/dev/null || :
-        ;;
-    esac
-    if clutch_ensure_dir; then
-      NOW=$(date +%s)
-      BASE=$(clutch_last_authored %H) || BASE=""
-      [ -n "$BASE" ] || BASE="-"
-      printf 'start %s\nbase %s\n' "$NOW" "$BASE" 2>/dev/null > "$CLUTCH_DIR/session-state"
-      # A sprint never legitimately spans a session boundary.
-      rm -f "$CLUTCH_DIR/sprint-start" 2>/dev/null
-    fi
     ;;
 esac
+[ "$COLD" = 1 ] && FRESH=1
+if [ "$FRESH" = 1 ]; then
+  # The gear is session-scoped: a brand-new session (startup or clear)
+  # opens in neutral, so the intent ask below always fires at a fresh
+  # start. A resume or a cold fork is a continued conversation and inherits
+  # its gear; a compaction or a hot fork never reaches this branch.
+  # Fail-open: rc pinned.
+  case "$INPUT" in
+    *'"source":"startup"'* | *'"source": "startup"'* | \
+      *'"source":"clear"'* | *'"source": "clear"'*)
+      rm -f "$CLUTCH_DIR/tempo" 2>/dev/null || :
+      ;;
+  esac
+  if clutch_ensure_dir; then
+    NOW=$(date +%s)
+    BASE=$(clutch_last_authored %H) || BASE=""
+    [ -n "$BASE" ] || BASE="-"
+    printf 'start %s\nbase %s\n' "$NOW" "$BASE" 2>/dev/null > "$CLUTCH_DIR/session-state"
+    # A sprint never legitimately spans a session boundary.
+    rm -f "$CLUTCH_DIR/sprint-start" 2>/dev/null
+  fi
+fi
 
 echo ""
 # The breadcrumb's last field is the most-recently-modified path (written by
@@ -74,10 +87,10 @@ else
 fi
 
 # Intent ask: one final line, only at a true session boundary (the same
-# startup|resume|clear gate that resets the clock; a compaction is the same
-# session continuing) and only when no gear is declared. Declared means the
-# heartbeat's exact predicate: the tempo file reads as one of the five gear
-# words. Empty, truncated, or invalid content is not a declaration and the
+# startup|resume|clear or cold-fork gate that resets the clock; a compaction
+# or a hot fork is the same session continuing) and only when no gear is
+# declared. Declared means the heartbeat's exact predicate: the tempo file
+# reads as one of the five gear words. Empty, truncated, or invalid content is not a declaration and the
 # question fires. Fail-open: the question fires only on a positive read of
 # "no gear" (readable state, no valid gear); an unreadable .clutch means
 # silence, the safe state.
