@@ -18,8 +18,12 @@ Procedure:
    sh "${CLAUDE_PLUGIN_ROOT}/scripts/status.sh"
    ```
 
-   Never locate it with $0 or $BASH_SOURCE; under a harness Bash tool those
+   Never locate it with \$0 or $BASH_SOURCE; under a harness Bash tool those
    name the shell binary, not this file.
+
+   If the command fails because the path did not resolve (`/scripts/status.sh` not found),
+   show the error verbatim, say clutch is not loaded as a plugin in this session,
+   and stop: do not search for the script.
 
 2. Show the report verbatim. Do not summarize it away; the lines are the
    evidence.

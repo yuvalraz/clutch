@@ -43,7 +43,11 @@ unpin() {
 
 # --- skill pins (the positive pin keeps the negatives from passing vacuously)
 pin   "skill: runs the script via CLAUDE_PLUGIN_ROOT" 'sh "${CLAUDE_PLUGIN_ROOT}/scripts/status.sh"'
-pin   "skill: keeps the \$0 warning"                  'Never locate it with $0 or $BASH_SOURCE'
+pin   "skill: keeps the \$0 warning, escaped"         'Never locate it with \$0 or $BASH_SOURCE'
+unpin "skill: no bare \$0 (argument shorthand)"       'Never locate it with $0'
+pin   "skill: unresolved path stops"                  'path did not resolve (`/scripts/status.sh` not found)'
+pin   "skill: says clutch is not loaded"              'clutch is not loaded as a plugin in this session'
+pin   "skill: no search for the script"               'do not search for the script'
 unpin "skill: no hand-resolved path"                  '<base-directory>'
 unpin "skill: stays model-invocable"                  'disable-model-invocation: true'
 
