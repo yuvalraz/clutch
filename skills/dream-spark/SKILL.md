@@ -22,10 +22,9 @@ argument, so everything below works from the files alone.
 
 `/clutch:dream-spark` — one mode, invoked.
 
-This is a ferment-gear pass: slow, deliberate wandering. Engaging
-`/clutch:tempo ferment` for it fits — a suggestion only; this skill never
-changes the gear itself. Run it when you stock the cellar: after a run of
-captures, before an ideate session.
+The pass carries its own slow, deliberate ferment shape; the session's gear does not reach it.
+Run it when you stock the cellar: after a run of captures, before an ideate
+session.
 
 <!-- ponytail: unbounded append; add a trim pass only when the pool outgrows one read -->
 
@@ -96,8 +95,9 @@ Per connection, append to `.clutch/dream-sparks.md` (create it if missing):
 
 ### Step 5: Summary
 
-One block: passes run, connections found by signal, top 3 titles. Nothing
-else — no ratios, no counts of what's sitting in the pool. This block is your final reply and all the session sees.
+One block, exactly: passes run, connections found by signal, and
+up to 3 titles of connections that banked. Nothing else: no gloss beside a title, no Sources list,
+no ratios, no count or size of the pool, in digits or in words. This block is your final reply and all the session sees.
 
 If any append fails, the block also carries one line per unbanked connection, the one thing "Nothing else" allows:
 `Dream-spark couldn't bank "<short title>" — <item A> × <item B>: <connection>` — the transcript holds what the pool couldn't.

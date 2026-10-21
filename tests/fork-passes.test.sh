@@ -83,5 +83,15 @@ pin "$DS" "dream-spark: append-failed line on one line" "Dream-spark couldn't ba
 pin "$DS" "dream-spark: failure line allowed in the block" 'If any append fails, the block also carries one line per unbanked connection'
 pin "$DS" "dream-spark: never report a missing bank" "Never report a bank that didn't land."
 
+# --- (viii) dream-spark reply shape: banked titles only, no glosses, no
+# Sources list, no pool count in any form; the session's gear never reaches it
+pin    "$DS" "dream-spark: titles are banked ones"   'up to 3 titles of connections that banked'
+pin    "$DS" "dream-spark: no gloss per title"       'no gloss beside a title'
+pin    "$DS" "dream-spark: no Sources list"          'no Sources list'
+pin    "$DS" "dream-spark: no pool count in words"   'no count or size of the pool, in digits or in words'
+absent "$DS" "dream-spark: loose top-3 wording gone" 'top 3 titles'
+pin    "$DS" "dream-spark: gear does not reach fork" "the session's gear does not reach it"
+absent "$DS" "dream-spark: no tempo suggestion"      '/clutch:tempo ferment'
+
 [ "$fail" -eq 0 ] || exit 1
 echo PASS
