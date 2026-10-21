@@ -26,7 +26,7 @@ done
 # rep <n> <char>: n copies of char.
 rep() { printf "%$1s" '' | tr ' ' "$2"; }
 
-T=$(mktemp -d)
+T=$(mktemp -d) || exit 1
 trap 'rm -rf "$T"' EXIT
 R="$T/repo"
 mkdir "$R"

@@ -4,7 +4,7 @@
 # instruction, no marker injects no sprint line at all.
 set -u
 
-T=$(mktemp -d)
+T=$(mktemp -d) || exit 1
 trap 'rm -rf "$T"' EXIT
 HERE=$(cd "$(dirname "$0")" && pwd)
 HB="$HERE/../scripts/heartbeat.sh"

@@ -68,7 +68,7 @@ check_empty "G2 template" -nE "$PAT_G2" $FIVE
 # Self-check: every pattern variable must still catch a planted probe. Same
 # variables as the sweep, so a typo'd or broken pattern fails here. The probe
 # lives in a temp dir OUTSIDE the sweep scope so it never pollutes the tree.
-T=$(mktemp -d)
+T=$(mktemp -d) || exit 1
 trap 'rm -rf "$T"' EXIT
 printf 'a javos [[probe]] /intent x /spark (2026-01-01 09:00) fuel daemon HH:MM\n' > "$T/probe"
 

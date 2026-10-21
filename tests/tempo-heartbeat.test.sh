@@ -5,7 +5,7 @@
 # ride unaffected either way. Every run must exit 0 (fail-open contract).
 set -u
 
-T=$(mktemp -d)
+T=$(mktemp -d) || exit 1
 trap 'rm -rf "$T"' EXIT
 HERE=$(cd "$(dirname "$0")" && pwd)
 HB="$HERE/../scripts/heartbeat.sh"

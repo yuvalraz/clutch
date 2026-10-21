@@ -90,7 +90,7 @@ pin "$G" "GLOSSARY: cites PoP entry"  'see "Point of performance"'
 # --- anchor behavior: the question line rides only the no-gear branch, and
 # only at a true session boundary (startup|resume|clear or a cold fork; never compact or a hot fork).
 Q='build, ideate, or ops?'
-T=$(mktemp -d)
+T=$(mktemp -d) || exit 1
 trap 'chmod -R u+rwx "$T" 2>/dev/null; rm -rf "$T"' EXIT
 # Stage the anchor under test beside the real prelude.sh (see the replay note
 # in the header) and execute the staged copy everywhere below.
