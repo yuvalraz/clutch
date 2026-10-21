@@ -3,6 +3,8 @@ name: dream-spark
 description: An unfocused cross-referencing pass over everything the pool holds — what connects that nobody's watching.
 when_to_use: Use when the user says "dream-spark", "cross-reference the pool", or "stock the cellar".
 disable-model-invocation: true
+context: fork
+background: true
 ---
 
 # Dream-spark
@@ -11,6 +13,10 @@ No anchor, no whisper — just "what connects that nobody's watching?" A
 cross-referencing pass over the whole pool and the repo's git history,
 appending what it finds to `.clutch/dream-sparks.md`. What it writes today
 stocks tomorrow's sessions: the cellar, not a recharge.
+
+The harness runs this skill as a forked pass in the background, and the
+session keeps going. The pass sees none of the conversation and takes no
+argument, so everything below works from the files alone.
 
 ## Usage
 
@@ -91,7 +97,7 @@ Per connection, append to `.clutch/dream-sparks.md` (create it if missing):
 ### Step 5: Summary
 
 One block: passes run, connections found by signal, top 3 titles. Nothing
-else — no ratios, no counts of what's sitting in the pool.
+else — no ratios, no counts of what's sitting in the pool. This block is your final reply and all the session sees.
 
 ## Quality guidelines
 

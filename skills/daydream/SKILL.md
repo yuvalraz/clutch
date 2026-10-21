@@ -4,6 +4,8 @@ description: Whisper a fragment mid-focus; a background pass runs 3–5 associat
 when_to_use: Use when the user says "daydream", "hold this thought", or "something connects".
 argument-hint: "<whisper>"
 disable-model-invocation: true
+context: fork
+background: true
 ---
 
 # Daydream
@@ -26,22 +28,29 @@ does the rest.
 
 ## Procedure
 
-### Step 1: Acknowledge and background
+### Step 1: The whisper
 
-Respond with one line — `Daydreaming on: "<whisper>"` — then launch a
-background sub-agent and return to the work. Run it on `fable` (the Agent
-tool's `model` parameter): a micro-spark is speed over depth, and the pass
-should cost the session close to nothing. If the model choice is
-unavailable, inherit the session's. If backgrounding is
-unavailable, run the same pass in the foreground; same output contract.
+The harness runs this skill as a forked pass, in the background on the
+session's model, and the session keeps going. Where backgrounding is off (a
+non-interactive run or an older Claude Code), the same pass runs in the
+foreground with the same final reply.
+The pass sees none of the conversation, only this file and the whisper.
 
-### Step 2: The micro-spark (sub-agent)
+The whisper: "$ARGUMENTS"
+
+An empty whisper banks nothing, and the final reply is `Daydream: no whisper — nothing banked`.
+
+### Step 2: The micro-spark
+
+Be fast. Be loose. This is a wandering pass, not a research report.
 
 1. **Lightweight sweep** (speed over depth; missing files skip silently):
    `.clutch/dream-sparks.md`, `.clutch/captures.md`, grep `.clutch/ideas/`
    for whisper keywords, recent `git log` for related work.
    The brain: the same files under $HOME/.clutch when a brain exists; a missing brain skips silently.
    Repo items come first; brain items ride behind them, labeled [brain].
+   Also read $HOME/.clutch/dream-sparks.md and grep $HOME/.clutch/ideas/ when a brain exists; skip silently if missing.
+   Label brain finds [brain].
 
 2. **3–5 associative hops**, starting from the whisper. Each hop pulls from
    the sweep, a web search, or prior work in the repo. Stop at five — this
@@ -76,40 +85,17 @@ unavailable, run the same pass in the foreground; same output contract.
    resonate with something tomorrow. If a hop used `.clutch/ideas/` or git
    history, add `[prior-work]` to the title.
 
-### Step 3: Notify when done
+### Step 3: Your final reply
 
-One line, signal-dependent, never interrupting:
+Your final reply is exactly one line, and it is all the session sees.
+Signal-dependent, never interrupting:
 
 - `resonant`: `Daydream landed: "<short title>" — it's in the pool`
 - `faint`: `Daydream: faint signal on "<whisper>" — banked`
 - `noise`: `Daydream: noise on "<whisper>" — banked anyway`
-- append failed: relay the sub-agent's line honestly — `Daydream couldn't
-  bank — chain: <the hops>` — the transcript holds what the pool couldn't
+- append failed: `Daydream couldn't bank — chain: <the hops>` — the transcript holds what the pool couldn't
 
-## Sub-agent prompt scaffold
-
-```
-You are a daydream — a background micro-spark running while the user works
-on something else.
-
-Your whisper: "<whisper>"
-
-1. Read .clutch/dream-sparks.md and .clutch/captures.md (skip silently if
-   missing)
-2. Grep .clutch/ideas/ and recent git log for the whisper's key terms
-   Also read $HOME/.clutch/dream-sparks.md and grep $HOME/.clutch/ideas/ when a brain exists; skip silently if missing.
-   Label brain finds [brain].
-3. Starting from the whisper, make 3-5 associative hops. Each hop pulls
-   from what you found, prior work, or a web search. Follow the chain —
-   don't converge, don't judge.
-4. Self-rate: resonant, faint, or noise
-5. Append your finding to .clutch/dream-sparks.md in the daydream format.
-   Tag [prior-work] if a hop used ideas or git history. If the append
-   fails, say so and return the chain in your reply — "Daydream couldn't
-   bank — chain: ..." — never report a bank that didn't land.
-
-Be fast. Be loose. This is a wandering pass, not a research report.
-```
+Never report a bank that didn't land.
 
 ## Where it sits in the gearbox
 
@@ -121,8 +107,8 @@ Be fast. Be loose. This is a wandering pass, not a research report.
 
 ## What this skill does NOT do
 
-- Interrupt the current session (one-line ack, one-line notify, nothing
-  between)
+- Interrupt the current session (the harness's launch notice, the one-line
+  final reply, nothing between)
 - Run a full chain reaction (3–5 hops max; that's `/clutch:spark`)
 - Converge or produce action items (it surfaces connections, nothing more)
 - Launch without a whisper — it is invoked, every time
