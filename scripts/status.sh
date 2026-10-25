@@ -53,10 +53,10 @@ if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
       else
         echo "  bell: unknown while the state is unreadable"
       fi
-    elif [ -e "$S" ]; then
+    elif [ -e "$S" ] || [ -L "$S" ]; then
       echo "  stop hook: session-state present but not a file"
     elif [ ! -w "$C" ]; then
-      echo "  stop hook: .clutch not writable; some hooks cannot record"
+      echo "  stop hook: .clutch not writable; hooks cannot record"
     else
       echo "  stop hook: no session state in this repo yet"
     fi

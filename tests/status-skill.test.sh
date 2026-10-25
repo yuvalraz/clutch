@@ -12,9 +12,11 @@
 # with or without a state file, is "not writable" (the temp-file-plus-mv
 # rewriters and the anchor's create cannot record), never "fired" and never
 # "no session state yet"; mode 300 (searchable, not listable) is "not
-# readable". Then three shape cases: .clutch as a regular file or a dangling
-# symlink is "not a directory", never the plugin-enablement line, and a
-# session-state directory is "not a file", never "no session state yet".
+# readable". Then four shape cases: .clutch as a regular file or a dangling
+# symlink is "not a directory", never the plugin-enablement line; a
+# session-state directory, alone or inside a 555 .clutch (non-root only; pins
+# the shape check above the not-writable check), and a dangling session-state
+# symlink are "not a file", never "no session state yet".
 # STATUS_SKILL and STATUS_SH override the skill
 # file and the script, so both can be replayed against any historical version
 # (git show BASE:... > tmp).
@@ -64,6 +66,11 @@ pin   "skill: no search for the script"               'do not search for the scr
 unpin "skill: no hand-resolved path"                  '<base-directory>'
 unpin "skill: stays model-invocable"                  'disable-model-invocation: true'
 pin   "skill: fix for a .clutch hooks cannot use"     'chmod u+rwx .clutch'
+# One pin per Step 3 fix line: the status phrase plus its fix verb.
+pin   "skill: fix line, .clutch dir"      '`.clutch present but not readable` or `.clutch not writable`: `chmod u+rwx .clutch`'
+pin   "skill: fix line, state file mode"  '`state present but not writable`, or `unreadable` when the file'"'"'s mode blocks reading: `chmod u+rw .clutch/session-state`'
+pin   "skill: fix line, .clutch shape"    '`.clutch present but not a directory`: moving that `.clutch` file or link aside'
+pin   "skill: fix line, state shape"      '`session-state present but not a file`: moving `.clutch/session-state` aside'
 
 T=$(mktemp -d) || exit 1
 trap 'rm -rf "$T"' EXIT
@@ -152,7 +159,7 @@ else
   OUT=$(cd "$T/repo" && sh "$ST"); rc=$?
   chmod 755 "$CD"
   [ "$rc" = 0 ] || { echo "FAIL: status (dir not writable, no state) exited $rc"; fail=1; }
-  printf '%s\n' "$OUT" | grep -qxF '  stop hook: .clutch not writable; some hooks cannot record' \
+  printf '%s\n' "$OUT" | grep -qxF '  stop hook: .clutch not writable; hooks cannot record' \
     || { echo "FAIL: status (dir not writable, no state) -- got:"; printf '%s\n' "$OUT" | grep 'stop hook'; fail=1; }
 
   # Mode 300 searches but cannot list: the -r half of the not-readable guard.
@@ -188,6 +195,17 @@ shape_line ".clutch is a dangling symlink" '.clutch present but not a directory'
 rm -f "$C2" || { echo "FAIL: rm .clutch symlink failed"; fail=1; }
 mkdir -p "$C2/session-state" || { echo "FAIL: session-state dir fixture failed"; fail=1; }
 shape_line "session-state is a dir" 'session-state present but not a file' 'no session state'
+trap 'chmod 755 "$CD" "$C2" 2>/dev/null; chmod 644 "$SS" 2>/dev/null; rm -rf "$T"' EXIT
+if [ "$(id -u)" = 0 ]; then
+  echo "SKIP: session-state dir in a 555 .clutch (running as root)"
+else
+  chmod 555 "$C2" || { echo "FAIL: chmod 555 repo2 .clutch failed"; fail=1; }
+  shape_line "session-state is a dir, .clutch 555" 'session-state present but not a file' 'not writable'
+  chmod 755 "$C2"
+fi
+rmdir "$C2/session-state" || { echo "FAIL: rmdir session-state failed"; fail=1; }
+ln -s "$T/missing/state" "$C2/session-state" || { echo "FAIL: dangling session-state link fixture failed"; fail=1; }
+shape_line "session-state is a dangling symlink" 'session-state present but not a file' 'no session state'
 
 [ "$fail" -eq 0 ] || exit 1
 echo PASS

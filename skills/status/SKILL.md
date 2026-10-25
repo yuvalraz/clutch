@@ -35,7 +35,7 @@ Procedure:
 
    - `.clutch present but not readable` or `.clutch not writable`: `chmod u+rwx .clutch` lets the hooks back in.
    - `state present but not writable`, or `unreadable` when the file's mode blocks reading: `chmod u+rw .clutch/session-state` lets the hooks back in.
-   - `.clutch present but not a directory`: removing that `.clutch` file or link lets the next hook make the directory.
+   - `.clutch present but not a directory`: moving that `.clutch` file or link aside lets the next hook make the directory.
    - `session-state present but not a file`: moving `.clutch/session-state` aside lets the next hook start a fresh one.
 
 Why this works: silence is the pack's designed degrade direction, so health

@@ -192,7 +192,14 @@ check_empty "F daemon (review)"            -niE "$PAT_F" "$RV"
 check_empty "G template (review)"          -nF  "$PAT_T" "$RV"
 # A `$` + digit in a SKILL.md body is argument shorthand and gets swallowed.
 check_empty "argument shorthand (review)"  -nE '\$[0-9]' "$RV"
-check_empty "tempo never says a review run in espresso" -nF 'review run in espresso' "$TP"
+# Joined first: the old phrase wrapped across lines, which a line grep misses.
+tr -s '[:space:]' ' ' < "$TP" | grep -qF 'review run in espresso'
+rc=$?
+case $rc in
+  1) ;;
+  0) echo "FAIL: tempo says a review run in espresso"; fail=1 ;;
+  *) echo "FAIL: tempo review-run guard -- grep error rc=$rc"; fail=1 ;;
+esac
 
 T=$(mktemp -d) || exit 1
 trap 'rm -rf "$T"' EXIT
