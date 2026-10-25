@@ -197,13 +197,16 @@ empty reserve. Slow output means wrong gear.
 
 ### Intent
 
-The declared focus of a session, build, ideate, or ops, set via /clutch:intent.
+The declared focus of a session, build, ideate, ops, or review, set via /clutch:intent.
 Declaring it externalizes the intention the transmission couples, at the
 moment it matters (see "Point of performance" above), which is why the
 session-start anchor asks when no gear is declared. Build engages craft and
 speaks the maker posture; ideate hands the session to the divergent mode.
 Ops engages espresso and hands the session to the operations mode, where
 the day is many short loops closed one at a time.
+Review engages espresso and hands the session to the review mode, where
+PRs close one at a time and a call that implies a rule is offered as a
+convention, written on a yes.
 The plugin's name is completed here: a clutch couples intention to action,
 and intent is the intention, declared.
 

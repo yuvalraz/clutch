@@ -52,7 +52,7 @@ anchor_out() {
 # --- (i) anchor worst case
 anchor_out "$PR"
 case "$OUT" in *"Last landed: '"*) ;; *) echo "FAIL: anchor -- no Last landed line, fixture under-measures"; fail=1 ;; esac
-case "$OUT" in *'build, ideate, or ops?'*) ;; *) echo "FAIL: anchor -- no intent ask, not the startup worst case"; fail=1 ;; esac
+case "$OUT" in *'build, ideate, ops, or review?'*) ;; *) echo "FAIL: anchor -- no intent ask, not the startup worst case"; fail=1 ;; esac
 N=$(printf '%s\n' "$OUT" | wc -c | tr -d ' ')
 [ "$N" -lt "$BUDGET" ] || { echo "FAIL: anchor worst case -- $N chars >= $BUDGET"; fail=1; }
 

@@ -81,14 +81,14 @@ fi
 # --- intent: the third form and its handoff
 pin "$I" "intent: ops form"            '/clutch:intent ops'
 pin "$I" "intent: ops handoff"         'run /clutch:ops'
-pin "$I" "intent: three focuses"       'Three focuses exist'
+pin "$I" "intent: four focuses"        'Four focuses exist'
 
 # --- tempo, GLOSSARY, README: ops is named where the gears are
 pin "$TP" "tempo: ops drives espresso" 'ops drives espresso'
 pin "$TP" "tempo: ops names its gear"  '/clutch:ops. engages espresso'
 pin "$G"  "GLOSSARY: ops in Intent"    'Ops engages espresso'
 pin "$R"  "README: ops command"        '/clutch:ops'
-pin "$R"  "README: three-way ask"      'build, ideate, or ops?'
+pin "$R"  "README: four-way ask"       'build, ideate, ops, or review?'
 
 # --- local mirror of the private-vocab, intent, F and G wording gates.
 # Same regex strings as de-private.test.sh; rc 1 = clean, 0 = leak,
@@ -140,7 +140,7 @@ mkdir "$T/repo"
 git -C "$T/repo" init -q
 git -C "$T/repo" -c user.email=t@t -c user.name=t commit -q --allow-empty -m seed
 mkdir -p "$T/repo/.clutch"
-Q='build, ideate, or ops?'
+Q='build, ideate, ops, or review?'
 
 # heartbeat: espresso -> tempo line names the gear and its shape
 printf 'espresso\n' > "$T/repo/.clutch/tempo"
@@ -157,10 +157,10 @@ printf '%s\n' "$OUT" | grep -qF "$Q" \
 grep -q '^espresso$' "$T/repo/.clutch/tempo" \
   || { echo "FAIL: resume wiped or mangled an espresso tempo"; exit 1; }
 
-# anchor on startup -> the ask names all three focuses as its final line
+# anchor on startup -> the ask names all four focuses as its final line
 OUT=$(cd "$T/repo" && printf '%s' '{"source":"startup"}' | sh "$RUN"); RC=$?
 [ "$RC" = 0 ] || { echo "FAIL: anchor exited $RC on startup"; exit 1; }
 printf '%s\n' "$OUT" | tail -n 1 | grep -qF "$Q" \
-  || { echo "FAIL: startup ask does not name the three focuses as its final line"; exit 1; }
+  || { echo "FAIL: startup ask does not name the four focuses as its final line"; exit 1; }
 
 echo PASS

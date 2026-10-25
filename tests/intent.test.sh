@@ -45,7 +45,7 @@ pin() {
 # --- skill pins: three forms, craft marker, posture, handoff, once-only law
 pin "$S" "skill: build form"          '/clutch:intent build'
 pin "$S" "skill: ideate form"         '/clutch:intent ideate'
-pin "$S" "skill: bare form asks"      'ask one question: build, ideate, or ops'
+pin "$S" "skill: bare form asks"      'ask one question: build, ideate, ops, or review'
 pin "$S" "skill: craft marker write"  'printf .%s.n. "craft" 2>/dev/null > "\$ROOT/\.clutch/tempo"'
 pin "$S" "skill: marker-fail contract" 'only the re-injection is lost'
 pin "$S" "skill: posture verify"      'we verify before we claim'
@@ -58,8 +58,8 @@ pin "$S" "skill: ops handoff"          'run /clutch:ops'
 pin "$S" "skill: once-only law"       'never re-asks uninvited'
 pin "$S" "skill: session-scoped gear" 'The gear is session-scoped'
 pin "$S" "skill: resume inherits"     'resume and compaction inherit'
-pin "$S" "skill: unknown arg"         'one line naming the three focuses'
-pin "$S" "skill: three focuses fixed" 'no fourth and no config'
+pin "$S" "skill: unknown arg"         'one line naming the four focuses'
+pin "$S" "skill: four focuses fixed"  'no fifth and no config'
 pin "$S" "skill: description trigger" 'answers the session-start intent question'
 pin "$S" "skill: invocation scope"    'A stray "build" mid-conversation invokes nothing'
 # The answer path: a plain "build" or "ideate" reply must be able to invoke
@@ -76,10 +76,11 @@ for f in "$C" "$H"; do
   pin "$f" "carve-out gear bound ($f)" 'only when no gear is declared'
   pin "$f" "carve-out not counted ($f)" 'never counted against the budget'
   pin "$f" "carve-out ignore legal ($f)" 'ignoring it is a legal answer'
+  pin "$f" "carve-out four focuses ($f)" 'build, ideate, ops, or review'
 done
 
 # --- README eleventh moment + GLOSSARY entry
-pin "$R" "README: intent moment"      'build, ideate, or ops?'
+pin "$R" "README: intent moment"      'build, ideate, ops, or review?'
 pin "$R" "README: never asks twice"   'it never asks twice'
 pin "$G" "GLOSSARY: Intent entry"     '### Intent'
 pin "$G" "GLOSSARY: set via command"  'set via /clutch:intent'
@@ -89,7 +90,7 @@ pin "$G" "GLOSSARY: cites PoP entry"  'see "Point of performance"'
 
 # --- anchor behavior: the question line rides only the no-gear branch, and
 # only at a true session boundary (startup|resume|clear or a cold fork; never compact or a hot fork).
-Q='build, ideate, or ops?'
+Q='build, ideate, ops, or review?'
 T=$(mktemp -d) || exit 1
 trap 'chmod -R u+rwx "$T" 2>/dev/null; rm -rf "$T"' EXIT
 # Stage the anchor under test beside the real prelude.sh (see the replay note
