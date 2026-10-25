@@ -29,10 +29,14 @@ if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
       LAST=$(grep '^stop ' "$S" 2>/dev/null | tail -n 1 | cut -d' ' -f2)
       NSTOP=$(grep -c '^stop ' "$S" 2>/dev/null)
       EMITS=$(grep -c '^emit ' "$S" 2>/dev/null)
-      case "$LAST" in
-        ''|*[!0-9]*) echo "  stop hook: state present but unreadable" ;;
-        *) echo "  stop hook: fired in this state (stop events recorded: $NSTOP)" ;;
-      esac
+      if [ "$NSTOP" = 0 ]; then
+        echo "  stop hook: not fired yet in this state"
+      else
+        case "$LAST" in
+          ''|*[!0-9]*) echo "  stop hook: state present but unreadable" ;;
+          *) echo "  stop hook: fired in this state (stop events recorded: $NSTOP)" ;;
+        esac
+      fi
       echo "  bell: $EMITS of 2 emissions used this state"
     else
       echo "  stop hook: no session state in this repo yet"

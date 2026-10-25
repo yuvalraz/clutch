@@ -3,14 +3,17 @@
 # ${CLAUDE_PLUGIN_ROOT} substitution, not a hand-resolved base-directory path,
 # and the skill stays model-invocable. Then run the real scripts/status.sh in
 # a scratch git repo and in a non-git dir: it must exit 0 both times and say
-# which substrate it found. STATUS_SKILL overrides the skill file, so the pins
-# can be replayed against any historical version (git show BASE:... > tmp).
+# which substrate it found. Then seed .clutch/session-state four ways and
+# assert the stop-hook line: no stop line yet is "not fired yet", a malformed
+# stop line is "unreadable". STATUS_SKILL and STATUS_SH override the skill
+# file and the script, so both can be replayed against any historical version
+# (git show BASE:... > tmp).
 set -u
 
 HERE=$(cd "$(dirname "$0")" && pwd)
 ROOT=$(cd "$HERE/.." && pwd)
 S=${STATUS_SKILL:-$ROOT/skills/status/SKILL.md}
-ST="$ROOT/scripts/status.sh"
+ST=${STATUS_SH:-$ROOT/scripts/status.sh}
 
 fail=0
 for f in "$S" "$ST"; do
@@ -67,6 +70,21 @@ mkdir "$T/plain"
 OUT=$(cd "$T/plain" && GIT_CEILING_DIRECTORIES="$T" sh "$ST"); rc=$?
 [ "$rc" = 0 ] || { echo "FAIL: status in non-git dir exited $rc"; fail=1; }
 case "$OUT" in *'git substrate: absent'*) ;; *) echo "FAIL: status in non-git dir -- no 'git substrate: absent' line"; fail=1 ;; esac
+
+# --- (vi) the stop-hook line across session-state shapes, in the scratch repo
+mkdir -p "$T/repo/.clutch"
+stop_line() {
+  label=$1; state=$2; want=$3
+  printf '%b' "$state" > "$T/repo/.clutch/session-state"
+  OUT=$(cd "$T/repo" && sh "$ST"); rc=$?
+  [ "$rc" = 0 ] || { echo "FAIL: status ($label) exited $rc"; fail=1; }
+  printf '%s\n' "$OUT" | grep -qxF "  stop hook: $want" \
+    || { echo "FAIL: status ($label) -- want 'stop hook: $want', got:"; printf '%s\n' "$OUT" | grep 'stop hook'; fail=1; }
+}
+stop_line "fresh start/base"   'start 100\nbase -\n'                    'not fired yet in this state'
+stop_line "declined only"      'declined 889814453\n'                    'not fired yet in this state'
+stop_line "valid stop"         'start 100\nbase -\nstop 200\n'          'fired in this state (stop events recorded: 1)'
+stop_line "malformed stop"     'start 100\nbase -\nstop abc\n'          'state present but unreadable'
 
 [ "$fail" -eq 0 ] || exit 1
 echo PASS

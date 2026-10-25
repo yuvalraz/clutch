@@ -53,17 +53,19 @@ The one key this mode needs is the `review-conventions:` bullet under
 Shared: the path to your conventions file. A leading `~` resolves to the
 home directory. If the file exists but that key is unset, name the gap and
 ask for the path inline, then offer to persist the answer into
-`~/.clutch/rituals.md` so it is asked only once. A missing file hands off; a
-single missing key does not.
+`~/.clutch/rituals.md` so it is asked only once.
+If the write fails, say so with the error; the path still holds for this session.
+A missing file hands off; a single missing key does not.
 
 ### Step 2: Load the conventions
 
 Read the conventions file before the first PR, once, so every finding can
 stand on it. If the file is missing on disk, name the missing file and
 offer to create it on a yes, with the `## Conventions` heading and nothing
-else. Never create the conventions file silently. On anything other than a
-yes, continue without conventions; the session still reviews, it just has
-nothing written to cite yet.
+else. Never create the conventions file silently.
+If the create fails, say so with the error and review without them this session.
+On anything other than a yes, continue without conventions; the session
+still reviews, it just has nothing written to cite yet.
 
 ### Step 3: The PR loop
 

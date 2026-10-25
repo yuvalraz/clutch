@@ -78,7 +78,7 @@ if grep -q 'disable-model-invocation: true' "$O"; then
   fail=1
 fi
 
-# --- intent: the third form and its handoff
+# --- intent: the ops form and its handoff
 pin "$I" "intent: ops form"            '/clutch:intent ops'
 pin "$I" "intent: ops handoff"         'run /clutch:ops'
 pin "$I" "intent: four focuses"        'Four focuses exist'

@@ -57,6 +57,8 @@ pin "$RV" "review: create on a yes"        'offer to create it on a yes'
 pin "$RV" "review: never create silently"  'Never create the conventions file silently'
 pin "$RV" "review: continue without"       'continue without conventions'
 pin "$RV" "review: loads first"            'before the first PR'
+pin "$RV" "review: key-write fail loud"    'If the write fails, say so with the error; the path still holds for this session'
+pin "$RV" "review: create fail loud"       'If the create fails, say so with the error'
 
 # --- review skill: the PR loop
 pin "$RV" "review: asks for a PR"          'ask which PR'
@@ -83,8 +85,9 @@ pin "$RV" "review: confirm names file"     'one line naming the file'
 pin "$RV" "review: outward checkpoint"     'post on a yes'
 pin "$RV" "review: reading is free"        'Reading is free'
 pin "$RV" "review: gh unreachable"         'ask for the diff another way'
-pin "$RV" "review: tangent banks"          '/clutch:fomo'
-pin "$RV" "review: build leaves review"    '/clutch:intent build'
+# Bullet text only: the Skill interactions table also names both commands.
+pin "$RV" "review: tangent banks"          'goes to `/clutch:fomo` in'
+pin "$RV" "review: build leaves review"    'declared with `/clutch:intent build`'
 pin "$RV" "review: no counts"              'No counts'
 pin "$RV" "review: no overdue framing"     'never as overdue'
 pin "$RV" "review: fires when fired"       'Nothing here runs on its own'
@@ -100,6 +103,17 @@ pin "$RV" "review: decline write"          'printf .declined %s.n. "\$H" >> "\$R
 pin "$RV" "review: decline check"          'grep -qx "declined \$H" "\$ROOT/\.clutch/session-state"'
 pin "$RV" "review: decline write fails"    'If the decline write fails, say so in the same turn and still do not re-offer the rule in this conversation'
 pin "$RV" "review: conversation memory wins" 'only if this conversation has not already declined the rule'
+pin "$RV" "review: decline root is loud"   '^ROOT=\$(git rev-parse --show-toplevel) || exit 1$'
+pin "$RV" "review: decline stays loud"     'Failures here stay loud'
+# The decline snippets (Step 4 fences only; the Step 0 marker stays silent by
+# design) must never swallow stderr. Empty extraction fails, so a moved or
+# missing block cannot pass vacuously.
+DECL=$(awk '/^### Step 4/{s=1} /^### Step 5/{s=0} s && /^```/{f=!f; next} s && f' "$RV")
+if [ -z "$DECL" ]; then
+  echo "FAIL: review: no decline snippet found in Step 4"; fail=1
+elif printf '%s\n' "$DECL" | grep -qF '2>/dev/null'; then
+  echo "FAIL: review: a decline snippet line silences stderr"; fail=1
+fi
 
 # The handoff path: /clutch:intent review must be able to invoke the skill,
 # so model invocation stays enabled (negative pin).
@@ -121,6 +135,9 @@ pin "$I" "intent: plain review answers"      'a plain "build", "ideate", "ops", 
 pin "$I" "intent: argument hint"             'argument-hint: "\[build | ideate | ops | review\]"'
 pin "$G" "GLOSSARY: review in Intent"        'Review engages espresso'
 pin "$R" "README: review command"            '/clutch:review'
+pin "$R" "README: review one PR at a time"   '`/clutch:review` closes one PR at a time'
+pin "$R" "README: convention on a yes"       'offers it as a convention, written on a yes'
+pin "$R" "README: post on a yes"             'Each post goes out on a yes'
 
 # --- local mirror of the private-vocab, intent, F and G wording gates.
 # Same regex strings as ops.test.sh; rc 1 = clean, 0 = leak,

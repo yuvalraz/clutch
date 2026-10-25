@@ -42,7 +42,7 @@ pin() {
   esac
 }
 
-# --- skill pins: three forms, craft marker, posture, handoff, once-only law
+# --- skill pins: the focus forms, craft marker, posture, handoff, once-only law
 pin "$S" "skill: build form"          '/clutch:intent build'
 pin "$S" "skill: ideate form"         '/clutch:intent ideate'
 pin "$S" "skill: bare form asks"      'ask one question: build, ideate, ops, or review'
@@ -55,6 +55,7 @@ pin "$S" "skill: posture scope check" 'a scope check, not more polish'
 pin "$S" "skill: ideate handoff"      'run /clutch:ideate'
 pin "$S" "skill: ops form"             '/clutch:intent ops'
 pin "$S" "skill: ops handoff"          'run /clutch:ops'
+pin "$S" "skill: handoff fails loud"   'if the handoff fails, say so in one line; no gear is engaged'
 pin "$S" "skill: once-only law"       'never re-asks uninvited'
 pin "$S" "skill: session-scoped gear" 'The gear is session-scoped'
 pin "$S" "skill: resume inherits"     'resume and compaction inherit'
