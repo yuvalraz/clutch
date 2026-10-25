@@ -31,7 +31,12 @@ Procedure:
 3. If a line names a missing piece, name the one smallest fix and stop:
    reinstall for a missing constitution, open a git repo for an absent
    substrate, nothing at all for a healthy quiet state. Quiet is not broken;
-   the report now says which one it is.
+   the report now says which one it is. For the state lines:
+
+   - `.clutch present but not readable` or `.clutch not writable`: `chmod u+rwx .clutch` lets the hooks back in.
+   - `state present but not writable`, or `unreadable` when the file's mode blocks reading: `chmod u+rw .clutch/session-state` lets the hooks back in.
+   - `.clutch present but not a directory`: removing that `.clutch` file or link lets the next hook make the directory.
+   - `session-state present but not a file`: moving `.clutch/session-state` aside lets the next hook start a fresh one.
 
 Why this works: silence is the pack's designed degrade direction, so health
 must be checkable on demand rather than inferred from absence. See

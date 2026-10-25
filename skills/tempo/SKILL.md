@@ -55,9 +55,9 @@ ops drives espresso and so does review, and daydream and dream-spark ride
 the freefall and ferment side.
 
 For the rest of the session, pace divergent and convergent pulses to the
-engaged gear. A gear mismatch degrades the output class (a review run in
-espresso treats the design question as friction), so we shift gears rather
-than push through.
+engaged gear. A gear mismatch degrades the output class
+(a design question run in espresso is treated as friction), so we shift gears
+rather than push through.
 
 ## Shift offers
 

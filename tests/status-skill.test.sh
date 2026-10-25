@@ -7,11 +7,15 @@
 # assert the stop-hook line: no stop line yet is "not fired yet", a malformed
 # stop line is "unreadable". Then two permission cases (skipped as root): a
 # chmod 000 file is "unreadable" with no garbled bell line, a chmod 444 file
-# is "not writable" rather than "not fired yet". Then three .clutch directory
+# is "not writable" rather than "not fired yet". Then four .clutch directory
 # cases: mode 000 is "not readable" with no bell or sprint line; mode 555,
 # with or without a state file, is "not writable" (the temp-file-plus-mv
 # rewriters and the anchor's create cannot record), never "fired" and never
-# "no session state yet". STATUS_SKILL and STATUS_SH override the skill
+# "no session state yet"; mode 300 (searchable, not listable) is "not
+# readable". Then three shape cases: .clutch as a regular file or a dangling
+# symlink is "not a directory", never the plugin-enablement line, and a
+# session-state directory is "not a file", never "no session state yet".
+# STATUS_SKILL and STATUS_SH override the skill
 # file and the script, so both can be replayed against any historical version
 # (git show BASE:... > tmp).
 set -u
@@ -59,6 +63,7 @@ pin   "skill: says clutch is not loaded"              'clutch is not loaded as a
 pin   "skill: no search for the script"               'do not search for the script'
 unpin "skill: no hand-resolved path"                  '<base-directory>'
 unpin "skill: stays model-invocable"                  'disable-model-invocation: true'
+pin   "skill: fix for a .clutch hooks cannot use"     'chmod u+rwx .clutch'
 
 T=$(mktemp -d) || exit 1
 trap 'rm -rf "$T"' EXIT
@@ -139,17 +144,50 @@ else
   OUT=$(cd "$T/repo" && sh "$ST"); rc=$?
   chmod 755 "$CD"
   [ "$rc" = 0 ] || { echo "FAIL: status (dir not writable) exited $rc"; fail=1; }
-  printf '%s\n' "$OUT" | grep -qxF '  stop hook: .clutch not writable; hooks cannot record' \
+  printf '%s\n' "$OUT" | grep -qxF '  stop hook: .clutch not writable; some hooks cannot record' \
     || { echo "FAIL: status (dir not writable) -- got:"; printf '%s\n' "$OUT" | grep 'stop hook'; fail=1; }
 
-  rm -f "$SS"
+  rm -f "$SS" || { echo "FAIL: rm session-state failed"; fail=1; }
   chmod 555 "$CD" || { echo "FAIL: chmod 555 dir failed"; fail=1; }
   OUT=$(cd "$T/repo" && sh "$ST"); rc=$?
   chmod 755 "$CD"
   [ "$rc" = 0 ] || { echo "FAIL: status (dir not writable, no state) exited $rc"; fail=1; }
-  printf '%s\n' "$OUT" | grep -qxF '  stop hook: .clutch not writable; hooks cannot record' \
+  printf '%s\n' "$OUT" | grep -qxF '  stop hook: .clutch not writable; some hooks cannot record' \
     || { echo "FAIL: status (dir not writable, no state) -- got:"; printf '%s\n' "$OUT" | grep 'stop hook'; fail=1; }
+
+  # Mode 300 searches but cannot list: the -r half of the not-readable guard.
+  printf 'start 100\nbase -\nstop 200\n' > "$SS" \
+    || { echo "FAIL: dir-300 fixture write failed"; fail=1; }
+  chmod 300 "$CD" || { echo "FAIL: chmod 300 dir failed"; fail=1; }
+  OUT=$(cd "$T/repo" && sh "$ST"); rc=$?
+  chmod 755 "$CD"
+  [ "$rc" = 0 ] || { echo "FAIL: status (dir 300) exited $rc"; fail=1; }
+  printf '%s\n' "$OUT" | grep -qxF '  stop hook: .clutch present but not readable' \
+    || { echo "FAIL: status (dir 300) -- got:"; printf '%s\n' "$OUT" | grep 'stop hook'; fail=1; }
 fi
+
+# --- (viii) shapes: .clutch or session-state present as the wrong kind of
+# thing is reported, never mistaken for an absent install or a fresh state.
+mkdir "$T/repo2" || { echo "FAIL: mkdir repo2 failed"; fail=1; }
+git -C "$T/repo2" init -q || { echo "FAIL: git init repo2 failed"; fail=1; }
+C2="$T/repo2/.clutch"
+shape_line() {
+  label=$1; want=$2; nowant=$3
+  OUT=$(cd "$T/repo2" && sh "$ST"); rc=$?
+  [ "$rc" = 0 ] || { echo "FAIL: status ($label) exited $rc"; fail=1; }
+  printf '%s\n' "$OUT" | grep -qxF "  stop hook: $want" \
+    || { echo "FAIL: status ($label) -- want 'stop hook: $want', got:"; printf '%s\n' "$OUT"; fail=1; }
+  printf '%s\n' "$OUT" | grep -qF "$nowant" \
+    && { echo "FAIL: status ($label) -- printed '$nowant'"; fail=1; }
+}
+printf 'x\n' > "$C2" || { echo "FAIL: .clutch file fixture write failed"; fail=1; }
+shape_line ".clutch is a file" '.clutch present but not a directory' 'no .clutch state here'
+rm -f "$C2" || { echo "FAIL: rm .clutch file failed"; fail=1; }
+ln -s "$T/nowhere" "$C2" || { echo "FAIL: dangling symlink fixture failed"; fail=1; }
+shape_line ".clutch is a dangling symlink" '.clutch present but not a directory' 'no .clutch state here'
+rm -f "$C2" || { echo "FAIL: rm .clutch symlink failed"; fail=1; }
+mkdir -p "$C2/session-state" || { echo "FAIL: session-state dir fixture failed"; fail=1; }
+shape_line "session-state is a dir" 'session-state present but not a file' 'no session state'
 
 [ "$fail" -eq 0 ] || exit 1
 echo PASS

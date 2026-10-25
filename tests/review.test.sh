@@ -99,8 +99,8 @@ pin "$RV" "review: named PR outside the mode"   'outside review mode is not a tr
 
 # --- review skill: the declined-rule record (OD-1 B)
 pin "$RV" "review: decline hash"           'H=\$(printf .%s.n. .<the rule>. | cksum | cut -d. . -f1)'
-pin "$RV" "review: decline write"          'printf .declined %s.n. "\$H" >> "\$ROOT/\.clutch/session-state"$'
-pin "$RV" "review: decline check"          'grep -qx "declined \$H" "\$ROOT/\.clutch/session-state"$'
+pin "$RV" "review: decline write"          '^printf .declined %s.n. "\$H" >> "\$ROOT/\.clutch/session-state"$'
+pin "$RV" "review: decline check"          '^grep -qx "declined \$H" "\$ROOT/\.clutch/session-state"$'
 pin "$RV" "review: decline write fails"    'If the decline write fails, say so in the same turn and still do not re-offer the rule in this conversation'
 pin "$RV" "review: conversation memory wins" 'only if this conversation has not already declined the rule'
 pin "$RV" "review: decline root is loud"   '^ROOT=\$(git rev-parse --show-toplevel) || exit 1$'
@@ -114,9 +114,16 @@ for want in "printf 'declined %s" 'grep -qx "declined'; do
   printf '%s\n' "$DECL" | grep -qF -- "$want" \
     || { echo "FAIL: review: Step 4 decline snippet missing: $want"; fail=1; }
 done
-if printf '%s\n' "$DECL" | grep -qE '> */dev/null|\|\| *(true|:|exit 0)'; then
-  echo "FAIL: review: a decline snippet line silences stderr or an exit code"; fail=1
-fi
+# Banned: any stderr redirect (2>file, 2>&1 after a stdout redirect, 2>&-),
+# both-stream &>, a closed stream >&-, and an exit code swallowed by || true,
+# || :, || exit 0, or a || { block. A stdout-only >/dev/null stays allowed.
+PAT_S='2>|&>|>&-|\|\| *(true|:|exit 0|\{)'
+printf '%s\n' "$DECL" | grep -qE -- "$PAT_S"
+case $? in
+  1) ;;
+  0) echo "FAIL: review: a decline snippet line silences stderr or an exit code"; fail=1 ;;
+  *) echo "FAIL: review: silencer gate grep error"; fail=1 ;;
+esac
 
 # The handoff path: /clutch:intent review must be able to invoke the skill,
 # so model invocation stays enabled (negative pin).
@@ -130,6 +137,19 @@ pin "$RT" "rituals: review-conventions key"  '^- review-conventions:'
 pin "$RT" "rituals: review batch question"   '\*\*Review conventions\*\*'
 pin "$TP" "tempo: review drives espresso"    'ops drives espresso and so does review'
 pin "$TP" "tempo: review names its gear"     '/clutch:review. engages espresso'
+pin "$TP" "tempo: mismatch example is design" 'a design question run in espresso is treated as friction'
+
+# The shared failed-handoff rule has its own section before the once-only
+# law, not under ## Review. Each extract must find its section first.
+HSEC=$(awk '/^## /{s=($0=="## When a handoff fails")} s' "$I")
+RSEC=$(awk '/^## /{s=($0=="## Review")} s' "$I")
+[ -n "$RSEC" ] || { echo "FAIL: intent: no ## Review section"; fail=1; }
+printf '%s\n' "$HSEC" | grep -qF 'For ideate, ops, and review alike: if the handoff fails' \
+  || { echo "FAIL: intent: failed-handoff rule not under ## When a handoff fails"; fail=1; }
+printf '%s\n' "$RSEC" | grep -qF 'if the handoff fails' \
+  && { echo "FAIL: intent: failed-handoff rule still sits under ## Review"; fail=1; }
+awk '/^## When a handoff fails$/{h=NR} /^## The once-only law$/{o=NR} END{exit !(h && o && h < o)}' "$I" \
+  || { echo "FAIL: intent: ## When a handoff fails must precede ## The once-only law"; fail=1; }
 
 # --- intent, GLOSSARY, README: review is the fourth focus
 pin "$I" "intent: review form"               '/clutch:intent review'
@@ -172,6 +192,7 @@ check_empty "F daemon (review)"            -niE "$PAT_F" "$RV"
 check_empty "G template (review)"          -nF  "$PAT_T" "$RV"
 # A `$` + digit in a SKILL.md body is argument shorthand and gets swallowed.
 check_empty "argument shorthand (review)"  -nE '\$[0-9]' "$RV"
+check_empty "tempo never says a review run in espresso" -nF 'review run in espresso' "$TP"
 
 T=$(mktemp -d) || exit 1
 trap 'rm -rf "$T"' EXIT
@@ -183,6 +204,15 @@ grep -iE "$PAT_F" "$T/probe" >/dev/null 2>&1 || { echo "FAIL: self-check missed 
 grep -F  "$PAT_T" "$T/probe" >/dev/null 2>&1 || { echo "FAIL: self-check missed probe for G"; fail=1; }
 printf 'x $0 y\n' > "$T/probe-n"
 grep -E '\$[0-9]' "$T/probe-n" >/dev/null 2>&1 || { echo "FAIL: self-check missed probe for argument shorthand"; fail=1; }
+for probe in 'x 2>/dev/null' 'x 2>"/dev/null"' "x 2>'/dev/null'" 'x &>"/dev/null"' \
+  'x >"/dev/null" 2>&1' 'x 2>&-' 'x >&-' 'x || {' 'x || true' 'x || :' 'x || exit 0'; do
+  printf '%s\n' "$probe" | grep -qE -- "$PAT_S" \
+    || { echo "FAIL: self-check missed silencer probe: $probe"; fail=1; }
+done
+for probe in 'x >/dev/null' 'x >"/dev/null"' 'x >> "$ROOT/.clutch/session-state"' 'x || exit 1'; do
+  printf '%s\n' "$probe" | grep -qE -- "$PAT_S" \
+    && { echo "FAIL: self-check flagged allowed form: $probe"; fail=1; }
+done
 
 [ "$fail" -eq 0 ] || exit 1
 
