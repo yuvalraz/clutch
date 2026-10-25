@@ -7,7 +7,11 @@
 # assert the stop-hook line: no stop line yet is "not fired yet", a malformed
 # stop line is "unreadable". Then two permission cases (skipped as root): a
 # chmod 000 file is "unreadable" with no garbled bell line, a chmod 444 file
-# is "not writable" rather than "not fired yet". STATUS_SKILL and STATUS_SH override the skill
+# is "not writable" rather than "not fired yet". Then three .clutch directory
+# cases: mode 000 is "not readable" with no bell or sprint line; mode 555,
+# with or without a state file, is "not writable" (the temp-file-plus-mv
+# rewriters and the anchor's create cannot record), never "fired" and never
+# "no session state yet". STATUS_SKILL and STATUS_SH override the skill
 # file and the script, so both can be replayed against any historical version
 # (git show BASE:... > tmp).
 set -u
@@ -92,7 +96,8 @@ stop_line "malformed stop"     'start 100\nbase -\nstop abc\n'          'state p
 # --- (vii) permissions: root reads and writes through chmod, so skip there.
 # Permissions are restored after each case so the trap's rm -rf works.
 SS="$T/repo/.clutch/session-state"
-trap 'chmod 644 "$SS" 2>/dev/null; rm -rf "$T"' EXIT
+CD="$T/repo/.clutch"
+trap 'chmod 755 "$CD" 2>/dev/null; chmod 644 "$SS" 2>/dev/null; rm -rf "$T"' EXIT
 if [ "$(id -u)" = 0 ]; then
   echo "SKIP: permission cases (running as root)"
 else
@@ -115,6 +120,35 @@ else
   [ "$rc" = 0 ] || { echo "FAIL: status (not writable) exited $rc"; fail=1; }
   printf '%s\n' "$OUT" | grep -qxF '  stop hook: state present but not writable; hooks cannot record' \
     || { echo "FAIL: status (not writable) -- got:"; printf '%s\n' "$OUT" | grep 'stop hook'; fail=1; }
+
+  # .clutch the script cannot search: the files inside are invisible to [ -f ].
+  printf 'start 100\nbase -\nstop 200\n' > "$SS" \
+    || { echo "FAIL: dir-unreadable fixture write failed"; fail=1; }
+  chmod 000 "$CD" || { echo "FAIL: chmod 000 dir failed"; fail=1; }
+  OUT=$(cd "$T/repo" && sh "$ST"); rc=$?
+  chmod 755 "$CD"
+  [ "$rc" = 0 ] || { echo "FAIL: status (dir unreadable) exited $rc"; fail=1; }
+  printf '%s\n' "$OUT" | grep -qxF '  stop hook: .clutch present but not readable' \
+    || { echo "FAIL: status (dir unreadable) -- got:"; printf '%s\n' "$OUT" | grep 'stop hook'; fail=1; }
+  printf '%s\n' "$OUT" | grep -qE '^  (bell|sprint):' \
+    && { echo "FAIL: status (dir unreadable) -- bell or sprint line printed:"; printf '%s\n' "$OUT" | grep -E '^  (bell|sprint):'; fail=1; }
+
+  # .clutch the hooks cannot write: a writable file does not help a rewriter
+  # whose temp file lands in the dir.
+  chmod 555 "$CD" || { echo "FAIL: chmod 555 dir failed"; fail=1; }
+  OUT=$(cd "$T/repo" && sh "$ST"); rc=$?
+  chmod 755 "$CD"
+  [ "$rc" = 0 ] || { echo "FAIL: status (dir not writable) exited $rc"; fail=1; }
+  printf '%s\n' "$OUT" | grep -qxF '  stop hook: .clutch not writable; hooks cannot record' \
+    || { echo "FAIL: status (dir not writable) -- got:"; printf '%s\n' "$OUT" | grep 'stop hook'; fail=1; }
+
+  rm -f "$SS"
+  chmod 555 "$CD" || { echo "FAIL: chmod 555 dir failed"; fail=1; }
+  OUT=$(cd "$T/repo" && sh "$ST"); rc=$?
+  chmod 755 "$CD"
+  [ "$rc" = 0 ] || { echo "FAIL: status (dir not writable, no state) exited $rc"; fail=1; }
+  printf '%s\n' "$OUT" | grep -qxF '  stop hook: .clutch not writable; hooks cannot record' \
+    || { echo "FAIL: status (dir not writable, no state) -- got:"; printf '%s\n' "$OUT" | grep 'stop hook'; fail=1; }
 fi
 
 [ "$fail" -eq 0 ] || exit 1

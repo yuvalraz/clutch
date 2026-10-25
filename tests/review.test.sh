@@ -100,7 +100,7 @@ pin "$RV" "review: named PR outside the mode"   'outside review mode is not a tr
 # --- review skill: the declined-rule record (OD-1 B)
 pin "$RV" "review: decline hash"           'H=\$(printf .%s.n. .<the rule>. | cksum | cut -d. . -f1)'
 pin "$RV" "review: decline write"          'printf .declined %s.n. "\$H" >> "\$ROOT/\.clutch/session-state"$'
-pin "$RV" "review: decline check"          'grep -qx "declined \$H" "\$ROOT/\.clutch/session-state"'
+pin "$RV" "review: decline check"          'grep -qx "declined \$H" "\$ROOT/\.clutch/session-state"$'
 pin "$RV" "review: decline write fails"    'If the decline write fails, say so in the same turn and still do not re-offer the rule in this conversation'
 pin "$RV" "review: conversation memory wins" 'only if this conversation has not already declined the rule'
 pin "$RV" "review: decline root is loud"   '^ROOT=\$(git rev-parse --show-toplevel) || exit 1$'
