@@ -72,7 +72,7 @@ Confirm in one line: "Review declared; handing off." Then run /clutch:review. Th
 skill is the machinery: it engages espresso, loads your conventions, and
 holds the one-PR-at-a-time rhythm. Duplicate none of it here.
 
-For ideate, ops, and review alike: if the handoff fails, say so in one line; no gear is engaged.
+For ideate, ops, and review alike: if the handoff fails, say so in one line; no new gear is engaged; any earlier gear still holds.
 
 ## The once-only law
 

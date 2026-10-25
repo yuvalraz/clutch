@@ -5,7 +5,9 @@
 # a scratch git repo and in a non-git dir: it must exit 0 both times and say
 # which substrate it found. Then seed .clutch/session-state four ways and
 # assert the stop-hook line: no stop line yet is "not fired yet", a malformed
-# stop line is "unreadable". STATUS_SKILL and STATUS_SH override the skill
+# stop line is "unreadable". Then two permission cases (skipped as root): a
+# chmod 000 file is "unreadable" with no garbled bell line, a chmod 444 file
+# is "not writable" rather than "not fired yet". STATUS_SKILL and STATUS_SH override the skill
 # file and the script, so both can be replayed against any historical version
 # (git show BASE:... > tmp).
 set -u
@@ -75,7 +77,8 @@ case "$OUT" in *'git substrate: absent'*) ;; *) echo "FAIL: status in non-git di
 mkdir -p "$T/repo/.clutch"
 stop_line() {
   label=$1; state=$2; want=$3
-  printf '%b' "$state" > "$T/repo/.clutch/session-state"
+  printf '%b' "$state" > "$T/repo/.clutch/session-state" \
+    || { echo "FAIL: status ($label) -- fixture write failed"; fail=1; return; }
   OUT=$(cd "$T/repo" && sh "$ST"); rc=$?
   [ "$rc" = 0 ] || { echo "FAIL: status ($label) exited $rc"; fail=1; }
   printf '%s\n' "$OUT" | grep -qxF "  stop hook: $want" \
@@ -85,6 +88,34 @@ stop_line "fresh start/base"   'start 100\nbase -\n'                    'not fir
 stop_line "declined only"      'declined 889814453\n'                    'not fired yet in this state'
 stop_line "valid stop"         'start 100\nbase -\nstop 200\n'          'fired in this state (stop events recorded: 1)'
 stop_line "malformed stop"     'start 100\nbase -\nstop abc\n'          'state present but unreadable'
+
+# --- (vii) permissions: root reads and writes through chmod, so skip there.
+# Permissions are restored after each case so the trap's rm -rf works.
+SS="$T/repo/.clutch/session-state"
+trap 'chmod 644 "$SS" 2>/dev/null; rm -rf "$T"' EXIT
+if [ "$(id -u)" = 0 ]; then
+  echo "SKIP: permission cases (running as root)"
+else
+  printf 'start 100\nbase -\nstop 200\n' > "$SS" \
+    || { echo "FAIL: unreadable fixture write failed"; fail=1; }
+  chmod 000 "$SS" || { echo "FAIL: chmod 000 failed"; fail=1; }
+  OUT=$(cd "$T/repo" && sh "$ST"); rc=$?
+  chmod 644 "$SS"
+  [ "$rc" = 0 ] || { echo "FAIL: status (unreadable) exited $rc"; fail=1; }
+  printf '%s\n' "$OUT" | grep -qxF '  stop hook: state present but unreadable' \
+    || { echo "FAIL: status (unreadable) -- got:"; printf '%s\n' "$OUT" | grep 'stop hook'; fail=1; }
+  printf '%s\n' "$OUT" | grep -qxF '  bell: unknown while the state is unreadable' \
+    || { echo "FAIL: status (unreadable) -- bell line, got:"; printf '%s\n' "$OUT" | grep 'bell'; fail=1; }
+
+  printf 'start 100\nbase -\n' > "$SS" \
+    || { echo "FAIL: not-writable fixture write failed"; fail=1; }
+  chmod 444 "$SS" || { echo "FAIL: chmod 444 failed"; fail=1; }
+  OUT=$(cd "$T/repo" && sh "$ST"); rc=$?
+  chmod 644 "$SS"
+  [ "$rc" = 0 ] || { echo "FAIL: status (not writable) exited $rc"; fail=1; }
+  printf '%s\n' "$OUT" | grep -qxF '  stop hook: state present but not writable; hooks cannot record' \
+    || { echo "FAIL: status (not writable) -- got:"; printf '%s\n' "$OUT" | grep 'stop hook'; fail=1; }
+fi
 
 [ "$fail" -eq 0 ] || exit 1
 echo PASS

@@ -99,20 +99,23 @@ pin "$RV" "review: named PR outside the mode"   'outside review mode is not a tr
 
 # --- review skill: the declined-rule record (OD-1 B)
 pin "$RV" "review: decline hash"           'H=\$(printf .%s.n. .<the rule>. | cksum | cut -d. . -f1)'
-pin "$RV" "review: decline write"          'printf .declined %s.n. "\$H" >> "\$ROOT/\.clutch/session-state"'
+pin "$RV" "review: decline write"          'printf .declined %s.n. "\$H" >> "\$ROOT/\.clutch/session-state"$'
 pin "$RV" "review: decline check"          'grep -qx "declined \$H" "\$ROOT/\.clutch/session-state"'
 pin "$RV" "review: decline write fails"    'If the decline write fails, say so in the same turn and still do not re-offer the rule in this conversation'
 pin "$RV" "review: conversation memory wins" 'only if this conversation has not already declined the rule'
 pin "$RV" "review: decline root is loud"   '^ROOT=\$(git rev-parse --show-toplevel) || exit 1$'
 pin "$RV" "review: decline stays loud"     'Failures here stay loud'
 # The decline snippets (Step 4 fences only; the Step 0 marker stays silent by
-# design) must never swallow stderr. Empty extraction fails, so a moved or
-# missing block cannot pass vacuously.
+# design) must never swallow stderr or an exit code. The gate first proves it
+# reached its target: the extract must hold the decline write and the check,
+# so a block moved out of Step 4 fails instead of passing vacuously.
 DECL=$(awk '/^### Step 4/{s=1} /^### Step 5/{s=0} s && /^```/{f=!f; next} s && f' "$RV")
-if [ -z "$DECL" ]; then
-  echo "FAIL: review: no decline snippet found in Step 4"; fail=1
-elif printf '%s\n' "$DECL" | grep -qF '2>/dev/null'; then
-  echo "FAIL: review: a decline snippet line silences stderr"; fail=1
+for want in "printf 'declined %s" 'grep -qx "declined'; do
+  printf '%s\n' "$DECL" | grep -qF -- "$want" \
+    || { echo "FAIL: review: Step 4 decline snippet missing: $want"; fail=1; }
+done
+if printf '%s\n' "$DECL" | grep -qE '> */dev/null|\|\| *(true|:|exit 0)'; then
+  echo "FAIL: review: a decline snippet line silences stderr or an exit code"; fail=1
 fi
 
 # The handoff path: /clutch:intent review must be able to invoke the skill,
