@@ -51,8 +51,8 @@ lost.
 | **ferment** | SLOW divergence: deliberate wandering, long pulses | none; downstream rating only | the cellar: slow pre-crafting that stocks later craft sessions |
 
 All five gears ship now, protocols included: ideate and spark drive ballmer,
-ops drives espresso, and daydream and dream-spark ride the freefall and
-ferment side.
+ops drives espresso and so does review, and daydream and dream-spark ride
+the freefall and ferment side.
 
 For the rest of the session, pace divergent and convergent pulses to the
 engaged gear. A gear mismatch degrades the output class (a review run in
@@ -77,8 +77,9 @@ constraints are hard:
   or interest death, and those want opposite gears.
 - An explicit `/clutch:tempo <gear>`, an accepted offer, or an invoked skill
   that names its gear (`/clutch:ideate` engages ballmer,
-  `/clutch:ops` engages espresso) is the only thing that changes the
-  engaged gear. Never shift silently on your own read.
+  `/clutch:ops` engages espresso, `/clutch:review` engages espresso) is
+  the only thing that changes the engaged gear. Never shift silently on
+  your own read.
 
 ## Gearbox rules (hard constraints)
 
