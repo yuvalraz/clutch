@@ -18,7 +18,7 @@ SURFACES="rules/constitution.md README.md GLOSSARY.md ANNOTATIONS.md"
 PAT_A='javos|knowledge-ops|aipaper|daylog|MEMORY\.md|trust ledger|trust-ledger|\.claude/tempo|config/intents'
 PAT_B='[['
 PAT_C='/intent\b|intent default'
-PAT_D='/(spark|ideate|daydream|dream-spark|fomo|memory|loop|ops)\b'
+PAT_D='/(spark|ideate|daydream|dream-spark|fomo|memory|loop|ops|review)\b'
 PAT_E='fuel'
 PAT_F='daemon|launchd|cron|nightly|overnight|schedul|auto-trigger'
 PAT_G1='\(20[0-9]{2}-[0-9]{2}-[0-9]{2} '
@@ -94,6 +94,9 @@ grep -E "$PAT_C" "$T/probe-c2" >/dev/null 2>&1 \
 printf 'see config/intents/dev.md\n' > "$T/probe-a2"
 grep -iE "$PAT_A" "$T/probe-a2" >/dev/null 2>&1 \
   || { echo "FAIL: self-check missed probe for A (config/intents)"; fail=1; }
+printf 'run /review now\n' > "$T/probe-d2"
+grep -E "$PAT_D" "$T/probe-d2" >/dev/null 2>&1 \
+  || { echo "FAIL: self-check missed probe for D (review)"; fail=1; }
 
 # Negative probe: the prefixed form is clutch's own vocabulary and must never
 # trip pattern C. Same PAT_C variable as the sweep, never a copy.

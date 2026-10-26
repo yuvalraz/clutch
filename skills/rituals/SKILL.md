@@ -44,6 +44,8 @@ The batch covers:
   first, any extra steps to weave in, and any close-out steps to end on.
 - **Integrations** — freeform: a calendar tool, a task board, anything the
   day prep should check when reachable.
+- **Review conventions** — optional: the file review sessions read their
+  conventions from and append new ones to. Skippable.
 
 ### Step 3: Write the config
 
@@ -59,6 +61,7 @@ Placeholder values below; yours replace them:
 - state dir: <a directory your day lives in>
 - focus file: <path to the day's focuses, relative to state dir>
 - integrations: <a calendar tool, a task board — freeform bullets>
+- review-conventions: <path to your review conventions file>
 
 ## Morning
 - time: <your anchor time — display only>
@@ -75,7 +78,8 @@ Placeholder values below; yours replace them:
 ### Close-out
 ```
 
-Recognized keys: `workdays`, `state dir`, `focus file`, `time`, `prep`, plus
+Recognized keys: `workdays`, `state dir`, `focus file`, `time`, `prep`,
+`review-conventions`, plus
 freeform `integrations:` bullets under Shared. Anything else you write in the
 file is carried into the ritual as context, never treated as an error. The
 file is yours: hand-edit it any time, and a re-run of this skill respects

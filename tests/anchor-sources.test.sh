@@ -40,7 +40,7 @@ pin "$J" "matcher includes fork" '"matcher": "startup|resume|clear|compact|fork"
 pin "$S" "intent: fork inherits gear" 'A fork inherits the declared gear too.'
 
 # --- (iii) harness
-Q='build, ideate, or ops?'
+Q='build, ideate, ops, or review?'
 T=$(mktemp -d) || exit 1
 trap 'rm -rf "$T"' EXIT
 mkdir "$T/scripts"

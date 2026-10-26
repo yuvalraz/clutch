@@ -1,15 +1,15 @@
 ---
 name: intent
-description: Declare the session's focus, build, ideate, or ops, and engage the matching gear and posture.
-when_to_use: Use ONLY when the user answers the session-start intent question (a plain "build", "ideate", or "ops" counts as an answer) or explicitly asks to set the session's focus. A passing mention of building, ideating, or operations mid-conversation is not a trigger.
-argument-hint: "[build | ideate | ops]"
+description: Declare the session's focus, build, ideate, ops, or review, and engage the matching gear and posture.
+when_to_use: Use ONLY when the user answers the session-start intent question (a plain "build", "ideate", "ops", or "review" counts as an answer) or explicitly asks to set the session's focus. A passing mention of building, ideating, operations, or reviewing mid-conversation is not a trigger.
+argument-hint: "[build | ideate | ops | review]"
 ---
 
 # Intent
 
 A clutch couples intention to action, and this is where the intention gets
-declared. Three focuses exist: build, ideate, and ops.
-There is no fourth and no config; new focuses arrive by shipped release,
+declared. Four focuses exist: build, ideate, ops, and review.
+There is no fifth and no config; new focuses arrive by shipped release,
 never by settings.
 
 ## Usage
@@ -20,10 +20,12 @@ never by settings.
   hand off.
 - `/clutch:intent ops` declares an operations session: one confirm line, then
   hand off.
-- `/clutch:intent` bare: ask one question: build, ideate, or ops? Nothing
-  else.
+- `/clutch:intent review` declares a review session: one confirm line, then
+  hand off.
+- `/clutch:intent` bare: ask one question: build, ideate, ops, or review?
+  Nothing else.
 
-Any other argument gets one line naming the three focuses, no error ceremony.
+Any other argument gets one line naming the four focuses, no error ceremony.
 
 Invocation scope: this skill fires when the user answers the session-start
 question or explicitly asks to set the session's focus, and at no other
@@ -63,6 +65,16 @@ anti-convergence. Duplicate none of it here.
 Confirm in one line: "Ops declared; handing off." Then run /clutch:ops. That
 skill is the machinery: it engages espresso, sweeps the reachable tools once,
 and holds the one-loop-at-a-time rhythm. Duplicate none of it here.
+
+## Review
+
+Confirm in one line: "Review declared; handing off." Then run /clutch:review. That
+skill is the machinery: it engages espresso, loads your conventions, and
+holds the one-PR-at-a-time rhythm. Duplicate none of it here.
+
+## When a handoff fails
+
+For ideate, ops, and review alike: if the handoff fails, say so in one line; no new gear is engaged; any earlier gear still holds.
 
 ## The once-only law
 

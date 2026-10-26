@@ -23,17 +23,40 @@ if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   fi
 
   C="$ROOT/.clutch"
-  if [ -d "$C" ]; then
+  if [ -d "$C" ] && { [ ! -x "$C" ] || [ ! -r "$C" ]; }; then
+    # [ -f ] is false for every file in a dir it cannot search; stay quiet.
+    echo "  stop hook: .clutch present but not readable"
+  elif [ -d "$C" ]; then
     S="$C/session-state"
     if [ -f "$S" ]; then
       LAST=$(grep '^stop ' "$S" 2>/dev/null | tail -n 1 | cut -d' ' -f2)
       NSTOP=$(grep -c '^stop ' "$S" 2>/dev/null)
       EMITS=$(grep -c '^emit ' "$S" 2>/dev/null)
-      case "$LAST" in
-        ''|*[!0-9]*) echo "  stop hook: state present but unreadable" ;;
-        *) echo "  stop hook: fired in this state (stop events recorded: $NSTOP)" ;;
-      esac
-      echo "  bell: $EMITS of 2 emissions used this state"
+      # grep -c prints nothing only when it cannot read the file.
+      if [ -z "$NSTOP" ]; then
+        echo "  stop hook: state present but unreadable"
+      elif [ ! -w "$C" ]; then
+        # Appends still land; the temp-file-plus-mv rewriters and creates fail.
+        echo "  stop hook: .clutch not writable; some hooks cannot record"
+      elif [ ! -w "$S" ]; then
+        echo "  stop hook: state present but not writable; hooks cannot record"
+      elif [ "$NSTOP" = 0 ]; then
+        echo "  stop hook: not fired yet in this state"
+      else
+        case "$LAST" in
+          ''|*[!0-9]*) echo "  stop hook: state present but unreadable" ;;
+          *) echo "  stop hook: fired in this state (stop events recorded: $NSTOP)" ;;
+        esac
+      fi
+      if [ -n "$EMITS" ]; then
+        echo "  bell: $EMITS of 2 emissions used this state"
+      else
+        echo "  bell: unknown while the state is unreadable"
+      fi
+    elif [ -e "$S" ] || [ -L "$S" ]; then
+      echo "  stop hook: session-state present but not a file"
+    elif [ ! -w "$C" ]; then
+      echo "  stop hook: .clutch not writable; hooks cannot record"
     else
       echo "  stop hook: no session state in this repo yet"
     fi
@@ -48,6 +71,9 @@ if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
     else
       echo "  thread: no breadcrumb yet"
     fi
+  elif [ -e "$C" ] || [ -L "$C" ]; then
+    # A regular file or a dangling symlink: hooks cannot make the dir.
+    echo "  stop hook: .clutch present but not a directory"
   else
     echo "  hooks: no .clutch state here. If sessions ran in this repo since install, /plugin list shows whether clutch is enabled"
   fi

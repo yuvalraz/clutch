@@ -107,7 +107,7 @@ if [ "$FRESH" = 1 ]; then
   fi
 fi
 if [ "$ASK" = 1 ]; then
-  printf 'Intent for this session: build, ideate, or ops? /clutch:intent sets the frame.\n'
+  printf 'Intent for this session: build, ideate, ops, or review? /clutch:intent sets the frame.\n'
 fi
 
 exit 0
