@@ -113,7 +113,7 @@ resume, or clear. Never propose a live on: item uninvited; the user's
 explicit ask wins over any claim. Claims are facts for peers that age out,
 never a list for the user. Append one line silently: moved: when a loop
 outside git closes (commits log themselves), on: when starting work a peer
-might take. Speak only on MISS.
+might take. Escape ' as '\''. Speak on MISS or an error.
 
 ```sh
 mkdir -p "$HOME/.clutch" 2>/dev/null && printf '%s %s %s %.200s\n' "$(date +%s)" "$(basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" | tr ' ' -)" '<moved:|on:>' '<one line>' >> "$HOME/.clutch/worklog.md" || echo MISS

@@ -558,7 +558,8 @@ anchor C5 "$PLAIN"
 block | grep -qxF 'crepo on: parser rewrite' \
   || { echo "FAIL: C5 -- line not under Worklog:"; fail=1; }
 
-# --- C6 model text with an apostrophe, escaped the project's '\'' way
+# --- C6 model text with an apostrophe, escaped per the constitution's
+# rule "Escape ' as '\''."
 fresh c6
 fill "Dana'\\''s thread" "$T/csnip6.sh"
 snip "$CR" "$T/csnip6.sh"
@@ -566,6 +567,25 @@ only C6 "^[0-9][0-9]* crepo on: Dana's thread$"
 anchor C6 "$PLAIN"
 block | grep -qxF "crepo on: Dana's thread" \
   || { echo "FAIL: C6 -- line not under Worklog:"; fail=1; }
+
+# --- C7 raw text filled the way the prose instructs: apostrophes, $( ) and a
+# backtick span stay literal text; nothing in them runs.
+fresh c7
+mkdir -p "$T/c7plain"
+C7RAW="don't touch Bo's branch \$(touch pwned1) \`touch pwned2\`"
+# The rule applied by awk gsub: each ' becomes '\''. The replacement string
+# holds one backslash; a lone \ before ' is literal in gsub's replacement.
+C7ESC=$(C7RAW=$C7RAW awk 'BEGIN { s = ENVIRON["C7RAW"]; gsub("\047", "\047\\\047\047", s); print s }')
+fill "$C7ESC" "$T/csnip7.sh"
+snip "$T/c7plain" "$T/csnip7.sh"
+[ "$rc" = 0 ] || { echo "FAIL: C7 -- snippet exited $rc"; fail=1; }
+[ -z "$SOUT" ] || { echo "FAIL: C7 -- snippet wrote stdout: $SOUT"; fail=1; }
+nlines C7 1
+c7got=$(sed -n 's/^[0-9][0-9]* c7plain on: //p' "$W" 2>/dev/null)
+[ "$c7got" = "$C7RAW" ] || { echo "FAIL: C7 -- stored text is not the raw text: $c7got"; fail=1; }
+for pw in pwned1 pwned2; do
+  [ -e "$T/c7plain/$pw" ] && { echo "FAIL: C7 -- $pw ran"; fail=1; }
+done
 
 # Prose pins: single-line fragments of the constitution's Worklog section.
 cpin() {
@@ -585,7 +605,10 @@ cpin 'Never propose a live on: item uninvited'
 cpin 'explicit ask wins over any claim'
 cpin 'never a list for the user'
 cpin '(commits log themselves)'
-cpin 'Speak only on MISS'
+cpin "Escape ' as '\\''."
+cpin 'Speak on MISS or an error'
+nold=$(grep -c 'Speak only on MISS' "$C")
+[ "$nold" = 0 ] || { echo "FAIL: pin -- old 'Speak only on MISS' still present"; fail=1; }
 
 [ "$fail" -eq 0 ] || exit 1
 echo PASS
