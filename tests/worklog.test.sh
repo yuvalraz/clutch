@@ -4,7 +4,7 @@
 # its git gate, so sessions outside a repo see it too. Live on: claims are
 # kept first, then the newest moved: lines fill up to 8, printed in file
 # order with the epoch dropped and each line cut to 160 chars. P2 covers the
-# stop.sh writer (S1-S10): one moved: landed line per forward move of the
+# stop.sh writer (S1-S11, S4b): one moved: landed line per forward move of the
 # user's newest authored commit, deduped by subject, silent on stdout.
 # The scripts under test are staged into a scratch tree (anchor.sh, prelude.sh
 # and stop.sh into $T/scripts, the constitution into $T/rules) and run under
