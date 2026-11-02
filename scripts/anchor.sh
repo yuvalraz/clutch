@@ -1,7 +1,7 @@
 #!/bin/sh
 # clutch anchor: SessionStart hook (startup|resume|clear|compact|fork).
 # Injects the constitution plus at most 3 lines of thread context.
-# Outside a git work tree: constitution plus the worklog block. Fail-open everywhere.
+# The worklog block prints before the git gate, so it shows inside and outside a repo. Fail-open everywhere.
 
 # Hook input JSON arrives on stdin; only the source field matters here, plus seconds_since_last_response on a fork (read, never printed).
 INPUT=$(cat 2>/dev/null) || INPUT=""
