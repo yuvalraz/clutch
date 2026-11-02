@@ -204,10 +204,11 @@ other. That log is not pool stock: it is the one thing sessions write to
 commit subjects and repo names included, reach sessions in every repo, a work
 repo included. If you keep no `~/.clutch` yet, the first note creates it, and
 that folder is the brain: from then on an absorb verdict in `/clutch:fomo`
-files ideas into `~/.clutch/ideas/` instead of skipping. The divergent skills
-can reach out (`/clutch:fomo` fetches a banked link, and a spark, daydream,
-dream-spark, or ideate pass may run a web search) but only when you invoke
-them. Nothing here touches the network on its own, and you can verify it:
+files ideas into `~/.clutch/ideas/`, which sessions in every repo read,
+instead of the repo's `.clutch/ideas/`. The divergent skills can reach out
+(`/clutch:fomo` fetches a banked link, and a spark, daydream, dream-spark, or
+ideate pass may run a web search) but only when you invoke them. Nothing here
+touches the network on its own, and you can verify it:
 
 ```
 grep -rE 'curl|wget|/dev/tcp|nc ' scripts/

@@ -634,6 +634,10 @@ dpin "$README" 'No pool item enters it ambiently'
 # Paired with the positive pin above, so a missing README cannot pass this.
 namb=$(grep -c 'Nothing enters it ambiently' "$README")
 [ "$namb" = 0 ] || { echo "FAIL: doc pin -- README still says 'Nothing enters it ambiently' ($namb hit)"; fail=1; }
+# Without a brain, absorb files into the repo's .clutch/ideas/, not nowhere.
+dpin "$README" "instead of the repo's"
+nskip=$(grep -c 'instead of skipping' "$README")
+[ "$nskip" = 0 ] || { echo "FAIL: doc pin -- README still says 'instead of skipping' ($nskip hit)"; fail=1; }
 dpin "$GLOSSARY" 'is not pool stock'
 dpin "$GLOSSARY" 'no command or verdict asks for'
 dpin "$GLOSSARY" 'Its first write creates'
