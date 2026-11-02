@@ -3,7 +3,9 @@
 # reader: anchor.sh shows the live window under a "Worklog:" header, before
 # its git gate, so sessions outside a repo see it too. Live on: claims are
 # kept first, then the newest moved: lines fill up to 8, printed in file
-# order with the epoch dropped and each line cut to 160 chars.
+# order with the epoch dropped and each line cut to 160 chars. P2 covers the
+# stop.sh writer (S1-S10): one moved: landed line per forward move of the
+# user's newest authored commit, deduped by subject, silent on stdout.
 # The scripts under test are staged into a scratch tree (anchor.sh, prelude.sh
 # and stop.sh into $T/scripts, the constitution into $T/rules) and run under
 # a scratch HOME with CLAUDE_PLUGIN_ROOT unset, so the anchor's
@@ -256,6 +258,158 @@ proj on: c8
 proj on: c9'
 [ "$(block)" = "$EXP" ] || { echo "FAIL: W12b -- block is not c2..c9 in file order"; fail=1; }
 lacks "W12b move" "after-claims"
+
+# ===== P2: the stop.sh writer =====
+# No global or system git config may leak an identity into the scratch repos.
+unset XDG_CONFIG_HOME
+GIT_CONFIG_NOSYSTEM=1
+export GIT_CONFIG_NOSYSTEM
+STOP="$T/scripts/stop.sh"
+rm -rf "$HOME/.clutch"
+
+# stop <label> <dir>: one Stop run; asserts rc 0 and empty stdout.
+stop() {
+  SOUT=$(cd "$2" && printf '{}' | sh "$STOP"); rc=$?
+  [ "$rc" = 0 ] || { echo "FAIL: $1 -- stop exited $rc"; fail=1; }
+  [ -z "$SOUT" ] || { echo "FAIL: $1 -- stop wrote stdout: $SOUT"; fail=1; }
+}
+# mkrepo <dir>: a repo with a repo-local identity and one commit.
+mkrepo() {
+  mkdir -p "$1" && git -C "$1" init -q &&
+    git -C "$1" config user.email s@s && git -C "$1" config user.name s &&
+    git -C "$1" commit -q --allow-empty -m "seed $(basename "$1")"
+}
+# commit <dir> <subject>
+commit() { git -C "$1" commit -q --allow-empty -m "$2"; }
+# lines: the worklog's line count (0 when absent).
+lines() { if [ -f "$W" ]; then wc -l < "$W" | tr -d ' '; else echo 0; fi; }
+# nlines <label> <n>
+nlines() {
+  nl=$(lines)
+  [ "$nl" = "$2" ] || { echo "FAIL: $1 -- worklog has $nl lines, want $2"; fail=1; }
+}
+# headis <label> <dir>: .clutch/worklog-head holds the repo's HEAD.
+headis() {
+  [ "$(head -n 1 "$2/.clutch/worklog-head" 2>/dev/null)" = "$(git -C "$2" rev-parse HEAD)" ] \
+    || { echo "FAIL: $1 -- worklog-head is not HEAD"; fail=1; }
+}
+# lastline <label> <ERE>: the worklog's last line matches.
+lastline() {
+  tail -n 1 "$W" 2>/dev/null | grep -qE -- "$2" \
+    || { echo "FAIL: $1 -- last line does not match: $2"; fail=1; }
+}
+noclutch() {
+  { [ -e "$HOME/.clutch" ] || [ -L "$HOME/.clutch" ]; } && { echo "FAIL: $1 -- ~/.clutch exists"; fail=1; }
+}
+
+SR="$T/srepo"
+mkrepo "$SR" || exit 1
+
+# --- S1 first stop seeds the head, writes no line, creates no ~/.clutch
+stop S1 "$SR"
+headis S1 "$SR"
+noclutch S1
+
+# --- S2 a new commit logs exactly one line and creates ~/.clutch
+commit "$SR" "feat two"
+stop S2 "$SR"
+[ -d "$HOME/.clutch" ] || { echo "FAIL: S2 -- ~/.clutch not created"; fail=1; }
+nlines S2 1
+grep -qxE "[0-9]+ srepo moved: landed 'feat two'" "$W" 2>/dev/null \
+  || { echo "FAIL: S2 -- line is not <epoch> srepo moved: landed 'feat two'"; fail=1; }
+
+# --- S3 the same head logs nothing more
+stop S3 "$SR"
+nlines S3 1
+
+# --- S4 a side branch off the first commit reseeds silently
+git -C "$SR" checkout -q -b side "$(git -C "$SR" rev-list --max-parents=0 HEAD)"
+commit "$SR" "side"
+stop S4 "$SR"
+nlines S4 1
+headis S4 "$SR"
+
+# --- S5 no ~/.clutch: the same head creates nothing; a new commit does
+rm -rf "$HOME/.clutch"
+stop "S5 same" "$SR"
+noclutch S5
+commit "$SR" "feat five"
+stop "S5 new" "$SR"
+nlines S5 1
+lastline S5 "^[0-9]+ srepo moved: landed 'feat five'$"
+
+# --- S6 an unwritable ~/.clutch or HOME writes nothing, silently
+if [ "$(id -u)" = 0 ]; then
+  echo "SKIP: S6 (root writes through chmod 555)"
+else
+  rm -f "$W"
+  chmod 555 "$HOME/.clutch"
+  commit "$SR" "feat six"
+  stop S6a "$SR"
+  [ -e "$W" ] && { echo "FAIL: S6a -- worklog written"; fail=1; }
+  chmod 755 "$HOME/.clutch"
+  rm -rf "$HOME/.clutch"
+  chmod 555 "$HOME"
+  commit "$SR" "feat six b"
+  stop S6b "$SR"
+  chmod 755 "$HOME"
+  noclutch S6b
+  commit "$SR" "feat six c"
+  stop "S6 control" "$SR"
+  nlines "S6 control" 1
+  lastline "S6 control" "^[0-9]+ srepo moved: landed 'feat six c'$"
+fi
+
+# --- S7 round trip: the hook's line shows in the anchor
+commit "$SR" "feat seven"
+stop S7 "$SR"
+anchor S7 "$PLAIN"
+has S7 "srepo moved: landed 'feat seven'"
+
+# --- S8 a spaced repo name becomes a dashed project field
+S8R="$T/my repo"
+mkrepo "$S8R" || exit 1
+stop "S8 seed" "$S8R"
+commit "$S8R" "feat eight"
+stop S8 "$S8R"
+lastline S8 "^[0-9]+ my-repo moved: landed 'feat eight'$"
+anchor S8 "$PLAIN"
+has S8 "my-repo moved: landed 'feat eight'"
+
+# --- S9 no matching identity: no head, no line; then the head seeds
+S9R="$T/r9"
+mkdir -p "$S9R" && git -C "$S9R" init -q || exit 1
+git -C "$S9R" -c user.email=o@o -c user.name=o commit -q --allow-empty -m "nine a"
+git -C "$S9R" -c user.email=o@o -c user.name=o commit -q --allow-empty -m "nine b"
+n9=$(lines)
+stop S9 "$S9R"
+[ -e "$S9R/.clutch/worklog-head" ] && { echo "FAIL: S9 -- head file written"; fail=1; }
+nlines S9 "$n9"
+git -C "$S9R" config user.email o@o
+git -C "$S9R" config user.name o
+stop "S9 control" "$S9R"
+headis "S9 control" "$S9R"
+nlines "S9 control" "$n9"
+
+# --- S10 a pull of own commits logs nothing; the clone's own commit does
+mkrepo "$T/r10" || exit 1
+git clone -q "$T/r10" "$T/clone" || exit 1
+git -C "$T/clone" config user.email s@s
+git -C "$T/clone" config user.name s
+stop "S10 seed" "$T/r10"
+stop "S10 seed clone" "$T/clone"
+n10=$(lines)
+commit "$T/r10" "feat ten"
+stop S10 "$T/r10"
+nlines S10 $((n10 + 1))
+git -C "$T/clone" pull -q --ff-only 2>/dev/null
+stop "S10 pull" "$T/clone"
+nlines "S10 pull" $((n10 + 1))
+headis "S10 pull" "$T/clone"
+commit "$T/clone" "feat ten b"
+stop "S10 control" "$T/clone"
+nlines "S10 control" $((n10 + 2))
+lastline "S10 control" "^[0-9]+ clone moved: landed 'feat ten b'$"
 
 [ "$fail" -eq 0 ] || exit 1
 echo PASS
