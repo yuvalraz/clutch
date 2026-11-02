@@ -42,6 +42,8 @@ pin "$S" "intent: fork inherits gear" 'A fork inherits the declared gear too.'
 # --- (iii) harness
 Q='build, ideate, ops, or review?'
 T=$(mktemp -d) || exit 1
+HOME=$T/home; export HOME
+mkdir -p "$HOME"
 trap 'rm -rf "$T"' EXIT
 mkdir "$T/scripts"
 cp "$A" "$T/scripts/anchor.sh"

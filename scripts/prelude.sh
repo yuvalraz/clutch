@@ -2,7 +2,8 @@
 # POSIX sh only. Every failure degrades to "do nothing".
 #
 # Sets: CLUTCH_GIT (1 inside a git work tree, else 0), ROOT, CLUTCH_DIR,
-# EXCLUDE_FILE. Defines clutch_ensure_dir, clutch_last_authored.
+# EXCLUDE_FILE, CLUTCH_WORKLOG. Defines clutch_ensure_dir,
+# clutch_last_authored, clutch_worklog_window.
 
 CLUTCH_GIT=0
 ROOT=""
@@ -26,6 +27,9 @@ if command -v git >/dev/null 2>&1; then
     fi
   fi
 fi
+
+# The cross-session worklog is global, so it is set inside a repo or not.
+CLUTCH_WORKLOG="$HOME/.clutch/worklog.md"
 
 # Create .clutch/ on first write and keep it out of git status via the
 # repo-local exclude file. Fail-open: any error returns nonzero, caller exits 0.
@@ -79,4 +83,31 @@ clutch_last_authored() {
   fi
   [ -n "$H" ] || return 1
   git log -1 --pretty="$FMT" "$H" 2>/dev/null
+}
+
+# Print the live worklog window: moved: lines under 24 h and on: lines under
+# 4 h, epoch dropped, at most 8, in file order. Malformed, future-dated and
+# unknown-verb lines are skipped. Returns 1 when the file is absent or
+# unreadable; never creates anything.
+# shortcut: scans the last 200 lines and cuts bytes, not characters; upgrade
+# if a day logs more than 200 lines or a cut splits a glyph.
+clutch_worklog_window() {
+  [ -f "$CLUTCH_WORKLOG" ] && [ -r "$CLUTCH_WORKLOG" ] || return 1
+  WNOW=$(date +%s 2>/dev/null) || return 1
+  tail -n 200 "$CLUTCH_WORKLOG" 2>/dev/null | awk -v now="$WNOW" '
+    $1 ~ /^[0-9]+$/ && NF >= 4 {
+      age = now - $1
+      if (age < 0) next
+      if (($3 == "on:" && age < 14400) || ($3 == "moved:" && age < 86400)) {
+        line = $0; sub(/^[ \t]*[0-9]+[ \t]+/, "", line)
+        n++; txt[n] = substr(line, 1, 160); on[n] = ($3 == "on:")
+      }
+    }
+    # Live claims are kept first so a burst of moves cannot push a held item out of view.
+    END {
+      k = 0
+      for (i = n; i > 0 && k < 8; i--) if (on[i]) { keep[i] = 1; k++ }
+      for (i = n; i > 0 && k < 8; i--) if (!on[i]) { keep[i] = 1; k++ }
+      for (i = 1; i <= n; i++) if (keep[i]) print txt[i]
+    }' 2>/dev/null
 }

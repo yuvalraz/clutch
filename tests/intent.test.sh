@@ -93,6 +93,8 @@ pin "$G" "GLOSSARY: cites PoP entry"  'see "Point of performance"'
 # only at a true session boundary (startup|resume|clear or a cold fork; never compact or a hot fork).
 Q='build, ideate, ops, or review?'
 T=$(mktemp -d) || exit 1
+HOME=$T/home; export HOME
+mkdir -p "$HOME"
 trap 'chmod -R u+rwx "$T" 2>/dev/null; rm -rf "$T"' EXIT
 # Stage the anchor under test beside the real prelude.sh (see the replay note
 # in the header) and execute the staged copy everywhere below.

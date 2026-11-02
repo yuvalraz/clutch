@@ -37,6 +37,8 @@ Procedure:
    - `state present but not writable`, or `unreadable` when the file's mode blocks reading: `chmod u+rw .clutch/session-state` lets the hooks back in.
    - `.clutch present but not a directory`: moving that `.clutch` file or link aside lets the next hook make the directory.
    - `session-state present but not a file`: moving `.clutch/session-state` aside lets the next hook start a fresh one.
+   - `worklog: unwritable`: `chmod u+rwx ~/.clutch` and `chmod u+rw ~/.clutch/worklog.md` let the writers back in.
+   - `worklog: missing`: nothing to fix; the first write makes it, and when the line names `~/.clutch` that write creates the folder too, which also starts a brain.
 
 Why this works: silence is the pack's designed degrade direction, so health
 must be checkable on demand rather than inferred from absence. See

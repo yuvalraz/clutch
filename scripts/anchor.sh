@@ -1,7 +1,7 @@
 #!/bin/sh
 # clutch anchor: SessionStart hook (startup|resume|clear|compact|fork).
 # Injects the constitution plus at most 3 lines of thread context.
-# Outside a git work tree: constitution only. Fail-open everywhere.
+# The worklog block prints before the git gate, so it shows inside and outside a repo. Fail-open everywhere.
 
 # Hook input JSON arrives on stdin; only the source field matters here, plus seconds_since_last_response on a fork (read, never printed).
 INPUT=$(cat 2>/dev/null) || INPUT=""
@@ -16,6 +16,9 @@ fi
 PRELUDE=$(dirname "$0")/prelude.sh
 [ -f "$PRELUDE" ] || exit 0
 . "$PRELUDE" || exit 0
+# Read before the git gate so sessions outside a repo see the worklog too.
+WLINES=$(clutch_worklog_window 2>/dev/null) || WLINES=""
+[ -n "$WLINES" ] && printf '\nWorklog:\n%s\n' "$WLINES"
 [ "$CLUTCH_GIT" = 1 ] || exit 0
 
 # Reset the session clock only on a positively identified fresh session

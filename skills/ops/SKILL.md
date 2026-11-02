@@ -83,6 +83,19 @@ Bounds (HARD):
 - No counts: not how many sit unread, not how many wait, not how long
   anything has waited.
 
+Read the worklog in the same pulse, once:
+
+```sh
+sh -c '. "${CLAUDE_PLUGIN_ROOT}/scripts/prelude.sh" && clutch_worklog_window'
+```
+
+Each line is a session's, maybe this one's from before a compaction or
+clear. A live `on:` line is a loop a session holds; a `moved:` line is one
+already closed. Leave both out of the situation and never propose them
+uninvited; the user's explicit ask wins over any claim. Empty output
+means no peer context, and the sweep goes on. A
+`/scripts/prelude.sh` not-found error means clutch is not loaded as a plugin: say so once and go on.
+
 ### Step 3: The situation
 
 Speak the situation in a few lines, present tense, co-working voice. Group
@@ -125,6 +138,9 @@ behavior:
   engages. **A loop that wants a clock** gets `/clutch:sprint`.
 - **Re-sweep on request only.** `/clutch:ops re-sweep` is the only path to a
   second sweep.
+- **A closed loop logs one line.** Append its `moved:` line with the
+  constitution's worklog snippet, silently; speak on MISS or an error.
+  That line is the only thing a closed loop writes; the sweep itself still writes nothing.
 
 ### Session close
 

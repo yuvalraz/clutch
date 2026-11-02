@@ -71,6 +71,21 @@ pin "$O" "ops: one smallest move"       'one loop that closes in one sitting'
 pin "$O" "ops: fires when fired"        'Nothing here runs on its own'
 pin "$O" "ops: eod owns the close"      '/clutch:eod'
 pin "$O" "ops: description trigger"     'hands off after an "ops" answer'
+
+# --- ops skill: the sweep reads the worklog window; a closed loop logs one line
+pin "$O" "ops: worklog window read"     'clutch_worklog_window'
+pin "$O" "ops: claims never proposed"   'never propose them'
+pin "$O" "ops: explicit ask wins"       "the user's explicit ask wins over any claim"
+pin "$O" "ops: empty read goes on"      'means no peer context'
+pin "$O" "ops: not loaded as a plugin"  '`/scripts/prelude\.sh` not-found error means clutch is not loaded as a plugin'
+pin "$O" "ops: say so once"             'say so once and go on'
+# Paired with the positive pin above: a failed read no longer passes as no peer context.
+nfr=$(grep -c 'failed read means' "$O")
+[ "$nfr" = 0 ] || { echo "FAIL: ops -- still says 'failed read means' ($nfr hit)"; fail=1; }
+pin "$O" "ops: closed loop logs"        'A closed loop logs one line'
+pin "$O" "ops: snippet speaks on MISS"  'silently; speak on MISS or an error'
+pin "$O" "ops: only write"              'the only thing a closed loop writes'
+pin "$O" "ops: sweep still writes none" 'the sweep itself still writes nothing'
 # The handoff path: /clutch:intent ops must be able to invoke the skill, so
 # model invocation stays enabled (negative pin).
 if grep -q 'disable-model-invocation: true' "$O"; then
@@ -120,6 +135,8 @@ check_empty "F daemon (ops)"        -niE "$PAT_F" "$O"
 check_empty "G template (ops)"      -nF  "$PAT_T" "$O"
 
 T=$(mktemp -d) || exit 1
+HOME=$T/home; export HOME
+mkdir -p "$HOME"
 trap 'rm -rf "$T"' EXIT
 printf 'a javos /intent fuel daemon at HH:MM\n' > "$T/probe"
 grep -iE "$PAT_A" "$T/probe" >/dev/null 2>&1 || { echo "FAIL: self-check missed probe for A"; fail=1; }
@@ -162,5 +179,28 @@ OUT=$(cd "$T/repo" && printf '%s' '{"source":"startup"}' | sh "$RUN"); RC=$?
 [ "$RC" = 0 ] || { echo "FAIL: anchor exited $RC on startup"; exit 1; }
 printf '%s\n' "$OUT" | tail -n 1 | grep -qF "$Q" \
   || { echo "FAIL: startup ask does not name the four focuses as its final line"; exit 1; }
+
+# --- O-run: the skill's own worklog read line, run against the real
+# prelude.sh from a plain dir, prints a fresh on: claim and hides a 5 h one.
+# The plugin root must be fully substituted and is unset for the run, so an
+# inherited CLAUDE_PLUGIN_ROOT cannot carry a line the substitution missed.
+LINE=$(grep -F 'sh -c' "$O" | grep -F 'clutch_worklog_window')
+[ "$(printf '%s\n' "$LINE" | grep -c .)" = 1 ] \
+  || { echo "FAIL: O-run wants exactly one sh -c line reading clutch_worklog_window, got: $LINE"; exit 1; }
+CMD=$(printf '%s\n' "$LINE" | RR=$(cd "$HERE/.." && pwd) awk '{
+  k = "${CLAUDE_PLUGIN_ROOT}"; i = index($0, k)
+  if (i) $0 = substr($0, 1, i - 1) ENVIRON["RR"] substr($0, i + length(k))
+  print }')
+case "$CMD" in
+  *CLAUDE_PLUGIN_ROOT*) echo "FAIL: O-run -- plugin root left unsubstituted: $CMD"; exit 1 ;;
+esac
+unset CLAUDE_PLUGIN_ROOT
+NOW=$(date +%s)
+mkdir -p "$HOME/.clutch" "$T/plain"
+printf '%s proj on: fresh-claim\n%s proj on: stale-claim\n' "$NOW" "$((NOW - 5 * 3600))" > "$HOME/.clutch/worklog.md"
+OUT=$(cd "$T/plain" && sh -c "$CMD"); RC=$?
+[ "$RC" = 0 ] || { echo "FAIL: O-run exited $RC: $CMD"; exit 1; }
+[ "$OUT" = "proj on: fresh-claim" ] \
+  || { echo "FAIL: O-run wanted only the fresh claim, got: $OUT"; exit 1; }
 
 echo PASS

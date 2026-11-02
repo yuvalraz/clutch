@@ -1,7 +1,8 @@
 #!/bin/sh
 # clutch stop: the single Stop hook. Same-event hooks run in parallel, so the
-# thread breadcrumb writer and the recognition bell live in one process, run
-# sequentially, and never race each other on .clutch/ state.
+# thread breadcrumb writer, the worklog writer (~/.clutch/worklog.md) and the
+# recognition bell live in one process, run sequentially, and never race each
+# other on .clutch/ state.
 # Silent by default; any error degrades to nothing. Exit 0 always.
 
 PRELUDE=$(dirname "$0")/prelude.sh
@@ -10,7 +11,7 @@ PRELUDE=$(dirname "$0")/prelude.sh
 [ "$CLUTCH_GIT" = 1 ] || exit 0
 clutch_ensure_dir || exit 0
 
-# --- thread: breadcrumb + Stop timestamp. Emits nothing, ever. ---
+# --- thread: breadcrumb + Stop timestamp + worklog. Emits nothing, ever. ---
 {
   BRANCH=$(git symbolic-ref --short -q HEAD 2>/dev/null) || BRANCH=""
   SUBJECT=$(clutch_last_authored %s) || SUBJECT=""
@@ -45,6 +46,43 @@ clutch_ensure_dir || exit 0
   printf '%s\n' "$LINE" > "$CLUTCH_DIR/breadcrumb"
   NOW=$(date +%s)
   printf 'stop %s\n' "$NOW" >> "$CLUTCH_DIR/session-state"
+
+  # Worklog: log a landed authored commit once for peer sessions. The head and
+  # this stop's epoch are recorded first, on every stop, then the line
+  # appended: a lost line is acceptable, a repeated one is not. The gate reads
+  # the epoch stored by the previous stop, so an idle head stays fresh and a
+  # fetched branch checked out later is not logged. The first run seeds without
+  # backfill; a head that does not descend from the logged one (branch
+  # switch, rebase) reseeds silently. A head whose committer time is older
+  # than the stored epoch was reached by a checkout, not a new commit (old
+  # branch, return to a logged branch, bisect), and reseeds silently; so does
+  # a one-field head file with no epoch. A subject already in the last 200
+  # lines is skipped, because a pull of the user's own commits from another
+  # worktree or clone moves the head forward with recent commits too.
+  # mkdir -p sits last so only a due line creates ~/.clutch, and creating it
+  # starts a brain (accepted, see README).
+  WHEAD="$CLUTCH_DIR/worklog-head"
+  WCUR=$(clutch_last_authored %H) || WCUR=""
+  if [ -n "$WCUR" ]; then
+    WREC=$(head -n 1 "$WHEAD" 2>/dev/null) || WREC=""
+    WPREV=${WREC%% *}
+    WSEEN=${WREC#* }
+    case "$WSEEN" in '' | *[!0-9]*) WSEEN="" ;; esac
+    if printf '%s %s\n' "$WCUR" "$NOW" > "$WHEAD" && [ "$WCUR" != "$WPREV" ]; then
+      WCT=$(git log -1 --format=%ct "$WCUR" 2>/dev/null) || WCT=""
+      # shortcut: the 200 cut counts bytes, not characters, and can split a
+      # glyph; upgrade if subjects that long show up.
+      WLANDED=$(printf "landed '%.200s'" "$SUBJECT")
+      if [ -n "$WPREV" ] && [ -n "$WSEEN" ] && [ -n "$SUBJECT" ] &&
+        [ "$WCT" -ge "$WSEEN" ] &&
+        git merge-base --is-ancestor "$WPREV" "$WCUR" &&
+        ! tail -n 200 "$CLUTCH_WORKLOG" 2>/dev/null | grep -qF "moved: $WLANDED" &&
+        mkdir -p "$HOME/.clutch" 2>/dev/null; then
+        printf '%s %s moved: %s\n' "$NOW" \
+          "$(basename "$ROOT" | tr ' ' -)" "$WLANDED" >> "$CLUTCH_WORKLOG"
+      fi
+    fi
+  fi
 } >/dev/null 2>&1
 
 # --- bell: gated recognition. Silent by default; the gate is the point. ---

@@ -80,4 +80,14 @@ if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
 else
   echo "  git substrate: absent; the anchor and bell degrade by design here"
 fi
+W="$HOME/.clutch/worklog.md"
+if [ -f "$W" ] && [ -w "$W" ]; then
+  echo "  worklog: writable ($W)"
+elif [ ! -e "$HOME/.clutch" ]; then
+  echo "  worklog: missing; the first write makes it and ~/.clutch, which starts a brain"
+elif [ ! -e "$W" ] && [ ! -L "$W" ] && [ -d "$HOME/.clutch" ] && [ -w "$HOME/.clutch" ] && [ -x "$HOME/.clutch" ]; then
+  echo "  worklog: missing; the first write makes it"
+else
+  echo "  worklog: unwritable ($W)"
+fi
 exit 0
