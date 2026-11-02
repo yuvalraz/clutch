@@ -47,25 +47,36 @@ clutch_ensure_dir || exit 0
   NOW=$(date +%s)
   printf 'stop %s\n' "$NOW" >> "$CLUTCH_DIR/session-state"
 
-  # Worklog: log a landed authored commit once for peer sessions. The head is
-  # recorded first, then the line appended: a lost line is acceptable, a
-  # repeated one is not. The first run seeds without backfill; a head that
-  # does not descend from the logged one (branch switch, rebase) reseeds
-  # silently. A subject already in the last 200 lines is skipped, because a
-  # pull of the user's own commits from another worktree or clone moves the
-  # head forward too. mkdir -p sits last so only a due line creates
-  # ~/.clutch, and creating it starts a brain (accepted, see README).
+  # Worklog: log a landed authored commit once for peer sessions. The head and
+  # this stop's epoch are recorded first, then the line appended: a lost line
+  # is acceptable, a repeated one is not. The first run seeds without
+  # backfill; a head that does not descend from the logged one (branch
+  # switch, rebase) reseeds silently. A head whose committer time is older
+  # than the stored epoch was reached by a checkout, not a new commit (old
+  # branch, return to a logged branch, bisect), and reseeds silently; so does
+  # a one-field head file with no epoch. A subject already in the last 200
+  # lines is skipped, because a pull of the user's own commits from another
+  # worktree or clone moves the head forward with recent commits too.
+  # mkdir -p sits last so only a due line creates ~/.clutch, and creating it
+  # starts a brain (accepted, see README).
   WHEAD="$CLUTCH_DIR/worklog-head"
   WCUR=$(clutch_last_authored %H) || WCUR=""
   if [ -n "$WCUR" ]; then
-    WPREV=$(head -n 1 "$WHEAD" 2>/dev/null) || WPREV=""
-    if [ "$WCUR" != "$WPREV" ] && printf '%s\n' "$WCUR" > "$WHEAD"; then
+    WREC=$(head -n 1 "$WHEAD" 2>/dev/null) || WREC=""
+    WPREV=${WREC%% *}
+    WSEEN=${WREC#* }
+    case "$WSEEN" in '' | *[!0-9]*) WSEEN="" ;; esac
+    if [ "$WCUR" != "$WPREV" ] && printf '%s %s\n' "$WCUR" "$NOW" > "$WHEAD"; then
+      WCT=$(git log -1 --format=%ct "$WCUR" 2>/dev/null) || WCT=""
+      # shortcut: the 200 cut counts bytes, not characters, and can split a
+      # glyph; upgrade if subjects that long show up.
       WLANDED=$(printf "landed '%.200s'" "$SUBJECT")
-      if [ -n "$WPREV" ] && [ -n "$SUBJECT" ] &&
+      if [ -n "$WPREV" ] && [ -n "$WSEEN" ] && [ -n "$SUBJECT" ] &&
+        [ "$WCT" -ge "$WSEEN" ] &&
         git merge-base --is-ancestor "$WPREV" "$WCUR" &&
         ! tail -n 200 "$CLUTCH_WORKLOG" 2>/dev/null | grep -qF "moved: $WLANDED" &&
         mkdir -p "$HOME/.clutch" 2>/dev/null; then
-        printf '%s %s moved: %s\n' "$(date +%s)" \
+        printf '%s %s moved: %s\n' "$NOW" \
           "$(basename "$ROOT" | tr ' ' -)" "$WLANDED" >> "$CLUTCH_WORKLOG"
       fi
     fi

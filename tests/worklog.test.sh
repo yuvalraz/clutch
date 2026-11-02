@@ -288,10 +288,14 @@ nlines() {
   nl=$(lines)
   [ "$nl" = "$2" ] || { echo "FAIL: $1 -- worklog has $nl lines, want $2"; fail=1; }
 }
-# headis <label> <dir>: .clutch/worklog-head holds the repo's HEAD.
+# headis <label> <dir>: .clutch/worklog-head holds "<HEAD> <stop-epoch>".
 headis() {
-  [ "$(head -n 1 "$2/.clutch/worklog-head" 2>/dev/null)" = "$(git -C "$2" rev-parse HEAD)" ] \
+  hrec=$(head -n 1 "$2/.clutch/worklog-head" 2>/dev/null)
+  [ "$(printf '%s\n' "$hrec" | cut -d' ' -f1)" = "$(git -C "$2" rev-parse HEAD)" ] \
     || { echo "FAIL: $1 -- worklog-head is not HEAD"; fail=1; }
+  case "$(printf '%s\n' "$hrec" | cut -s -d' ' -f2)" in
+    '' | *[!0-9]*) echo "FAIL: $1 -- worklog-head has no numeric stop-epoch"; fail=1 ;;
+  esac
 }
 # lastline <label> <ERE>: the worklog's last line matches.
 lastline() {
@@ -402,7 +406,10 @@ n10=$(lines)
 commit "$T/r10" "feat ten"
 stop S10 "$T/r10"
 nlines S10 $((n10 + 1))
-git -C "$T/clone" pull -q --ff-only 2>/dev/null
+git -C "$T/clone" pull -q --ff-only 2>/dev/null \
+  || { echo "FAIL: S10 -- pull failed"; fail=1; }
+[ "$(git -C "$T/clone" rev-parse HEAD)" = "$(git -C "$T/r10" rev-parse HEAD)" ] \
+  || { echo "FAIL: S10 -- clone is not at r10's HEAD after the pull"; fail=1; }
 stop "S10 pull" "$T/clone"
 nlines "S10 pull" $((n10 + 1))
 headis "S10 pull" "$T/clone"
@@ -410,6 +417,71 @@ commit "$T/clone" "feat ten b"
 stop "S10 control" "$T/clone"
 nlines "S10 control" $((n10 + 2))
 lastline "S10 control" "^[0-9]+ clone moved: landed 'feat ten b'$"
+
+# dated <dir> <age seconds> <subject>: a commit dated <age> ago.
+dated() {
+  d="$((NOW - $2)) +0000"
+  GIT_AUTHOR_DATE="$d" GIT_COMMITTER_DATE="$d" git -C "$1" commit -q --allow-empty -m "$3"
+}
+# r7init <dir>: an empty repo on main with the repo-local identity.
+r7init() {
+  mkdir -p "$1" && git -C "$1" init -q -b main &&
+    git -C "$1" config user.email s@s && git -C "$1" config user.name s
+}
+D=86400
+
+# --- S4b checkout to an old descendant and bisect-style steps log nothing
+rm -rf "$HOME/.clutch"
+B="$T/r4b"
+r7init "$B" || exit 1
+dated "$B" $((40 * D)) "base"
+git -C "$B" checkout -q -b old
+dated "$B" $((35 * D)) "old one"
+dated "$B" $((30 * D)) "old feature"
+git -C "$B" checkout -q main
+stop "S4b seed" "$B"
+git -C "$B" checkout -q old
+stop "S4b old" "$B"
+[ -e "$W" ] && { echo "FAIL: S4b -- checkout of old wrote a line"; fail=1; }
+noclutch "S4b old"
+headis "S4b old" "$B"
+for ref in main old~1 old; do
+  git -C "$B" checkout -q --detach "$ref"
+  stop "S4b $ref" "$B"
+done
+[ -e "$W" ] && { echo "FAIL: S4b -- bisect steps wrote a line"; fail=1; }
+noclutch "S4b bisect"
+git -C "$B" checkout -q old
+commit "$B" "feat four b"
+stop "S4b control" "$B"
+nlines "S4b control" 1
+lastline "S4b control" "^[0-9]+ r4b moved: landed 'feat four b'$"
+
+# --- S11 a return to a logged branch past the dedupe window logs nothing
+E="$T/r11"
+r7init "$E" || exit 1
+commit "$E" "seed r11"
+stop "S11 seed" "$E"
+# Fixture: the last head change was 2 h ago.
+printf '%s %s\n' "$(git -C "$E" rev-parse HEAD)" "$((NOW - 2 * H))" > "$E/.clutch/worklog-head"
+git -C "$E" checkout -q -b feat
+dated "$E" "$H" "feat eleven"
+n11=$(lines)
+stop S11 "$E"
+nlines S11 $((n11 + 1))
+lastline S11 "^[0-9]+ r11 moved: landed 'feat eleven'$"
+git -C "$E" checkout -q main
+stop "S11 main" "$E"
+i=1
+while [ "$i" -le 201 ]; do printf '%s filler moved: x%s\n' "$NOW" "$i"; i=$((i + 1)); done >> "$W"
+n11=$(lines)
+git -C "$E" checkout -q feat
+stop "S11 return" "$E"
+nlines "S11 return" "$n11"
+commit "$E" "feat eleven b"
+stop "S11 control" "$E"
+nlines "S11 control" $((n11 + 1))
+lastline "S11 control" "^[0-9]+ r11 moved: landed 'feat eleven b'$"
 
 [ "$fail" -eq 0 ] || exit 1
 echo PASS
