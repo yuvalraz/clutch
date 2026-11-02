@@ -120,6 +120,8 @@ check_empty "F daemon (ops)"        -niE "$PAT_F" "$O"
 check_empty "G template (ops)"      -nF  "$PAT_T" "$O"
 
 T=$(mktemp -d) || exit 1
+HOME=$T/home; export HOME
+mkdir -p "$HOME"
 trap 'rm -rf "$T"' EXIT
 printf 'a javos /intent fuel daemon at HH:MM\n' > "$T/probe"
 grep -iE "$PAT_A" "$T/probe" >/dev/null 2>&1 || { echo "FAIL: self-check missed probe for A"; fail=1; }

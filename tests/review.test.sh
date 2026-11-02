@@ -202,6 +202,8 @@ case $rc in
 esac
 
 T=$(mktemp -d) || exit 1
+HOME=$T/home; export HOME
+mkdir -p "$HOME"
 trap 'rm -rf "$T"' EXIT
 printf 'a javos /intent fuel daemon at HH:MM\n' > "$T/probe"
 grep -iE "$PAT_A" "$T/probe" >/dev/null 2>&1 || { echo "FAIL: self-check missed probe for A"; fail=1; }

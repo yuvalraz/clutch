@@ -2,7 +2,8 @@
 # Injection-size guard: hook output is capped at 10,000 chars, so the two
 # injected payloads, the SessionStart anchor and the UserPromptSubmit
 # heartbeat, must stay under BUDGET (1,000 chars of headroom) at their worst
-# case. (i) anchor on startup with every optional line present; (ii) heartbeat
+# case. (i) anchor on startup with every optional line present, including a
+# full worklog block (10 fresh 300-char lines under a scratch HOME); (ii) heartbeat
 # with a gear, a live sprint and spent budget; (iii) negative control: the
 # anchor with a constitution padded to 10,000 chars must trip the same check,
 # so the size assert cannot pass vacuously. The real anchor.sh runs beside the
@@ -27,6 +28,8 @@ done
 rep() { printf "%$1s" '' | tr ' ' "$2"; }
 
 T=$(mktemp -d) || exit 1
+HOME=$T/home; export HOME
+mkdir -p "$HOME"
 trap 'rm -rf "$T"' EXIT
 R="$T/repo"
 mkdir "$R"
@@ -45,6 +48,11 @@ anchor_out() {
   mkdir "$R/.clutch"
   printf '%s; most recent: %s\n' "$(rep 135 b)" "$(rep 150 p)" > "$R/.clutch/breadcrumb"
   printf 'one\ntwo\nthree\n' > "$R/.clutch/captures.md"
+  mkdir -p "$HOME/.clutch"
+  : > "$HOME/.clutch/worklog.md"
+  for i in 1 2 3 4 5 6 7 8 9 10; do
+    printf '%s\n' "$(date +%s) $(rep 20 p) moved: $(rep 300 m)" >> "$HOME/.clutch/worklog.md"
+  done
   OUT=$(cd "$R" && printf '%s' '{"source":"startup"}' | CLAUDE_PLUGIN_ROOT=$1 sh "$A"); rc=$?
   [ "$rc" = 0 ] || { echo "FAIL: anchor exited $rc"; fail=1; }
 }
@@ -53,6 +61,7 @@ anchor_out() {
 anchor_out "$PR"
 case "$OUT" in *"Last landed: '"*) ;; *) echo "FAIL: anchor -- no Last landed line, fixture under-measures"; fail=1 ;; esac
 case "$OUT" in *'build, ideate, ops, or review?'*) ;; *) echo "FAIL: anchor -- no intent ask, not the startup worst case"; fail=1 ;; esac
+printf '%s\n' "$OUT" | grep -qx 'Worklog:' || { echo "FAIL: anchor -- no worklog block, fixture under-measures"; fail=1; }
 N=$(printf '%s\n' "$OUT" | wc -c | tr -d ' ')
 [ "$N" -lt "$BUDGET" ] || { echo "FAIL: anchor worst case -- $N chars >= $BUDGET"; fail=1; }
 

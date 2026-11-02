@@ -1,0 +1,261 @@
+#!/bin/sh
+# Worklog: the cross-session log at $HOME/.clutch/worklog.md. P1 covers the
+# reader: anchor.sh shows the live window under a "Worklog:" header, before
+# its git gate, so sessions outside a repo see it too. Live on: claims are
+# kept first, then the newest moved: lines fill up to 8, printed in file
+# order with the epoch dropped and each line cut to 160 chars.
+# The scripts under test are staged into a scratch tree (anchor.sh, prelude.sh
+# and stop.sh into $T/scripts, the constitution into $T/rules) and run under
+# a scratch HOME with CLAUDE_PLUGIN_ROOT unset, so the anchor's
+# $(dirname "$0")/../rules fallback reads the staged constitution. ANCHOR_SH,
+# PRELUDE_SH, STOP_SH and CONST_FILE override the targets for replay against
+# a historical version. Every hide case carries a positive control in the
+# same leg, so no case passes on the pre-change scripts.
+set -u
+
+HERE=$(cd "$(dirname "$0")" && pwd)
+A=${ANCHOR_SH:-$HERE/../scripts/anchor.sh}
+P=${PRELUDE_SH:-$HERE/../scripts/prelude.sh}
+S=${STOP_SH:-$HERE/../scripts/stop.sh}
+C=${CONST_FILE:-$HERE/../rules/constitution.md}
+
+fail=0
+for f in "$A" "$P" "$S" "$C"; do
+  [ -f "$f" ] || { echo "FAIL: missing $f"; fail=1; }
+done
+[ "$fail" -eq 0 ] || exit 1
+
+T=$(mktemp -d) || exit 1
+trap 'chmod -R u+rwx "$T" 2>/dev/null; rm -rf "$T"' EXIT
+HOME=$T/home
+export HOME
+mkdir -p "$HOME" "$T/scripts" "$T/rules" "$T/plain"
+cp "$A" "$T/scripts/anchor.sh"
+cp "$P" "$T/scripts/prelude.sh"
+cp "$S" "$T/scripts/stop.sh"
+cp "$C" "$T/rules/constitution.md"
+unset CLAUDE_PLUGIN_ROOT
+RUN="$T/scripts/anchor.sh"
+PLAIN="$T/plain"
+W="$HOME/.clutch/worklog.md"
+NOW=$(date +%s)
+H=3600
+Q='build, ideate, ops, or review?'
+
+# rep <n> <char>: n copies of char.
+rep() { printf "%$1s" '' | tr ' ' "$2"; }
+
+# seed: an empty worklog in the scratch HOME.
+seed() { mkdir -p "$HOME/.clutch" && : > "$W"; }
+# add <age seconds> <rest of line>: append one stored line aged <age>.
+add() { printf '%s %s\n' "$((NOW - $1))" "$2" >> "$W"; }
+
+# anchor <label> <dir> [source]: sets OUT and ERR; asserts rc 0.
+OUT=""
+ERR=""
+anchor() {
+  OUT=$(cd "$2" && printf '{"source":"%s"}' "${3:-startup}" | sh "$RUN" 2>"$T/err"); rc=$?
+  ERR=$(cat "$T/err")
+  [ "$rc" = 0 ] || { echo "FAIL: $1 -- anchor exited $rc"; fail=1; }
+}
+
+# block: the lines after the Worklog: header (outside git the block is last).
+block() { printf '%s\n' "$OUT" | awk 'f { print } $0 == "Worklog:" { f = 1 }'; }
+
+# has <label> <line>: an exact output line must be present.
+has() {
+  printf '%s\n' "$OUT" | grep -qxF -- "$2"
+  rc=$?
+  case $rc in
+    0) ;;
+    1) echo "FAIL: $1 -- line not shown: $2"; fail=1 ;;
+    *) echo "FAIL: $1 -- grep error rc=$rc: $2"; fail=1 ;;
+  esac
+}
+# lacks <label> <text>: the fixed text must appear nowhere in the output.
+lacks() {
+  printf '%s\n' "$OUT" | grep -qF -- "$2"
+  rc=$?
+  case $rc in
+    1) ;;
+    0) echo "FAIL: $1 -- hidden text shown: $2"; fail=1 ;;
+    *) echo "FAIL: $1 -- grep error rc=$rc: $2"; fail=1 ;;
+  esac
+}
+# nblock <label> <n>: the block holds exactly n lines.
+nblock() {
+  nb=$(block | grep -c .)
+  [ "$nb" = "$2" ] || { echo "FAIL: $1 -- block has ${nb:-?} lines, want $2"; fail=1; }
+}
+
+# --- W1 a moved: line 1 h old shows without its epoch
+seed
+add "$H" "proj moved: shipped-one"
+anchor W1 "$PLAIN"
+has W1 "proj moved: shipped-one"
+lacks "W1 epoch" "$((NOW - H))"
+
+# --- W2 a moved: line 25 h old is hidden
+seed
+add $((25 * H)) "proj moved: stale-two"
+add "$H" "ctl moved: control-W2"
+anchor W2 "$PLAIN"
+has "W2 control" "ctl moved: control-W2"
+lacks W2 "stale-two"
+
+# --- W3 an on: line 3 h old shows
+seed
+add $((3 * H)) "proj on: claim-three"
+anchor W3 "$PLAIN"
+has W3 "proj on: claim-three"
+
+# --- W4 an on: line 5 h old is hidden
+seed
+add $((5 * H)) "proj on: old-four"
+add "$H" "ctl moved: control-W4"
+anchor W4 "$PLAIN"
+has "W4 control" "ctl moved: control-W4"
+lacks W4 "old-four"
+
+# --- W5 a line dated 1 h in the future is hidden
+seed
+add $((-H)) "proj moved: future-five"
+add "$H" "ctl moved: control-W5"
+anchor W5 "$PLAIN"
+has "W5 control" "ctl moved: control-W5"
+lacks W5 "future-five"
+
+# --- W6 malformed lines are hidden
+seed
+printf 'abc proj moved: bad-epoch\n' >> "$W"
+add "$H" "proj did: bad-verb"
+add "$H" "proj moved:"
+add "$H" "ctl moved: control-W6"
+anchor W6 "$PLAIN"
+has "W6 control" "ctl moved: control-W6"
+lacks "W6 epoch" "bad-epoch"
+lacks "W6 verb" "bad-verb"
+printf '%s\n' "$OUT" | grep -qxF 'proj moved:' && { echo "FAIL: W6 -- text-less line shown"; fail=1; }
+
+# --- W7 ten fresh moved: lines: the last 8 by file order, in file order
+seed
+for i in 1 2 3 4 5 6 7 8 9 10; do add $(((11 - i) * 60)) "proj moved: m$i"; done
+anchor W7 "$PLAIN"
+nblock W7 8
+EXP='proj moved: m3
+proj moved: m4
+proj moved: m5
+proj moved: m6
+proj moved: m7
+proj moved: m8
+proj moved: m9
+proj moved: m10'
+[ "$(block)" = "$EXP" ] || { echo "FAIL: W7 -- block is not m3..m10 in file order"; fail=1; }
+
+# --- W8 a 300-char text is cut to a 160-char displayed line
+seed
+add "$H" "proj moved: $(rep 300 x)"
+anchor W8 "$PLAIN"
+nblock W8 1
+L8=$(block | awk '{ print length($0) }')
+[ "$L8" = 160 ] || { echo "FAIL: W8 -- displayed line is ${L8:-?} chars, want 160"; fail=1; }
+block | grep -q '^proj moved: xxx' || { echo "FAIL: W8 -- cut line lost its head"; fail=1; }
+
+# --- W9 outside git: constitution plus block; inside git: block, ask last
+seed
+add "$H" "proj moved: nine"
+anchor "W9 plain" "$PLAIN"
+has "W9 plain constitution" "# Clutch constitution"
+has "W9 plain header" "Worklog:"
+has "W9 plain line" "proj moved: nine"
+R="$T/repo"
+mkdir "$R"
+git -C "$R" init -q
+git -C "$R" config user.email t@t
+git -C "$R" config user.name t
+git -C "$R" commit -q --allow-empty -m seed
+anchor "W9 git" "$R"
+has "W9 git header" "Worklog:"
+has "W9 git line" "proj moved: nine"
+printf '%s\n' "$OUT" | tail -n 1 | grep -qF "$Q" \
+  || { echo "FAIL: W9 git -- intent ask is not the last line"; fail=1; }
+
+# --- W10 empty file, missing file, missing ~/.clutch: no block, nothing created
+# w10 <label>: no header but the constitution; then a control line shows.
+w10() {
+  anchor "$1" "$PLAIN"
+  has "$1 constitution" "# Clutch constitution"
+  printf '%s\n' "$OUT" | grep -qx 'Worklog:' && { echo "FAIL: $1 -- block shown"; fail=1; }
+}
+w10ctl() {
+  mkdir -p "$HOME/.clutch"
+  add "$H" "ctl moved: control-$1"
+  anchor "$1 control" "$PLAIN"
+  has "$1 control header" "Worklog:"
+  has "$1 control line" "ctl moved: control-$1"
+}
+seed
+w10 "W10 empty"
+w10ctl "W10-empty"
+rm -f "$W"
+w10 "W10 missing file"
+w10ctl "W10-file"
+rm -rf "$HOME/.clutch"
+w10 "W10 missing dir"
+{ [ -e "$HOME/.clutch" ] || [ -L "$HOME/.clutch" ]; } && { echo "FAIL: W10 -- reader created ~/.clutch"; fail=1; }
+w10ctl "W10-dir"
+
+# --- W11 an unreadable worklog: no block, rc 0, empty stderr
+if [ "$(id -u)" = 0 ]; then
+  echo "SKIP: W11 (root reads chmod 000 files)"
+else
+  seed
+  add "$H" "proj moved: eleven"
+  chmod 000 "$W"
+  anchor W11 "$PLAIN"
+  has "W11 constitution" "# Clutch constitution"
+  lacks W11 "eleven"
+  [ -z "$ERR" ] || { echo "FAIL: W11 -- stderr not empty: $ERR"; fail=1; }
+  chmod 644 "$W"
+  anchor "W11 control" "$PLAIN"
+  has "W11 control" "proj moved: eleven"
+fi
+
+# --- W12 a live claim survives ten newer moved: lines
+seed
+add $((3 * H)) "proj on: claim-twelve"
+for i in 1 2 3 4 5 6 7 8 9 10; do add $(((11 - i) * 60)) "proj moved: m$i"; done
+anchor W12 "$PLAIN"
+nblock W12 8
+EXP='proj on: claim-twelve
+proj moved: m4
+proj moved: m5
+proj moved: m6
+proj moved: m7
+proj moved: m8
+proj moved: m9
+proj moved: m10'
+[ "$(block)" = "$EXP" ] || { echo "FAIL: W12 -- block is not the claim then m4..m10"; fail=1; }
+for i in 1 2 3; do
+  block | grep -qxF "proj moved: m$i" && { echo "FAIL: W12 -- m$i shown"; fail=1; }
+done
+
+# --- W12b nine live claims and one newer move: the newest 8 claims
+seed
+for i in 1 2 3 4 5 6 7 8 9; do add $(((20 - i) * 60)) "proj on: c$i"; done
+add 60 "proj moved: after-claims"
+anchor W12b "$PLAIN"
+nblock W12b 8
+EXP='proj on: c2
+proj on: c3
+proj on: c4
+proj on: c5
+proj on: c6
+proj on: c7
+proj on: c8
+proj on: c9'
+[ "$(block)" = "$EXP" ] || { echo "FAIL: W12b -- block is not c2..c9 in file order"; fail=1; }
+lacks "W12b move" "after-claims"
+
+[ "$fail" -eq 0 ] || exit 1
+echo PASS
