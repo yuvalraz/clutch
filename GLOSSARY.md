@@ -243,7 +243,10 @@ levels: the repo pool, where every write lands, and the brain, a user-level pool
 at `~/.clutch/` that every reader also sweeps, its items labeled [brain].
 Writes stay repo-scoped; promotion upward is the absorb verdict in
 /clutch:fomo, one item at a time. No brain, no change: everything reads
-exactly as before.
+exactly as before. The worklog, `~/.clutch/worklog.md`, is not pool stock:
+sessions append to it on their own as they work, the one write into
+`~/.clutch` no command or verdict asks for. Its first write creates
+`~/.clutch` when it is missing, so a brain starts there.
 
 ### Dream-spark
 

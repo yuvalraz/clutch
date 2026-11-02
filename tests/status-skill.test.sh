@@ -16,7 +16,9 @@
 # symlink is "not a directory", never the plugin-enablement line; a
 # session-state directory, alone or inside a 555 .clutch (non-root only; pins
 # the shape check above the not-writable check), and a dangling session-state
-# symlink are "not a file", never "no session state yet".
+# symlink are "not a file", never "no session state yet". Then the worklog
+# line under the scratch HOME: missing (with and without ~/.clutch, creating
+# nothing), writable, and unwritable (file 444; ~/.clutch 555, non-root only).
 # STATUS_SKILL and STATUS_SH override the skill
 # file and the script, so both can be replayed against any historical version
 # (git show BASE:... > tmp).
@@ -71,8 +73,13 @@ pin   "skill: fix line, .clutch dir"      '`.clutch present but not readable` or
 pin   "skill: fix line, state file mode"  '`state present but not writable`, or `unreadable` when the file'"'"'s mode blocks reading: `chmod u+rw .clutch/session-state`'
 pin   "skill: fix line, .clutch shape"    '`.clutch present but not a directory`: moving that `.clutch` file or link aside'
 pin   "skill: fix line, state shape"      '`session-state present but not a file`: moving `.clutch/session-state` aside'
+pin   "skill: worklog missing, first write" 'the first write makes it'
+pin   "skill: worklog missing, brain"       'which also starts a brain'
+pin   "skill: worklog unwritable, dir fix"  'chmod u+rwx ~/.clutch'
 
 T=$(mktemp -d) || exit 1
+HOME=$T/home; export HOME
+mkdir -p "$HOME"
 trap 'rm -rf "$T"' EXIT
 
 # --- (iv) scratch git repo: rc 0, first line "clutch status"
@@ -206,6 +213,36 @@ fi
 rmdir "$C2/session-state" || { echo "FAIL: rmdir session-state failed"; fail=1; }
 ln -s "$T/missing/state" "$C2/session-state" || { echo "FAIL: dangling session-state link fixture failed"; fail=1; }
 shape_line "session-state is a dangling symlink" 'session-state present but not a file' 'no session state'
+
+# --- (ix) the worklog line, from a plain dir under the scratch HOME. Readers
+# never create anything: the no-~/.clutch leg leaves HOME empty.
+WD="$HOME/.clutch"
+WF="$WD/worklog.md"
+trap 'chmod 755 "$CD" "$C2" "$WD" 2>/dev/null; chmod 644 "$SS" "$WF" 2>/dev/null; rm -rf "$T"' EXIT
+worklog_line() {
+  label=$1; want=$2
+  OUT=$(cd "$T/plain" && GIT_CEILING_DIRECTORIES="$T" sh "$ST"); rc=$?
+  [ "$rc" = 0 ] || { echo "FAIL: status ($label) exited $rc"; fail=1; }
+  printf '%s\n' "$OUT" | grep -qxF "$want" \
+    || { echo "FAIL: status ($label) -- want '$want', got:"; printf '%s\n' "$OUT" | grep worklog; fail=1; }
+}
+worklog_line "worklog, no ~/.clutch" '  worklog: missing; the first write makes it and ~/.clutch, which starts a brain'
+[ -z "$(ls -A "$HOME")" ] || { echo "FAIL: status (worklog, no ~/.clutch) created: $(ls -A "$HOME")"; fail=1; }
+mkdir -p "$WD" || { echo "FAIL: mkdir ~/.clutch failed"; fail=1; }
+worklog_line "worklog, ~/.clutch, no file" '  worklog: missing; the first write makes it'
+: > "$WF" || { echo "FAIL: worklog fixture write failed"; fail=1; }
+worklog_line "worklog, file present" "  worklog: writable ($WF)"
+if [ "$(id -u)" = 0 ]; then
+  echo "SKIP: worklog permission cases (running as root)"
+else
+  chmod 444 "$WF" || { echo "FAIL: chmod 444 worklog failed"; fail=1; }
+  worklog_line "worklog, file 444" "  worklog: unwritable ($WF)"
+  chmod 644 "$WF"
+  rm -f "$WF" || { echo "FAIL: rm worklog failed"; fail=1; }
+  chmod 555 "$WD" || { echo "FAIL: chmod 555 ~/.clutch failed"; fail=1; }
+  worklog_line "worklog, ~/.clutch 555, no file" "  worklog: unwritable ($WF)"
+  chmod 755 "$WD"
+fi
 
 [ "$fail" -eq 0 ] || exit 1
 echo PASS

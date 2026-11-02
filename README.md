@@ -122,11 +122,12 @@ session.
    park, or release — plus the one thing worth knowing. Nothing waits on you
    remembering to process a backlog.
 3. **The pool holds it.** A local `.clutch/` folder your repo owns:
-   cross-references, spark logs, idea files. Writes stay repo-scoped by design.
+   cross-references, spark logs, idea files.
+   Pool writes stay repo-scoped by design.
 4. **The brain compounds it.**
    Keep a `~/.clutch` folder and it becomes the brain,
    the second pool level every reader sweeps, across all your repos.
-   Nothing enters it ambiently: one door up, the absorb verdict in
+   No pool item enters it ambiently: one door up, the absorb verdict in
    `/clutch:fomo`. The idea a work session almost lost feeds a family-project
    spark next week.
 5. **You come back to riff.** `/clutch:spark` and `/clutch:ideate` draw from
@@ -196,10 +197,17 @@ whatever repo you run these skills in, a work repo included. Whether that is
 fine is your call.
 
 It writes the local `.clutch/` folder, plus your brain on an absorb verdict, and
-adds the local folder to git's ignore list. The divergent skills can reach out
-(`/clutch:fomo` fetches a banked link, and a spark, daydream, dream-spark, or
-ideate pass may run a web search) but only when you invoke them. Nothing here
-touches the network on its own, and you can verify it:
+adds the local folder to git's ignore list. Sessions also append one-line notes
+of what moved to `~/.clutch/worklog.md`, so parallel sessions can see each
+other. That log is not pool stock: it is the one thing sessions write to
+`~/.clutch` without a command or a verdict. The log is global: its lines,
+commit subjects and repo names included, reach sessions in every repo, a work
+repo included. If you keep no `~/.clutch` yet, the first note creates it, and
+that folder is the brain: from then on an absorb verdict in `/clutch:fomo`
+files ideas into `~/.clutch/ideas/` instead of skipping. The divergent skills
+can reach out (`/clutch:fomo` fetches a banked link, and a spark, daydream,
+dream-spark, or ideate pass may run a web search) but only when you invoke
+them. Nothing here touches the network on its own, and you can verify it:
 
 ```
 grep -rE 'curl|wget|/dev/tcp|nc ' scripts/

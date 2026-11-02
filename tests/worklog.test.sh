@@ -20,9 +20,11 @@ A=${ANCHOR_SH:-$HERE/../scripts/anchor.sh}
 P=${PRELUDE_SH:-$HERE/../scripts/prelude.sh}
 S=${STOP_SH:-$HERE/../scripts/stop.sh}
 C=${CONST_FILE:-$HERE/../rules/constitution.md}
+README=${README_FILE:-$HERE/../README.md}
+GLOSSARY=${GLOSSARY_FILE:-$HERE/../GLOSSARY.md}
 
 fail=0
-for f in "$A" "$P" "$S" "$C"; do
+for f in "$A" "$P" "$S" "$C" "$README" "$GLOSSARY"; do
   [ -f "$f" ] || { echo "FAIL: missing $f"; fail=1; }
 done
 [ "$fail" -eq 0 ] || exit 1
@@ -609,6 +611,32 @@ cpin "Escape ' as '\\''."
 cpin 'Speak on MISS or an error'
 nold=$(grep -c 'Speak only on MISS' "$C")
 [ "$nold" = 0 ] || { echo "FAIL: pin -- old 'Speak only on MISS' still present"; fail=1; }
+
+# Doc pins (P5): README and GLOSSARY name the worklog write. Each fragment
+# sits on one line of the shipped text.
+dpin() {
+  grep -qF -- "$2" "$1"
+  rc=$?
+  case $rc in
+    0) ;;
+    1) echo "FAIL: doc pin -- pattern not found in $1: $2"; fail=1 ;;
+    *) echo "FAIL: doc pin -- grep error rc=$rc in $1: $2"; fail=1 ;;
+  esac
+}
+dpin "$README" '~/.clutch/worklog.md'
+dpin "$README" 'commit subjects and repo names'
+dpin "$README" 'the first note creates it'
+dpin "$README" 'files ideas into'
+dpin "$README" 'is not pool stock'
+dpin "$README" 'without a command or a verdict'
+dpin "$README" 'Pool writes stay repo-scoped by design'
+dpin "$README" 'No pool item enters it ambiently'
+# Paired with the positive pin above, so a missing README cannot pass this.
+namb=$(grep -c 'Nothing enters it ambiently' "$README")
+[ "$namb" = 0 ] || { echo "FAIL: doc pin -- README still says 'Nothing enters it ambiently' ($namb hit)"; fail=1; }
+dpin "$GLOSSARY" 'is not pool stock'
+dpin "$GLOSSARY" 'no command or verdict asks for'
+dpin "$GLOSSARY" 'Its first write creates'
 
 [ "$fail" -eq 0 ] || exit 1
 echo PASS
