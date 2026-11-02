@@ -18,7 +18,8 @@
 # the shape check above the not-writable check), and a dangling session-state
 # symlink are "not a file", never "no session state yet". Then the worklog
 # line under the scratch HOME: missing (with and without ~/.clutch, creating
-# nothing), writable, and unwritable (file 444; ~/.clutch 555, non-root only).
+# nothing), writable, and unwritable (file 444; ~/.clutch 555; ~/.clutch 644
+# with the file present; non-root only).
 # STATUS_SKILL and STATUS_SH override the skill
 # file and the script, so both can be replayed against any historical version
 # (git show BASE:... > tmp).
@@ -241,6 +242,11 @@ else
   rm -f "$WF" || { echo "FAIL: rm worklog failed"; fail=1; }
   chmod 555 "$WD" || { echo "FAIL: chmod 555 ~/.clutch failed"; fail=1; }
   worklog_line "worklog, ~/.clutch 555, no file" "  worklog: unwritable ($WF)"
+  chmod 755 "$WD"
+  # Write without search: the file cannot be seen or written, so not "missing".
+  : > "$WF" || { echo "FAIL: worklog fixture write failed"; fail=1; }
+  chmod 644 "$WD" || { echo "FAIL: chmod 644 ~/.clutch failed"; fail=1; }
+  worklog_line "worklog, ~/.clutch 644, file present" "  worklog: unwritable ($WF)"
   chmod 755 "$WD"
 fi
 
