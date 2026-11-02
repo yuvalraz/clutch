@@ -5,7 +5,11 @@
 # kept first, then the newest moved: lines fill up to 8, printed in file
 # order with the epoch dropped and each line cut to 160 chars. P2 covers the
 # stop.sh writer (S1-S11, S4b): one moved: landed line per forward move of the
-# user's newest authored commit, deduped by subject, silent on stdout.
+# user's newest authored commit, deduped by subject, silent on stdout. C covers
+# the constitution's worklog snippet, extracted from the shipped rules file and
+# run: it targets worklog.md, creates ~/.clutch, and its line round-trips
+# through the anchor. P5 doc pins (dpin) check that README and GLOSSARY name
+# the worklog write and keep the stale wording out.
 # The scripts under test are staged into a scratch tree (anchor.sh, prelude.sh
 # and stop.sh into $T/scripts, the constitution into $T/rules) and run under
 # a scratch HOME with CLAUDE_PLUGIN_ROOT unset, so the anchor's
