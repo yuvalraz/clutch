@@ -483,5 +483,109 @@ stop "S11 control" "$E"
 nlines "S11 control" $((n11 + 1))
 lastline "S11 control" "^[0-9]+ r11 moved: landed 'feat eleven b'$"
 
+# --- C: the constitution's worklog snippet, extracted from the shipped file
+# with the fomo-snippet awk and run as is, so prose and test cannot drift.
+nsh=$(grep -c '^```sh' "$C")
+[ "$nsh" = 1 ] || { echo "FAIL: C -- constitution has $nsh sh blocks, want 1"; fail=1; }
+awk '/```sh/{n++;f=1;next} /```/{f=0} f && n==1' "$C" > "$T/csnip.raw"
+[ -s "$T/csnip.raw" ] || { echo "FAIL: C -- snippet extraction came up empty"; fail=1; }
+grep -qF 'worklog.md' "$T/csnip.raw" || { echo "FAIL: C -- snippet does not target worklog.md"; fail=1; }
+grep -qF 'mkdir -p "$HOME/.clutch"' "$T/csnip.raw" || { echo "FAIL: C -- snippet does not create ~/.clutch"; fail=1; }
+
+# fill <text> <out>: the snippet with on: and <text> in its placeholders.
+# Literal index() replacement through ENVIRON: no regex, no -v escape processing.
+fill() {
+  CV='on:' CX=$1 awk '
+    function rl(s, a, b,   i) { i = index(s, a); return i ? substr(s, 1, i - 1) b substr(s, i + length(a)) : s }
+    { $0 = rl($0, "<moved:|on:>", ENVIRON["CV"]); print rl($0, "<one line>", ENVIRON["CX"]) }' "$T/csnip.raw" > "$2"
+}
+fill 'parser rewrite' "$T/csnip.sh"
+# fresh <name>: a new scratch HOME for one C case.
+fresh() { HOME="$T/h-$1"; export HOME; W="$HOME/.clutch/worklog.md"; mkdir -p "$HOME"; }
+# snip <dir> [script]: run the snippet in <dir>; sets SOUT (stderr dropped) and rc.
+snip() { SOUT=$(cd "$1" && sh "${2:-$T/csnip.sh}" 2>/dev/null); rc=$?; }
+# only <label> <ERE>: the worklog holds exactly one line, matching.
+only() {
+  nlines "$1" 1
+  grep -qE -- "$2" "$W" 2>/dev/null || { echo "FAIL: $1 -- line does not match: $2"; fail=1; }
+}
+CR="$T/crepo"
+mkdir -p "$CR" && git -C "$CR" init -q || exit 1
+
+# --- C1 in a repo with ~/.clutch: silent, one line with the repo's name
+fresh c1
+mkdir -p "$HOME/.clutch"
+snip "$CR"
+[ -z "$SOUT" ] || { echo "FAIL: C1 -- snippet wrote stdout: $SOUT"; fail=1; }
+only C1 '^[0-9][0-9]* crepo on: parser rewrite$'
+
+# --- C2 in a plain dir: the project field is the dir's basename
+fresh c2
+mkdir -p "$HOME/.clutch" "$T/c2plain"
+snip "$T/c2plain"
+only C2 '^[0-9][0-9]* c2plain on: parser rewrite$'
+
+# --- C3 no ~/.clutch: the snippet creates it and writes the line
+fresh c3
+snip "$CR"
+[ "$rc" = 0 ] || { echo "FAIL: C3 -- snippet exited $rc"; fail=1; }
+[ -z "$SOUT" ] || { echo "FAIL: C3 -- snippet wrote stdout: $SOUT"; fail=1; }
+[ -d "$HOME/.clutch" ] || { echo "FAIL: C3 -- ~/.clutch not created"; fail=1; }
+only C3 '^[0-9][0-9]* crepo on: parser rewrite$'
+
+if [ "$(id -u)" = 0 ]; then
+  echo "SKIP: C4, C4b (root writes through chmod)"
+else
+  # --- C4 an unwritable worklog: MISS
+  fresh c4
+  mkdir -p "$HOME/.clutch" && : > "$W" && chmod 444 "$W"
+  snip "$CR"
+  chmod 644 "$W"
+  [ "$SOUT" = MISS ] || { echo "FAIL: C4 -- expected MISS, got: $SOUT"; fail=1; }
+  # --- C4b no ~/.clutch under an unwritable HOME: MISS, nothing created
+  fresh c4b
+  chmod 555 "$HOME"
+  snip "$CR"
+  chmod 755 "$HOME"
+  [ "$SOUT" = MISS ] || { echo "FAIL: C4b -- expected MISS, got: $SOUT"; fail=1; }
+  noclutch C4b
+fi
+
+# --- C5 round trip: the anchor shows the written line under Worklog:
+fresh c5
+snip "$CR"
+anchor C5 "$PLAIN"
+block | grep -qxF 'crepo on: parser rewrite' \
+  || { echo "FAIL: C5 -- line not under Worklog:"; fail=1; }
+
+# --- C6 model text with an apostrophe, escaped the project's '\'' way
+fresh c6
+fill "Dana'\\''s thread" "$T/csnip6.sh"
+snip "$CR" "$T/csnip6.sh"
+only C6 "^[0-9][0-9]* crepo on: Dana's thread$"
+anchor C6 "$PLAIN"
+block | grep -qxF "crepo on: Dana's thread" \
+  || { echo "FAIL: C6 -- line not under Worklog:"; fail=1; }
+
+# Prose pins: single-line fragments of the constitution's Worklog section.
+cpin() {
+  grep -qF -- "$1" "$C"
+  rc=$?
+  case $rc in
+    0) ;;
+    1) echo "FAIL: pin -- pattern not found: $1"; fail=1 ;;
+    *) echo "FAIL: pin -- grep error rc=$rc: $1"; fail=1 ;;
+  esac
+}
+cpin '## Worklog'
+cpin "The anchor's worklog block is legal"
+cpin 'never speech to the user'
+cpin 'A line may be yours from before a compaction'
+cpin 'Never propose a live on: item uninvited'
+cpin 'explicit ask wins over any claim'
+cpin 'never a list for the user'
+cpin '(commits log themselves)'
+cpin 'Speak only on MISS'
+
 [ "$fail" -eq 0 ] || exit 1
 echo PASS
