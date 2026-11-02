@@ -4,7 +4,7 @@
 # its git gate, so sessions outside a repo see it too. Live on: claims are
 # kept first, then the newest moved: lines fill up to 8, printed in file
 # order with the epoch dropped and each line cut to 160 chars. P2 covers the
-# stop.sh writer (S1-S11, S4b): one moved: landed line per forward move of the
+# stop.sh writer (S1-S12, S4b): one moved: landed line per forward move of the
 # user's newest authored commit, deduped by subject, silent on stdout. C covers
 # the constitution's worklog snippet, extracted from the shipped rules file and
 # run: it targets worklog.md, creates ~/.clutch, and its line round-trips
@@ -489,6 +489,31 @@ stop "S11 control" "$E"
 nlines "S11 control" $((n11 + 1))
 lastline "S11 control" "^[0-9]+ r11 moved: landed 'feat eleven b'$"
 
+# --- S12 every stop refreshes the stored epoch, so a branch fetched from
+# another machine and checked out after an idle head logs nothing
+R12="$T/r12"
+r7init "$R12" || exit 1
+dated "$R12" $((4 * D)) "seed r12"
+stop "S12 seed" "$R12"
+# Fixture: the head has not moved for 3 days.
+printf '%s %s\n' "$(git -C "$R12" rev-parse HEAD)" "$((NOW - 3 * D))" > "$R12/.clutch/worklog-head"
+stop "S12 idle 1" "$R12"
+stop "S12 idle 2" "$R12"
+stop "S12 idle 3" "$R12"
+headis "S12 idle" "$R12"
+s12ep=$(cut -s -d' ' -f2 "$R12/.clutch/worklog-head" 2>/dev/null)
+[ "${s12ep:-0}" -ge "$NOW" ] 2>/dev/null \
+  || { echo "FAIL: S12 -- same-head stops did not refresh the epoch: ${s12ep:-none}"; fail=1; }
+git -C "$R12" checkout -q -b fetched
+dated "$R12" "$H" "fetched twelve"
+n12=$(lines)
+stop "S12 fetched" "$R12"
+nlines "S12 fetched" "$n12"
+commit "$R12" "feat twelve"
+stop "S12 control" "$R12"
+nlines "S12 control" $((n12 + 1))
+lastline "S12 control" "^[0-9]+ r12 moved: landed 'feat twelve'$"
+
 # --- C: the constitution's worklog snippet, extracted from the shipped file
 # with the fomo-snippet awk and run as is, so prose and test cannot drift.
 nsh=$(grep -c '^```sh' "$C")
@@ -578,7 +603,9 @@ block | grep -qxF "crepo on: Dana's thread" \
 # backtick span stay literal text; nothing in them runs.
 fresh c7
 mkdir -p "$T/c7plain"
-C7RAW="don't touch Bo's branch \$(touch pwned1) \`touch pwned2\`"
+# The $( ) and backtick spans sit between the first two apostrophes, so an
+# unescaped fill leaves them unquoted and they run (checked once by hand).
+C7RAW="don't \$(touch pwned1) \`touch pwned2\` touch Bo's branch"
 # The rule applied by awk gsub: each ' becomes '\''. The replacement string
 # holds one backslash; a lone \ before ' is literal in gsub's replacement.
 C7ESC=$(C7RAW=$C7RAW awk 'BEGIN { s = ENVIRON["C7RAW"]; gsub("\047", "\047\\\047\047", s); print s }')

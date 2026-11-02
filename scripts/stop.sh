@@ -48,8 +48,10 @@ clutch_ensure_dir || exit 0
   printf 'stop %s\n' "$NOW" >> "$CLUTCH_DIR/session-state"
 
   # Worklog: log a landed authored commit once for peer sessions. The head and
-  # this stop's epoch are recorded first, then the line appended: a lost line
-  # is acceptable, a repeated one is not. The first run seeds without
+  # this stop's epoch are recorded first, on every stop, then the line
+  # appended: a lost line is acceptable, a repeated one is not. The gate reads
+  # the epoch stored by the previous stop, so an idle head stays fresh and a
+  # fetched branch checked out later is not logged. The first run seeds without
   # backfill; a head that does not descend from the logged one (branch
   # switch, rebase) reseeds silently. A head whose committer time is older
   # than the stored epoch was reached by a checkout, not a new commit (old
@@ -66,7 +68,7 @@ clutch_ensure_dir || exit 0
     WPREV=${WREC%% *}
     WSEEN=${WREC#* }
     case "$WSEEN" in '' | *[!0-9]*) WSEEN="" ;; esac
-    if [ "$WCUR" != "$WPREV" ] && printf '%s %s\n' "$WCUR" "$NOW" > "$WHEAD"; then
+    if printf '%s %s\n' "$WCUR" "$NOW" > "$WHEAD" && [ "$WCUR" != "$WPREV" ]; then
       WCT=$(git log -1 --format=%ct "$WCUR" 2>/dev/null) || WCT=""
       # shortcut: the 200 cut counts bytes, not characters, and can split a
       # glyph; upgrade if subjects that long show up.
