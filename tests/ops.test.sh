@@ -130,6 +130,7 @@ fpin "$O" "tick: unreachable tool"      'A tool that is not reachable gets one l
 fpin "$O" "tick: never re-arms"         'A tick never re-arms a loop, never names one that did not move, and never says how long anything has waited.'
 fpin "$O" "tick: unreadable loops"      'Any other exit status means the wait loops are unreadable'
 fpin "$O" "tick: bounded line read"     'cut -c1-300'
+fpin "$O" "tick: rc 1 with stderr"      'Exit status 1 with error text on stderr means the same: the wait loops are unreadable.'
 fpin "$O" "tick: ref its own token"     'as its own token followed by a space'
 # The handoff path: /clutch:intent ops must be able to invoke the skill, so
 # model invocation stays enabled (negative pin).
@@ -329,5 +330,15 @@ tick
 [ "$TRC" = 0 ] && [ "$(printf '%s' "$TOUT" | wc -c | tr -d ' ')" = 300 ] \
   && printf '%s\n' "$TOUT" | grep -qE '^[0-9]+ proj wait: gh:o/r#9 t9 x+$' \
   || { echo "FAIL: O-arm (f) -- want the line cut to 300 bytes; rc $TRC: $TOUT"; exit 1; }
+
+# (g) a wait text ending in one invalid byte (a %.200s cut mid-glyph) hides
+# no newer loop when the tick runs in a UTF-8 locale.
+armhome g
+mkdir -p "$HOME/.clutch"
+printf '%s proj wait: gh:o/r#1 t1 caf\303\n%s proj wait: gh:o/r#2 t2 newer\n' "$(date +%s)" "$(date +%s)" > "$W"
+TOUT=$(cd "$T/armdir" && LC_ALL=en_US.UTF-8 sh -c "$TCMD" 2>&1); TRC=$?
+[ "$TRC" = 0 ] && printf '%s\n' "$TOUT" | grep -qF ' gh:o/r#1 ' \
+  && printf '%s\n' "$TOUT" | grep -qF ' gh:o/r#2 ' \
+  || { echo "FAIL: O-arm (g) -- want both loops under UTF-8; rc $TRC: $TOUT"; exit 1; }
 
 echo PASS

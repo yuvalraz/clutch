@@ -189,13 +189,14 @@ It runs on `/clutch:ops tick`, on "anything move?" in an ops session, and
 as the sweep's tick pass. Read the wait loops with this line, once:
 
 ```sh
-sh -c '. "${CLAUDE_PLUGIN_ROOT}/scripts/prelude.sh" && L=$(clutch_open_loops) || exit; [ -z "$L" ] || printf "%s\n" "$L" | cut -c1-300'
+sh -c '. "${CLAUDE_PLUGIN_ROOT}/scripts/prelude.sh" && L=$(clutch_open_loops) || exit; [ -z "$L" ] || printf "%s\n" "$L" | LC_ALL=C cut -c1-300'
 ```
 
 Each line is `<epoch> <repo> wait: <kind>:<ref> <baseline> <text>`, oldest
-first, cut to 300 characters. Empty output, or exit status 1 with no error
+first, cut to 300 bytes. Empty output, or exit status 1 with no error
 text (no worklog): no wait loops; say nothing about loops.
 Any other exit status means the wait loops are unreadable: say so in one line, never that nothing moved.
+Exit status 1 with error text on stderr means the same: the wait loops are unreadable.
 A `/scripts/prelude.sh` not-found error means clutch is not loaded as a
 plugin: say so once and go on.
 
