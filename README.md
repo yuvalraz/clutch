@@ -80,7 +80,7 @@ only at one of those moments.
   closes, an `on:` line when it starts work a parallel session might take.
 - In ops, an action you approve that awaits a reply logs a `wait:` line
   when its ask ends with "(I'll hold this as an open loop)", and so does
-  `watch <thing>`. A later `moved:` line naming the same ref closes it.
+  `watch <thing>`. A later `moved:` line that starts with the same ref closes it.
   Open waits show first in the `Worklog:` block and age out after 5 days.
 - The next session start shows them in its `Worklog:` block.
   Claims age out after 4 h and moves after 24 h.

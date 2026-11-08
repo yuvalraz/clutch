@@ -152,7 +152,8 @@ pin "$R"  "README: ops command"        '/clutch:ops'
 pin "$R"  "README: four-way ask"       'build, ideate, ops, or review?'
 fpin "$R" "README: wait bullet"        'In ops, an action you approve that awaits a reply logs a `wait:` line'
 fpin "$R" "README: watch code span"    '`watch <thing>`'
-fpin "$R" "README: three verbs"        '`on:` claim or `wait:` loop'
+fpin "$R" "README: closing ref"        'A later `moved:` line that starts with the same ref closes it.'
+fpin "$R" "README: three verbs"      '`on:` claim or `wait:` loop'
 fpin "$R" "README: tick sentence"      '`/clutch:ops tick` checks only those waits, on request, and speaks only when one moved.'
 
 # --- local mirror of the private-vocab, intent, F and G wording gates.
@@ -324,6 +325,18 @@ armhome e
 tick
 [ "$TRC" = 1 ] && [ -z "$TOUT" ] && [ ! -e "$HOME/.clutch" ] \
   || { echo "FAIL: O-arm (e) -- want rc 1, empty, nothing created; rc $TRC: $TOUT"; exit 1; }
+
+# (e2) an unreadable worklog: the tick line exits 2 (unreadable), not 1
+if [ "$(id -u)" = 0 ]; then
+  echo "SKIP: O-arm (e2) (root reads chmod 000 files)"
+else
+  armhome e2
+  mkdir -p "$HOME/.clutch" && : > "$W" && chmod 000 "$W"
+  tick
+  chmod 644 "$W"
+  [ "$TRC" = 2 ] && [ -z "$TOUT" ] \
+    || { echo "FAIL: O-arm (e2) -- want rc 2, empty; rc $TRC: $TOUT"; exit 1; }
+fi
 
 # (f) a long wait line is read cut to 300 bytes
 armhome f

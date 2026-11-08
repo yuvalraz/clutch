@@ -89,13 +89,15 @@ clutch_last_authored() {
 # is "<epoch> <repo> wait: <kind>:<ref> <baseline> <text>"; a later moved:
 # line whose fourth field is the same <kind>:<ref> closes it, and an open wait
 # ages out after 5 days. Malformed, future-dated and unknown-verb lines are
-# skipped. Returns 1 when the file is absent or unreadable; never creates
+# skipped. Returns 1 when the file does not exist (no worklog), 2 when it
+# exists but is not a readable regular file or `date` fails; never creates
 # anything.
 # shortcut: scans the last 2000 lines and cuts bytes, not characters; upgrade
 # if 5 days log more than 2000 lines or a cut splits a glyph.
 clutch_worklog_scan() {
-  [ -f "$CLUTCH_WORKLOG" ] && [ -r "$CLUTCH_WORKLOG" ] || return 1
-  WNOW=$(date +%s 2>/dev/null) || return 1
+  [ -e "$CLUTCH_WORKLOG" ] || return 1
+  [ -f "$CLUTCH_WORKLOG" ] && [ -r "$CLUTCH_WORKLOG" ] || return 2
+  WNOW=$(date +%s 2>/dev/null) || return 2
   # LC_ALL=C: a UTF-8 awk aborts the whole scan on one invalid byte.
   tail -n 2000 "$CLUTCH_WORKLOG" 2>/dev/null | LC_ALL=C awk -v now="$WNOW" -v mode="$1" '
     $1 ~ /^[0-9]+$/ && NF >= 4 {
@@ -105,14 +107,15 @@ clutch_worklog_scan() {
       if ($3 == "wait:" && NF >= 6 && $4 ~ /^[^:]+:./) open[$4] = n
       else if ($3 == "moved:" && ($4 in open)) delete open[$4]
     }
-    # Open waits are kept first, then live claims, then moves, so a burst of
-    # moves cannot push a held item out of view.
+    # Live claims are kept first, then open waits, then moves, so neither a
+    # burst of moves nor a pile of waits can push a claim out of view; waits
+    # still print first.
     END {
       for (r in open) if (ag[open[r]] < 432000) w[open[r]] = 1
       if (mode == "loops") { for (i = 1; i <= n; i++) if (w[i]) print ln[i]; exit }
       k = 0
-      for (i = n; i > 0 && k < 8; i--) if (w[i]) { keep[i] = 1; k++ }
       for (i = n; i > 0 && k < 8; i--) if (vb[i] == "on:" && ag[i] < 14400) { keep[i] = 1; k++ }
+      for (i = n; i > 0 && k < 8; i--) if (w[i]) { keep[i] = 1; k++ }
       for (i = n; i > 0 && k < 8; i--) if (vb[i] == "moved:" && ag[i] < 86400) { keep[i] = 1; k++ }
       for (p = 1; p >= 0; p--) for (i = 1; i <= n; i++) if (keep[i] && w[i] == p) {
         line = ln[i]; sub(/^[ \t]*[0-9]+[ \t]+/, "", line); print substr(line, 1, 160)

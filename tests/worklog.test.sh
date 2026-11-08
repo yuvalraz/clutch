@@ -5,7 +5,8 @@
 # kept first, then the newest moved: lines fill up to 8, printed in file
 # order with the epoch dropped and each line cut to 160 chars. W13-W22 cover
 # wait: loops: open until a moved: line names the same ref or 5 days pass,
-# kept and printed first in the window, and listed raw by clutch_open_loops.
+# kept after live claims and printed first in the window, and listed raw by
+# clutch_open_loops (rc 1 with no worklog, rc 2 when it is unreadable).
 # P2 covers the
 # stop.sh writer (S1-S12, S4b): one moved: landed line per forward move of the
 # user's newest authored commit, deduped by subject, silent on stdout. C covers
@@ -366,6 +367,23 @@ proj moved: early-m
 proj on: mid-on'
 [ "$(block)" = "$EXP" ] || { echo "FAIL: W17b -- block is not the wait, early-m, mid-on"; fail=1; }
 
+# --- W17c eight open waits cannot hide a live claim: the claim takes a slot,
+# the newest seven waits fill the rest and still print first.
+seed
+for i in 1 2 3 4 5 6 7 8; do add $((2 * H)) "proj wait: gh:o/r#$i b w17c-$i"; done
+add 60 "proj on: claim-17c"
+anchor W17c "$PLAIN"
+nblock W17c 8
+EXP='proj wait: gh:o/r#2 b w17c-2
+proj wait: gh:o/r#3 b w17c-3
+proj wait: gh:o/r#4 b w17c-4
+proj wait: gh:o/r#5 b w17c-5
+proj wait: gh:o/r#6 b w17c-6
+proj wait: gh:o/r#7 b w17c-7
+proj wait: gh:o/r#8 b w17c-8
+proj on: claim-17c'
+[ "$(block)" = "$EXP" ] || { echo "FAIL: W17c -- block is not waits 2..8 then the claim"; fail=1; }
+
 # --- W18 a wait behind 300 newer lines is still found
 seed
 add $((2 * 24 * H)) "proj wait: linear:ENG-18 u18 lookback-18"
@@ -423,6 +441,21 @@ add 60 "proj wait: gh:o/r#22 b control-22"
 loops
 lcount "W22 control" 1
 lhas "W22 control" "control-22"
+
+# --- W22b an unreadable worklog is rc 2, not the "no worklog" rc 1
+if [ "$(id -u)" = 0 ]; then
+  echo "SKIP: W22b (root reads chmod 000 files)"
+else
+  chmod 000 "$W"
+  loops
+  WRC=$(cd "$PLAIN" && . "$T/scripts/prelude.sh" && clutch_worklog_window >/dev/null 2>&1; echo $?)
+  chmod 644 "$W"
+  [ "$LRC" = 2 ] || { echo "FAIL: W22b -- loops rc $LRC, want 2"; fail=1; }
+  [ -z "$LOUT" ] || { echo "FAIL: W22b -- loops printed: $LOUT"; fail=1; }
+  [ "$WRC" = 2 ] || { echo "FAIL: W22b -- window rc $WRC, want 2"; fail=1; }
+  loops
+  lcount "W22b control" 1
+fi
 
 # --- W23 invalid UTF-8 cannot blank the scan: under a UTF-8 locale, a bad
 # byte in a wait kind and in an epoch field is skipped, and the valid wait and
