@@ -424,6 +424,24 @@ loops
 lcount "W22 control" 1
 lhas "W22 control" "control-22"
 
+# --- W23 invalid UTF-8 cannot blank the scan: under a UTF-8 locale, a bad
+# byte in a wait kind and in an epoch field is skipped, and the valid wait and
+# the claim in the same file still show in the window and the loops.
+seed
+add $((2 * H)) "proj on: claim-23"
+add "$H" "proj wait: gh:o/r#23 b control-23"
+printf '%s proj wait: g\351h:o/r#9 b badkind-23\n' "$((NOW - H))" >> "$W"
+printf '1\377 proj moved: badepoch-23\n' >> "$W"
+WOUT=$(cd "$PLAIN" && export LC_ALL=en_US.UTF-8 && . "$T/scripts/prelude.sh" && clutch_worklog_window 2>/dev/null); WRC=$?
+[ "$WRC" = 0 ] || { echo "FAIL: W23 window -- rc $WRC, want 0"; fail=1; }
+printf '%s\n' "$WOUT" | grep -qxF "proj wait: gh:o/r#23 b control-23" \
+  || { echo "FAIL: W23 window -- valid wait not shown: $WOUT"; fail=1; }
+printf '%s\n' "$WOUT" | grep -qxF "proj on: claim-23" \
+  || { echo "FAIL: W23 window -- claim not shown: $WOUT"; fail=1; }
+LOUT=$(cd "$PLAIN" && export LC_ALL=en_US.UTF-8 && . "$T/scripts/prelude.sh" && clutch_open_loops 2>/dev/null); LRC=$?
+[ "$LRC" = 0 ] || { echo "FAIL: W23 loops -- rc $LRC, want 0"; fail=1; }
+lhas "W23 loops" "control-23"
+
 # ===== P2: the stop.sh writer =====
 # No global or system git config may leak an identity into the scratch repos.
 unset XDG_CONFIG_HOME

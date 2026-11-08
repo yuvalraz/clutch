@@ -96,7 +96,8 @@ clutch_last_authored() {
 clutch_worklog_scan() {
   [ -f "$CLUTCH_WORKLOG" ] && [ -r "$CLUTCH_WORKLOG" ] || return 1
   WNOW=$(date +%s 2>/dev/null) || return 1
-  tail -n 2000 "$CLUTCH_WORKLOG" 2>/dev/null | awk -v now="$WNOW" -v mode="$1" '
+  # LC_ALL=C: a UTF-8 awk aborts the whole scan on one invalid byte.
+  tail -n 2000 "$CLUTCH_WORKLOG" 2>/dev/null | LC_ALL=C awk -v now="$WNOW" -v mode="$1" '
     $1 ~ /^[0-9]+$/ && NF >= 4 {
       age = now - $1
       if (age < 0) next
