@@ -1,8 +1,8 @@
 ---
 name: ops
 description: Put the session in operations mode. Engage espresso, sweep the reachable integrations once for the live situation, then close loops one at a time with the day's focuses in view.
-when_to_use: Use ONLY when the user explicitly asks for operations mode ("ops", "operations mode", "run the day", "re-sweep") or when /clutch:intent hands off after an "ops" answer. A passing mention of meetings, people, or tasks mid-conversation is not a trigger.
-argument-hint: "[re-sweep]"
+when_to_use: Use ONLY when the user explicitly asks for operations mode ("ops", "operations mode", "run the day", "re-sweep", "tick") or when /clutch:intent hands off after an "ops" answer. A passing mention of meetings, people, or tasks mid-conversation is not a trigger.
+argument-hint: "[re-sweep|tick]"
 ---
 
 # Ops
@@ -21,6 +21,12 @@ Ops fires when you fire it. Nothing here runs on its own.
 - `/clutch:ops re-sweep` runs a fresh sweep mid-day with the same bounds and
   the same close. A re-sweep happens on request only, never on your own read
   that the situation may have moved.
+- `/clutch:ops tick` checks only the wait loops, once each, and speaks only
+  when one moved. "Anything move?" in an ops session is the same request.
+  A tick happens on request only, never on your own read that a loop moved.
+  A tick skips Steps 0-4: no gear, no config read, no sweep.
+  The Tick section governs the rest, including each moved loop's one
+  smallest move.
 
 ## Procedure
 
@@ -83,7 +89,8 @@ Bounds (HARD):
 - No counts: not how many sit unread, not how many wait, not how long
   anything has waited.
 
-Read the worklog in the same pulse, once:
+Read the worklog window in the same pulse, once;
+the tick pass reads the wait loops with its own line (see Tick):
 
 ```sh
 sh -c '. "${CLAUDE_PLUGIN_ROOT}/scripts/prelude.sh" && clutch_worklog_window'
@@ -96,6 +103,13 @@ uninvited; the user's explicit ask wins over any claim. Empty output
 means no peer context, and the sweep goes on. A
 `/scripts/prelude.sh` not-found error means clutch is not loaded as a plugin: say so once and go on.
 
+A `wait:` line is a wait loop: someone else's move, pending on something
+you did; leave it out of the situation unless the tick finds it moved.
+Run one tick pass (see Tick) before the situation, and fold each loop that
+moved into the situation as what moved, instead of its own line.
+A loop that did not move stays unmentioned. The tick pass is part of this
+pulse: one read of the wait loops, then it reads each wait loop once, by its kind.
+
 ### Step 3: The situation
 
 Speak the situation in a few lines, present tense, co-working voice. Group
@@ -103,7 +117,8 @@ by the next thing that can happen, never by tool. Name a waiting thread by
 what it needs now, never as overdue, late, or missed.
 
 The situation is at most seven lines. It is a read of now, not a dashboard
-and not a report for later. Nothing from the sweep is written anywhere; it
+and not a report for later. Nothing from the sweep is written anywhere
+except the tick pass's `moved:` lines (see Tick); the rest
 lives in the turn, and a fresh sweep replaces it.
 
 ### Step 4: One smallest move
@@ -120,10 +135,34 @@ behavior:
 
 - **One loop at a time.** Close it, checkpoint in one line naming what moved,
   then the next. A checkpoint is the closed loop itself, never a summary.
-  Never two loops open at once.
+  Never two loops open at once. A wait loop is someone else's move, not the
+  loop you are working, so it never counts against one loop at a time.
+  Wait loops are never listed or counted, at the close or anywhere.
 - **Outward-facing actions keep a human checkpoint.** Sending a message,
   accepting or moving a meeting, changing a ticket's state, anything another
   person will see: draft it, show it, send on a yes. Reading is free.
+- **An outward action that awaits a reply or a state change becomes a wait
+  loop.** Its yes ask ends with "(I'll hold this as an open loop)". On the
+  yes, once the action succeeds, append its `wait:` line with the snippet
+  below, silently,
+  instead of its `moved:` line; speak on MISS or an error.
+  "don't hold it" or "send, don't watch" sends with no line. "watch <thing>"
+  holds a loop with no action: read its baseline now, then append.
+  A failed action holds nothing.
+
+  ```sh
+  mkdir -p "$HOME/.clutch" 2>/dev/null && printf '%s %s wait: %s %s %.200s\n' "$(date +%s)" "$(basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" | tr ' ' -)" '<kind>:<ref>' '<baseline>' '<text>' >> "$HOME/.clutch/worklog.md" || echo MISS
+  ```
+
+  `<kind>` is one of slack, gh, linear, gmail, ld, dd; `<kind>:<ref>` and
+  `<baseline>` are one token each, no spaces; `<text>` names what you are
+  waiting for. Escape ' as '\''. The ref and baseline per kind:
+  - slack: ref `slack:<channel>/<thread ts>`; baseline, the sent message ts.
+  - gh: ref `gh:<owner>/<repo>#<number>`; baseline, the PR `updatedAt`.
+  - linear: ref `linear:<issue id>`; baseline, the issue `updatedAt`.
+  - gmail: ref `gmail:<thread id>`; baseline, the thread's last message id.
+  - ld: ref `ld:<flag key>`; baseline, the flag version.
+  - dd: ref `dd:<monitor id>`; baseline, the monitor state.
 - **Interruptions are the gait.** A new ping mid-loop gets one line, bank it
   or close it now, then back to the open loop.
 - **A tangent banks.** An idea that pulls sideways goes to `/clutch:fomo` in
@@ -141,6 +180,45 @@ behavior:
 - **A closed loop logs one line.** Append its `moved:` line with the
   constitution's worklog snippet, silently; speak on MISS or an error.
   That line is the only thing a closed loop writes; the sweep itself still writes nothing.
+  A tick's `moved:` line, the sweep's tick pass included, is the closed loop's one line.
+
+### Tick
+
+A tick reads only the wait loops, once each, and writes only their `moved:` lines.
+It runs on `/clutch:ops tick`, on "anything move?" in an ops session, and
+as the sweep's tick pass. Read the wait loops with this line, once:
+
+```sh
+sh -c '. "${CLAUDE_PLUGIN_ROOT}/scripts/prelude.sh" && L=$(clutch_open_loops) || exit; [ -z "$L" ] || printf "%s\n" "$L" | cut -c1-300'
+```
+
+Each line is `<epoch> <repo> wait: <kind>:<ref> <baseline> <text>`, oldest
+first, cut to 300 characters. Empty output, or exit status 1 with no error
+text (no worklog): no wait loops; say nothing about loops.
+Any other exit status means the wait loops are unreadable: say so in one line, never that nothing moved.
+A `/scripts/prelude.sh` not-found error means clutch is not loaded as a
+plugin: say so once and go on.
+
+Read each wait loop once, by its kind, against its baseline:
+
+- slack: replies in the thread newer than the baseline ts, from someone
+  other than the user.
+- gh: `gh pr view <number> --repo <owner>/<repo> --json state,reviewDecision,updatedAt`;
+  a changed state or review decision, or `updatedAt` newer than the baseline.
+- linear: `updatedAt` newer than the baseline, or a new comment.
+- gmail: a message in the thread newer than the baseline id.
+- ld: a flag version other than the baseline.
+- dd: a monitor state other than the baseline.
+
+A loop that moved: append its `moved:` line first (record, then speak),
+with the constitution's worklog snippet, verb `moved:` and text
+`<kind>:<ref> <what moved>`. Copy the ref exactly from its `wait:` line,
+as its own token followed by a space, with no comma or colon after it.
+Then speak one line naming at most two movements and one smallest move.
+When nothing moved, a tick prints nothing.
+A tool that is not reachable gets one line naming it, and that loop stays open.
+A tick never re-arms a loop, never names one that did not move, and never says how long anything has waited.
+In the sweep's tick pass, moved loops fold into the situation instead of their own lines.
 
 ### Session close
 
