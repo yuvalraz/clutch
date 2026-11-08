@@ -150,6 +150,9 @@ pin "$TP" "tempo: ops names its gear"  '/clutch:ops. engages espresso'
 pin "$G"  "GLOSSARY: ops in Intent"    'Ops engages espresso'
 pin "$R"  "README: ops command"        '/clutch:ops'
 pin "$R"  "README: four-way ask"       'build, ideate, ops, or review?'
+fpin "$R" "README: wait bullet"        'In ops, an action you approve that awaits a reply logs a `wait:` line'
+fpin "$R" "README: three verbs"        '`on:` claim or `wait:` loop'
+fpin "$R" "README: tick sentence"      '`/clutch:ops tick` checks only those waits, on request, and speaks only when one moved.'
 
 # --- local mirror of the private-vocab, intent, F and G wording gates.
 # Same regex strings as de-private.test.sh; rc 1 = clean, 0 = leak,
