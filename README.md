@@ -78,6 +78,10 @@ only at one of those moments.
   hook appends one `moved:` line naming your latest commit and its repo.
 - The model adds the rest, silently: a `moved:` line when a loop outside git
   closes, an `on:` line when it starts work a parallel session might take.
+- In ops, an action you approve that awaits a reply logs a `wait:` line
+  when its ask ends with "(I'll hold this as an open loop)", and so does
+  `watch <thing>`. A later `moved:` line that starts with the same ref closes it.
+  Open waits show first in the `Worklog:` block and age out after 5 days.
 - The next session start shows them in its `Worklog:` block.
   Claims age out after 4 h and moves after 24 h.
   At most eight lines show, and a burst of moves never pushes a claim out.
@@ -96,8 +100,8 @@ only at one of those moments.
    No pool item enters it ambiently: one door up, the absorb verdict in
    `/clutch:fomo`. The idea a work session almost lost feeds a family-project
    spark next week.
-3. **The worklog.** `~/.clutch/worklog.md`, one short line per `moved:` note
-   or `on:` claim, shared by every session in every repo.
+3. **The worklog.** `~/.clutch/worklog.md`, one short line per `moved:` note,
+   `on:` claim or `wait:` loop, shared by every session in every repo.
 
 The brain is a plain directory. Point it wherever you like, including inside a
 git repo you sync yourself. Clutch never moves it for you.
@@ -124,6 +128,10 @@ checkpoints), and holds anti-convergence until you land it.
 meetings, people, and threads rather than a repo: one sweep of the tools you
 named, the situation in a few lines, then one loop closed at a time, each
 outward step on a yes. Work another session holds stays out of the sweep.
+An approved step that awaits a reply is held as a `wait:` loop.
+`/clutch:ops tick` checks only those waits, on request, and speaks only when one moved.
+It also says so in one line when the waits cannot be read. Entering ops runs
+one tick pass as part of the sweep.
 
 **Review.** `/clutch:review` closes one PR at a time with your written
 conventions applied. When your call on a finding implies a rule, one line
