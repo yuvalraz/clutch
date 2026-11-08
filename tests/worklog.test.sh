@@ -3,7 +3,10 @@
 # reader: anchor.sh shows the live window under a "Worklog:" header, before
 # its git gate, so sessions outside a repo see it too. Live on: claims are
 # kept first, then the newest moved: lines fill up to 8, printed in file
-# order with the epoch dropped and each line cut to 160 chars. P2 covers the
+# order with the epoch dropped and each line cut to 160 chars. W13-W22 cover
+# wait: loops: open until a moved: line names the same ref or 5 days pass,
+# kept and printed first in the window, and listed raw by clutch_open_loops.
+# P2 covers the
 # stop.sh writer (S1-S12, S4b): one moved: landed line per forward move of the
 # user's newest authored commit, deduped by subject, silent on stdout. C covers
 # the constitution's worklog snippet, extracted from the shipped rules file and
@@ -264,6 +267,162 @@ proj on: c8
 proj on: c9'
 [ "$(block)" = "$EXP" ] || { echo "FAIL: W12b -- block is not c2..c9 in file order"; fail=1; }
 lacks "W12b move" "after-claims"
+
+# loops: clutch_open_loops from the staged prelude; sets LOUT and LRC.
+LOUT=""
+LRC=0
+loops() {
+  LOUT=$(cd "$PLAIN" && . "$T/scripts/prelude.sh" && clutch_open_loops 2>"$T/lerr"); LRC=$?
+}
+# lhas <label> <text> / llacks <label> <text>: fixed text in the loops output.
+lhas() {
+  printf '%s\n' "$LOUT" | grep -qF -- "$2" || { echo "FAIL: $1 -- loops lacks: $2"; fail=1; }
+}
+llacks() {
+  printf '%s\n' "$LOUT" | grep -qF -- "$2" && { echo "FAIL: $1 -- loops shows: $2"; fail=1; }
+}
+# lcount <label> <n>: loops printed exactly n lines with rc 0.
+lcount() {
+  [ "$LRC" = 0 ] || { echo "FAIL: $1 -- loops rc $LRC, want 0"; fail=1; }
+  nl=$(printf '%s' "$LOUT" | grep -c .)
+  [ "$nl" = "$2" ] || { echo "FAIL: $1 -- loops has ${nl:-?} lines, want $2"; fail=1; }
+}
+
+# --- W13 a wait 1 h old: first in the block, raw (epoch kept) in loops
+seed
+add "$H" "proj wait: slack:D1/1.1 1.1 asked-thirteen"
+anchor W13 "$PLAIN"
+has W13 "proj wait: slack:D1/1.1 1.1 asked-thirteen"
+loops
+lcount "W13 loops" 1
+printf '%s\n' "$LOUT" | grep -qxE '[0-9]+ proj wait: slack:D1/1\.1 1\.1 asked-thirteen' \
+  || { echo "FAIL: W13 -- loops line is not the raw wait: $LOUT"; fail=1; }
+
+# --- W14 a moved: line with the same ref closes; another ref or landed does not
+seed
+add $((3 * H)) "proj wait: gh:o/r#1 t1 w14-one"
+add $((3 * H)) "proj wait: gh:o/r#2 t2 w14-two"
+add $((2 * H)) "proj moved: gh:o/r#1 merged"
+add "$H" "srepo moved: landed 'gh:o/r#2'"
+anchor W14 "$PLAIN"
+has W14 "proj wait: gh:o/r#2 t2 w14-two"
+has "W14 move" "proj moved: gh:o/r#1 merged"
+has "W14 landed" "srepo moved: landed 'gh:o/r#2'"
+lacks W14 "w14-one"
+loops
+lcount "W14 loops" 1
+lhas "W14 loops" "w14-two"
+llacks "W14 loops" "w14-one"
+
+# --- W15 a wait outlives the 4 h on: rule
+seed
+add $((5 * H)) "proj wait: gh:o/r#15 t15 wait-fifteen"
+add $((5 * H)) "proj on: on-fifteen"
+add "$H" "ctl moved: control-W15"
+anchor W15 "$PLAIN"
+has W15 "proj wait: gh:o/r#15 t15 wait-fifteen"
+has "W15 control" "ctl moved: control-W15"
+lacks "W15 on" "on-fifteen"
+loops
+lcount "W15 loops" 1
+lhas "W15 loops" "wait-fifteen"
+
+# --- W16 a wait lives 5 days
+seed
+add $((5 * 24 * H + H)) "proj wait: dd:16b ok ttl-dead"
+add $((4 * 24 * H)) "proj wait: dd:16a ok ttl-alive"
+anchor W16 "$PLAIN"
+has W16 "proj wait: dd:16a ok ttl-alive"
+lacks W16 "ttl-dead"
+loops
+lcount "W16 loops" 1
+lhas "W16 loops" "ttl-alive"
+llacks "W16 loops" "ttl-dead"
+
+# --- W17 an open wait is kept first against ten newer moves
+seed
+add $((3 * H)) "proj wait: slack:C17/1.7 1.7 kept-17"
+for i in 1 2 3 4 5 6 7 8 9 10; do add $(((11 - i) * 60)) "proj moved: m$i"; done
+anchor W17 "$PLAIN"
+nblock W17 8
+EXP='proj wait: slack:C17/1.7 1.7 kept-17
+proj moved: m4
+proj moved: m5
+proj moved: m6
+proj moved: m7
+proj moved: m8
+proj moved: m9
+proj moved: m10'
+[ "$(block)" = "$EXP" ] || { echo "FAIL: W17 -- block is not the wait then m4..m10"; fail=1; }
+
+# --- W17b waits print first, then the other kept lines in file order
+seed
+add $((2 * H)) "proj moved: early-m"
+add 5400 "proj on: mid-on"
+add "$H" "proj wait: ld:flag-x 7 newest-w"
+anchor W17b "$PLAIN"
+EXP='proj wait: ld:flag-x 7 newest-w
+proj moved: early-m
+proj on: mid-on'
+[ "$(block)" = "$EXP" ] || { echo "FAIL: W17b -- block is not the wait, early-m, mid-on"; fail=1; }
+
+# --- W18 a wait behind 300 newer lines is still found
+seed
+add $((2 * 24 * H)) "proj wait: linear:ENG-18 u18 lookback-18"
+i=1
+while [ "$i" -le 300 ]; do add 60 "filler moved: x$i"; i=$((i + 1)); done
+anchor W18 "$PLAIN"
+[ "$(block | head -n 1)" = "proj wait: linear:ENG-18 u18 lookback-18" ] \
+  || { echo "FAIL: W18 -- the wait is not the block's first line"; fail=1; }
+loops
+lcount "W18 loops" 1
+lhas "W18 loops" "lookback-18"
+
+# --- W19 malformed waits are skipped
+seed
+add "$H" "proj wait: slack:D9/1.1 short"
+add "$H" "proj wait: nocolon 1 t-nocolon"
+add "$H" "proj wait: :x 1 t-emptykind"
+add "$H" "proj wait: dd:42 ok control-19"
+anchor W19 "$PLAIN"
+has "W19 control" "proj wait: dd:42 ok control-19"
+lacks "W19 short" "slack:D9/1.1 short"
+lacks "W19 nocolon" "t-nocolon"
+lacks "W19 emptykind" "t-emptykind"
+loops
+lcount "W19 loops" 1
+lhas "W19 loops" "control-19"
+
+# --- W20 close, then re-arm the same ref: open again, latest wait
+seed
+add $((3 * H)) "proj wait: slack:a b1 first-arm"
+add $((2 * H)) "proj moved: slack:a replied"
+add "$H" "proj wait: slack:a b2 second-arm"
+loops
+lcount "W20 loops" 1
+lhas "W20 loops" "second-arm"
+
+# --- W21 two waits on one ref: one line, the latest
+seed
+add $((2 * H)) "proj wait: gh:o/r#3 b dup-old"
+add "$H" "proj wait: gh:o/r#3 b dup-new"
+loops
+lcount "W21 loops" 1
+lhas "W21 loops" "dup-new"
+
+# --- W22 reader edges: missing file rc 1, nothing created; empty file rc 0
+rm -rf "$HOME/.clutch"
+loops
+[ "$LRC" = 1 ] || { echo "FAIL: W22 missing -- loops rc $LRC, want 1"; fail=1; }
+[ -z "$LOUT" ] || { echo "FAIL: W22 missing -- loops printed: $LOUT"; fail=1; }
+{ [ -e "$HOME/.clutch" ] || [ -L "$HOME/.clutch" ]; } && { echo "FAIL: W22 -- reader created ~/.clutch"; fail=1; }
+seed
+loops
+lcount "W22 empty" 0
+add 60 "proj wait: gh:o/r#22 b control-22"
+loops
+lcount "W22 control" 1
+lhas "W22 control" "control-22"
 
 # ===== P2: the stop.sh writer =====
 # No global or system git config may leak an identity into the scratch repos.

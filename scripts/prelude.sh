@@ -3,7 +3,7 @@
 #
 # Sets: CLUTCH_GIT (1 inside a git work tree, else 0), ROOT, CLUTCH_DIR,
 # EXCLUDE_FILE, CLUTCH_WORKLOG. Defines clutch_ensure_dir,
-# clutch_last_authored, clutch_worklog_window.
+# clutch_last_authored, clutch_worklog_window, clutch_open_loops.
 
 CLUTCH_GIT=0
 ROOT=""
@@ -85,29 +85,43 @@ clutch_last_authored() {
   git log -1 --pretty="$FMT" "$H" 2>/dev/null
 }
 
-# Print the live worklog window: moved: lines under 24 h and on: lines under
-# 4 h, epoch dropped, at most 8, in file order. Malformed, future-dated and
-# unknown-verb lines are skipped. Returns 1 when the file is absent or
-# unreadable; never creates anything.
-# shortcut: scans the last 200 lines and cuts bytes, not characters; upgrade
-# if a day logs more than 200 lines or a cut splits a glyph.
-clutch_worklog_window() {
+# One scan of the worklog for both readers ($1: window or loops). A wait loop
+# is "<epoch> <repo> wait: <kind>:<ref> <baseline> <text>"; a later moved:
+# line whose fourth field is the same <kind>:<ref> closes it, and an open wait
+# ages out after 5 days. Malformed, future-dated and unknown-verb lines are
+# skipped. Returns 1 when the file is absent or unreadable; never creates
+# anything.
+# shortcut: scans the last 2000 lines and cuts bytes, not characters; upgrade
+# if 5 days log more than 2000 lines or a cut splits a glyph.
+clutch_worklog_scan() {
   [ -f "$CLUTCH_WORKLOG" ] && [ -r "$CLUTCH_WORKLOG" ] || return 1
   WNOW=$(date +%s 2>/dev/null) || return 1
-  tail -n 200 "$CLUTCH_WORKLOG" 2>/dev/null | awk -v now="$WNOW" '
+  tail -n 2000 "$CLUTCH_WORKLOG" 2>/dev/null | awk -v now="$WNOW" -v mode="$1" '
     $1 ~ /^[0-9]+$/ && NF >= 4 {
       age = now - $1
       if (age < 0) next
-      if (($3 == "on:" && age < 14400) || ($3 == "moved:" && age < 86400)) {
-        line = $0; sub(/^[ \t]*[0-9]+[ \t]+/, "", line)
-        n++; txt[n] = substr(line, 1, 160); on[n] = ($3 == "on:")
-      }
+      n++; ln[n] = $0; vb[n] = $3; ag[n] = age
+      if ($3 == "wait:" && NF >= 6 && $4 ~ /^[^:]+:./) open[$4] = n
+      else if ($3 == "moved:" && ($4 in open)) delete open[$4]
     }
-    # Live claims are kept first so a burst of moves cannot push a held item out of view.
+    # Open waits are kept first, then live claims, then moves, so a burst of
+    # moves cannot push a held item out of view.
     END {
+      for (r in open) if (ag[open[r]] < 432000) w[open[r]] = 1
+      if (mode == "loops") { for (i = 1; i <= n; i++) if (w[i]) print ln[i]; exit }
       k = 0
-      for (i = n; i > 0 && k < 8; i--) if (on[i]) { keep[i] = 1; k++ }
-      for (i = n; i > 0 && k < 8; i--) if (!on[i]) { keep[i] = 1; k++ }
-      for (i = 1; i <= n; i++) if (keep[i]) print txt[i]
+      for (i = n; i > 0 && k < 8; i--) if (w[i]) { keep[i] = 1; k++ }
+      for (i = n; i > 0 && k < 8; i--) if (vb[i] == "on:" && ag[i] < 14400) { keep[i] = 1; k++ }
+      for (i = n; i > 0 && k < 8; i--) if (vb[i] == "moved:" && ag[i] < 86400) { keep[i] = 1; k++ }
+      for (p = 1; p >= 0; p--) for (i = 1; i <= n; i++) if (keep[i] && w[i] == p) {
+        line = ln[i]; sub(/^[ \t]*[0-9]+[ \t]+/, "", line); print substr(line, 1, 160)
+      }
     }' 2>/dev/null
 }
+
+# The open wait loops, raw (epoch kept), oldest first; read by the ops tick.
+clutch_open_loops() { clutch_worklog_scan loops; }
+
+# The window for the session-start block and the ops sweep: up to 8 lines,
+# open waits first, epoch dropped, each cut to 160 bytes.
+clutch_worklog_window() { clutch_worklog_scan window; }
