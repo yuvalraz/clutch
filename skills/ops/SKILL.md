@@ -81,6 +81,7 @@ there.
 Read for what is live: the meetings on today's calendar, the threads waiting
 on you, the tasks assigned to you, anything a person is waiting on. Read
 today's focuses from the focus file when one is set.
+For each Auto line, also read your own items it covers (for example your open PRs).
 
 Bounds (HARD):
 
@@ -243,7 +244,7 @@ Classify every inbound item the sweep reads against the policy:
   and name it once as what moved.
 - Auto: post into a channel the policy names as automated, an intake queue
   a process reads, exactly as its policy line describes, without a yes;
-  then append one `moved:` line the same way, text `Auto: <what was posted where>`.
+  then append one `moved:` line the same way, text `Auto: <what was posted where>`, and name it once as what moved.
   An Auto post of an item that awaits a review or a reply is also held as a wait loop, with the Step 5 snippet.
 - L1: draft it. A draft that touches the critical path shows now;
   any other draft waits for the next approval window, unmentioned until then.
@@ -256,12 +257,15 @@ An L1 item whose deadline falls before the next approval window touches the crit
 Anything the policy does not name is L3.
 When an item matches two levels, the stricter one wins, in this order: L3, L1, L0, Noise, Auto/L2.
 An item runs at L2 or Auto only when that level is its only match.
-A direct send is any message, email, thread reply or comment a person receives; no policy line makes one L2 or Auto.
+An item that matches both Auto and L2 is L3.
+A direct send is any message, email, channel post, thread reply or comment a person receives, except an Auto post as its policy line describes; no policy line makes one L2.
 An @-mention in an Auto post makes it a direct send, so L3, unless its policy line names the person mentioned.
 A channel the policy does not name stays L3.
-The sweep reads each Auto channel the policy names once, for your own items, so it never proposes a direct ask for an item already posted there.
-An L2 action that rests on a link, such as a ticket linked to a PR you
-authored, reads the link first and acts only when it holds.
+Auto posts only to a channel whose name matches the policy line exactly and resolves to one channel; a near match, more than one match, no match or a DM is L3, named in one line.
+The sweep reads each Auto channel the policy names once, looking back 5 days, for the item's link in any message there whoever posted it, and never posts an item already there nor proposes a direct ask for one.
+An open `wait:` line or a `moved: Auto:` line for the same item also blocks a new post.
+An L2 action or Auto post that rests on a link or a state, such as a ticket linked to a PR you authored, reads it first and acts only when it holds.
+A state the line names that ops cannot confirm (for example ready while checks are pending, failing or unreadable, or a draft PR) holds the item at L3.
 A failed L2 action or Auto post gets one line naming it; it logs nothing and is not retried.
 L2 actions and Auto posts run after the sweep's reads end, never inside them.
 

@@ -168,16 +168,28 @@ fpin "$O" "deleg: no focuses L0"        'With no focuses set, each L0 item shows
 fpin "$O" "window: draft wait loop"     'An approved window draft that awaits a reply or a state change is held as a wait loop, as in Step 5.'
 fpin "$O" "deleg: strictness order"     'When an item matches two levels, the stricter one wins, in this order: L3, L1, L0, Noise, Auto/L2.'
 fpin "$O" "deleg: L2 only match"        'An item runs at L2 or Auto only when that level is its only match.'
-fpin "$O" "deleg: send is L3"           'A direct send is any message, email, thread reply or comment a person receives; no policy line makes one L2 or Auto.'
+fpin "$O" "deleg: send is L3"           'A direct send is any message, email, channel post, thread reply or comment a person receives, except an Auto post as its policy line describes; no policy line makes one L2.'
+fpin "$O" "deleg: Auto and L2 tie is L3" 'An item that matches both Auto and L2 is L3.'
 fpin "$O" "auto: level line"            '- Auto: post into a channel the policy names as automated, an intake queue'
 fpin "$O" "auto: log text"              'text `Auto: <what was posted where>`'
 fpin "$O" "auto: held as wait loop"     'An Auto post of an item that awaits a review or a reply is also held as a wait loop, with the Step 5 snippet.'
 fpin "$O" "auto: mention is direct"     'An @-mention in an Auto post makes it a direct send, so L3, unless its policy line names the person mentioned.'
 fpin "$O" "auto: unnamed channel L3"    'A channel the policy does not name stays L3.'
-fpin "$O" "auto: sweep reads channel"   'The sweep reads each Auto channel the policy names once, for your own items, so it never proposes a direct ask for an item already posted there.'
-nsl=$(grep -cF 'no policy line makes one L2.' "$O")
-[ "$nsl" = 0 ] || { echo "FAIL: ops -- the old send rule without Auto is back ($nsl hit)"; fail=1; }
-fpin "$O" "deleg: link read first"      'reads the link first and acts only when it holds'
+fpin "$O" "auto: sweep reads channel"   "The sweep reads each Auto channel the policy names once, looking back 5 days, for the item's link in any message there whoever posted it, and never posts an item already there nor proposes a direct ask for one."
+fpin "$O" "auto: worklog blocks repost" 'An open `wait:` line or a `moved: Auto:` line for the same item also blocks a new post.'
+fpin "$O" "auto: exact channel match"   'Auto posts only to a channel whose name matches the policy line exactly and resolves to one channel; a near match, more than one match, no match or a DM is L3, named in one line.'
+fpin "$O" "auto: unconfirmed state L3"  'A state the line names that ops cannot confirm (for example ready while checks are pending, failing or unreadable, or a draft PR) holds the item at L3.'
+fpin "$O" "auto: named as what moved"   'text `Auto: <what was posted where>`, and name it once as what moved.'
+fpin "$O" "auto: sweep reads own items" 'For each Auto line, also read your own items it covers (for example your open PRs).'
+OJ=$(tr -s '[:space:]' ' ' < "$O")
+for old in 'A send is any message' \
+  'A direct send is any message, email, thread reply or comment' \
+  'once, for your own items, so it never proposes' \
+  'An L2 action that rests on a link,' \
+  'reads the link first and acts only when it holds'; do
+  case $OJ in *"$old"*) echo "FAIL: ops -- replaced wording is back: $old"; fail=1 ;; esac
+done
+fpin "$O" "deleg: link read first"      'An L2 action or Auto post that rests on a link or a state, such as a ticket linked to a PR you authored, reads it first and acts only when it holds.'
 fpin "$O" "deleg: failed L2"            'A failed L2 action or Auto post gets one line naming it; it logs nothing and is not retried.'
 fpin "$O" "deleg: L2 after reads"       "L2 actions and Auto posts run after the sweep's reads end, never inside them."
 fpin "$O" "window: once per sweep"      'Check the approval window once per sweep, after the situation:'
@@ -194,7 +206,8 @@ nwi=$(grep -c 'Write to any integration, or send anything, without a yes' "$O")
 fpin "$C" "const: delegation heading"   '## Delegation'
 fpin "$C" "const: L2 from policy"       'an L2 item in their policy'
 fpin "$C" "const: L2 logs, nothing else" 'runs without a yes and logs one moved: L2: line. Nothing else is L2: a'
-fpin "$C" "const: L3 always waits"      'production change, a direct send (not an Auto channel post), a merge or a'
+fpin "$C" "const: L3 always waits"      'production change, a direct send (not an Auto post in that turn), a merge or a'
+case $(tr -s '[:space:]' ' ' < "$C") in *'not an Auto channel post'*) echo "FAIL: const -- the unscoped Auto clause is back"; fail=1 ;; esac
 fpin "$C" "const: whatever the policy"  'whatever the policy says.'
 fpin "$C" "const: merged no-count"      'Never count missed days, streaks, staleness, or'
 fpin "$C" "const: primary-thing lead-in" 'Match on the primary thing the user is'

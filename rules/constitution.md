@@ -118,5 +118,5 @@ mkdir -p "$HOME/.clutch" 2>/dev/null && printf '%s %s %s %.200s\n' "$(date +%s)"
 
 In a user-invoked ops turn, an L2 item in their policy
 runs without a yes and logs one moved: L2: line. Nothing else is L2: a
-production change, a direct send (not an Auto channel post), a merge or a
+production change, a direct send (not an Auto post in that turn), a merge or a
 delete waits for a yes, whatever the policy says.
