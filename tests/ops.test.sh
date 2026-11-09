@@ -132,6 +132,57 @@ fpin "$O" "tick: unreadable loops"      'Any other exit status means the wait lo
 fpin "$O" "tick: bounded line read"     'cut -c1-300'
 fpin "$O" "tick: rc 1 with stderr"      'Exit status 1 with error text on stderr means the same: the wait loops are unreadable.'
 fpin "$O" "tick: ref its own token"     'as its own token followed by a space'
+
+# --- delegation: the policy sections, the levels, the approval window
+fpin "$O" "deleg: never ask for them"   'Neither is a missing key: never ask for them.'
+nak=$(grep -c 'Ops adds no keys of its own' "$O")
+[ "$nak" = 0 ] || { echo "FAIL: ops -- still says 'Ops adds no keys of its own' ($nak hit)"; fail=1; }
+fpin "$O" "deleg: classify after reads" 'Then classify what the sweep read (see Delegation).'
+fpin "$O" "deleg: L2 lines written"     'and the L2 lines (see Delegation)'
+fpin "$O" "deleg: one exception"        'An L2 action your delegation policy lists is the one exception (see Delegation).'
+fpin "$O" "deleg: L3 untouchable"       'L3 is untouchable: a production change, a send to anyone, a merge or a delete always waits for a yes'
+pin  "$O" "deleg: section"              '^### Delegation$'
+fpin "$O" "deleg: absent is S1"         'With no `### Delegation` section, nothing here applies and every outward action waits for a yes.'
+fpin "$O" "deleg: classify inbound"     'Classify every inbound item the sweep reads against the policy:'
+fpin "$O" "deleg: L3 line"              '- L3: the yes gate, exactly as in Step 5.'
+fpin "$O" "deleg: L2 log text"          'text `L2: <what was done>`'
+fpin "$O" "deleg: L1 waits"             'any other draft waits for the next approval window, unmentioned until then'
+fpin "$O" "deleg: L0 line"              '- L0: one line, only when it touches the critical path.'
+fpin "$O" "deleg: Noise line"           '- Noise: never shown.'
+fpin "$O" "deleg: critical path"        'The critical path is today'"'"'s focuses from the focus file.'
+fpin "$O" "deleg: unnamed is L3"        'Anything the policy does not name is L3, and so is any action you have not done yourself at least once.'
+fpin "$O" "deleg: strictness order"     'When an item matches two levels, the stricter one wins, in this order: L3, L1, L0, Noise, L2.'
+fpin "$O" "deleg: L2 only match"        'An item runs at L2 only when L2 is its only match.'
+fpin "$O" "deleg: send is L3"           'A send is any message, email, comment or post another person receives; no policy line makes one L2.'
+fpin "$O" "deleg: link read first"      'reads the link first and acts only when it holds'
+fpin "$O" "deleg: failed L2"            'A failed L2 action gets one line naming it; it logs nothing and is not retried.'
+fpin "$O" "deleg: L2 after reads"       "L2 actions run after the sweep's reads end, never inside them."
+fpin "$O" "window: once per sweep"      'Check the approval window once per sweep, after the situation:'
+fpin "$O" "window: one screen"          'approved with one yes or "all but N"'
+fpin "$O" "window: empty or error"      'Empty output or an error: no window is due; say nothing about drafts.'
+fpin "$O" "window: no stored queue"     'No draft is kept between windows: each window reads fresh, so there is no pending list.'
+fpin "$O" "window: after situation"     'In the sweep, the window screen follows the situation, and approving it is the one smallest move.'
+fpin "$O" "window: not in a tick"       'A tick never runs the window.'
+fpin "$O" "deleg: does-not send"        'Send anything without a yes, or write to any integration without one beyond the L2 actions your policy lists'
+nwi=$(grep -c 'Write to any integration, or send anything, without a yes' "$O")
+[ "$nwi" = 0 ] || { echo "FAIL: ops -- still has the old does-not send line ($nwi hit)"; fail=1; }
+
+# --- constitution: the Delegation section, paid for by four repeats removed
+fpin "$C" "const: delegation heading"   '## Delegation'
+fpin "$C" "const: L2 from policy"       'an L2 item from their delegation policy'
+fpin "$C" "const: L2 logs, nothing else" 'runs without a yes and logs one moved: L2: line. Nothing else is L2: a'
+fpin "$C" "const: L3 always waits"      'production change, a send to anyone, a merge or a delete always waits for'
+fpin "$C" "const: whatever the policy"  'whatever the policy says.'
+fpin "$C" "const: merged no-count"      'Never count missed days, streaks, staleness, or'
+fpin "$C" "const: primary-thing lead-in" 'Match on the primary thing the user is'
+nrp=$(grep -c 'Route on the primary thing' "$C")
+[ "$nrp" = 0 ] || { echo "FAIL: constitution -- the duplicate 'Route on the primary thing' rule is back ($nrp hit)"; fail=1; }
+
+# --- README: delegation in one paragraph
+fpin "$R" "README: delegation policy"   'With a `### Delegation` policy in `~/.clutch/rituals.md`, ops sorts what it reads'
+fpin "$R" "README: L2 chore"            'L2 does a chore you listed and logs it'
+fpin "$R" "README: L3 waits"            'always waits for a yes'
+fpin "$R" "README: window opens"        'which opens on your next sweep'
 # The handoff path: /clutch:intent ops must be able to invoke the skill, so
 # model invocation stays enabled (negative pin).
 if grep -q 'disable-model-invocation: true' "$O"; then
@@ -357,5 +408,23 @@ TOUT=$(cd "$T/armdir" && LC_ALL=en_US.UTF-8 sh -c "$TCMD" 2>&1); TRC=$?
 [ "$TRC" = 0 ] && printf '%s\n' "$TOUT" | grep -qF ' gh:o/r#1 ' \
   && printf '%s\n' "$TOUT" | grep -qF ' gh:o/r#2 ' \
   || { echo "FAIL: O-arm (g) -- want both loops under UTF-8; rc $TRC: $TOUT"; exit 1; }
+
+# --- O-window: the skill's one window line, root substituted like O-run. A
+# `### Windows` time of 00:00 has always passed, so the first run is due at any
+# hour and the second, in the same window, prints nothing.
+WLINE=$(grep -F 'sh -c' "$O" | grep -F 'clutch_ops_due window')
+[ "$(printf '%s\n' "$WLINE" | grep -c .)" = 1 ] \
+  || { echo "FAIL: O-window wants exactly one sh -c line running clutch_ops_due window, got: $WLINE"; exit 1; }
+WCMD=$(subroot "$WLINE")
+case "$WCMD" in
+  *CLAUDE_PLUGIN_ROOT*) echo "FAIL: O-window -- plugin root left unsubstituted: $WCMD"; exit 1 ;;
+esac
+armhome w
+mkdir -p "$HOME/.clutch"
+printf '## Ops\n### Windows\n- 00:00\n' > "$HOME/.clutch/rituals.md"
+W1=$(cd "$T/armdir" && sh -c "$WCMD" 2>&1); R1=$?
+W2=$(cd "$T/armdir" && sh -c "$WCMD" 2>&1); R2=$?
+[ "$R1" = 0 ] && [ "$W1" = due ] && [ "$R2" = 0 ] && [ -z "$W2" ] \
+  || { echo "FAIL: O-window -- want due then nothing; rc $R1: $W1 / rc $R2: $W2"; exit 1; }
 
 echo PASS

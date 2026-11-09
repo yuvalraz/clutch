@@ -67,7 +67,9 @@ offer to continue without state.
 
 The tools come from the `integrations:` bullets under Shared, the same ones
 the morning and close-of-day anchors read. Today's focuses come from the
-focus file when one is set. Ops adds no keys of its own.
+focus file when one is set. Ops reads two optional sections of its own,
+`### Delegation` and `### Windows` (see Delegation).
+Neither is a missing key: never ask for them.
 
 ### Step 2: The sweep
 
@@ -109,6 +111,7 @@ Run one tick pass (see Tick) before the situation, and fold each loop that
 moved into the situation as what moved, instead of its own line.
 A loop that did not move stays unmentioned. The tick pass is part of this
 pulse: one read of the wait loops, then it reads each wait loop once, by its kind.
+Then classify what the sweep read (see Delegation).
 
 ### Step 3: The situation
 
@@ -118,8 +121,9 @@ what it needs now, never as overdue, late, or missed.
 
 The situation is at most seven lines. It is a read of now, not a dashboard
 and not a report for later. Nothing from the sweep is written anywhere
-except the tick pass's `moved:` lines (see Tick); the rest
+except the tick pass's `moved:` lines and the L2 lines (see Delegation); the rest
 lives in the turn, and a fresh sweep replaces it.
+After the situation, check the approval window (see Delegation).
 
 ### Step 4: One smallest move
 
@@ -141,6 +145,8 @@ behavior:
 - **Outward-facing actions keep a human checkpoint.** Sending a message,
   accepting or moving a meeting, changing a ticket's state, anything another
   person will see: draft it, show it, send on a yes. Reading is free.
+  An L2 action your delegation policy lists is the one exception (see Delegation).
+  L3 is untouchable: a production change, a send to anyone, a merge or a delete always waits for a yes, whatever the policy says.
 - **An outward action that awaits a reply or a state change becomes a wait
   loop.** Its yes ask ends with "(I'll hold this as an open loop)". On the
   yes, once the action succeeds, append its `wait:` line with the snippet
@@ -221,6 +227,50 @@ A tool that is not reachable gets one line naming it, and that loop stays open.
 A tick never re-arms a loop, never names one that did not move, and never says how long anything has waited.
 In the sweep's tick pass, moved loops fold into the situation instead of their own lines.
 
+### Delegation
+
+A delegation policy lets ops do the chores you allowed, draft the rest, and
+show only what touches your critical path. It lives in two optional sections
+of `~/.clutch/rituals.md`: `### Delegation`, one `- <level>: <what it covers>`
+line each, and `### Windows`, the approval window times (see `/clutch:rituals`).
+With no `### Delegation` section, nothing here applies and every outward action waits for a yes.
+
+Classify every inbound item the sweep reads against the policy:
+
+- L3: the yes gate, exactly as in Step 5.
+- L2: do it without a yes, then append one `moved:` line with the
+  constitution's worklog snippet, verb `moved:`, text `L2: <what was done>`,
+  and name it once as what moved.
+- L1: draft it. A draft that touches the critical path shows now;
+  any other draft waits for the next approval window, unmentioned until then.
+- L0: one line, only when it touches the critical path.
+- Noise: never shown.
+
+The critical path is today's focuses from the focus file.
+Anything the policy does not name is L3, and so is any action you have not done yourself at least once.
+When an item matches two levels, the stricter one wins, in this order: L3, L1, L0, Noise, L2.
+An item runs at L2 only when L2 is its only match.
+A send is any message, email, comment or post another person receives; no policy line makes one L2.
+An L2 action that rests on a link, such as a ticket linked to a PR you
+authored, reads the link first and acts only when it holds.
+A failed L2 action gets one line naming it; it logs nothing and is not retried.
+L2 actions run after the sweep's reads end, never inside them.
+
+Check the approval window once per sweep, after the situation:
+
+```sh
+sh -c '. "${CLAUDE_PLUGIN_ROOT}/scripts/prelude.sh" && clutch_ops_due window'
+```
+
+`due` means a window time has passed since the last window (`### Windows`,
+default 11:00 and 16:30). Draft every L1 item that does not touch the
+critical path, from the sweep's fresh read, and show the drafts in one
+screen, numbered, approved with one yes or "all but N".
+Empty output or an error: no window is due; say nothing about drafts.
+No draft is kept between windows: each window reads fresh, so there is no pending list.
+In the sweep, the window screen follows the situation, and approving it is the one smallest move.
+A tick never runs the window.
+
 ### Session close
 
 `/clutch:eod` owns the day's close: the retro, tomorrow's focuses, the fun
@@ -241,7 +291,7 @@ and the one open loop with its next move. Nothing else is written.
 ## What this skill does NOT do
 
 - Fire on its own, re-sweep on its own, or watch anything in the background
-- Write to any integration, or send anything, without a yes
+- Send anything without a yes, or write to any integration without one beyond the L2 actions your policy lists
 - Produce a dashboard, a report, or a list for later
 - Count unread, waiting, overdue, or missed anything
 - Write code or design anything: that is a build session
