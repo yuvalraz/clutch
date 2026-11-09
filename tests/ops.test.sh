@@ -99,8 +99,8 @@ nfr=$(grep -c 'failed read means' "$O")
 pin "$O" "ops: closed loop logs"        'A closed loop logs one line'
 pin "$O" "ops: snippet speaks on MISS"  'silently; speak on MISS or an error'
 pin "$O" "ops: only write"              'the only thing a closed loop writes'
-fpin "$O" "ops: sweep writes only L2"  'the sweep itself still writes nothing beyond its L2 lines'
-fpin "$O" "ops: sweep bound L2 exception" '- The sweep reads; it never writes to any integration; L2 actions run after the reads (see Delegation).'
+fpin "$O" "ops: sweep writes only L2"  'the sweep itself still writes nothing beyond its L2 and Auto lines'
+fpin "$O" "ops: sweep bound L2 exception" '- The sweep reads; it never writes to any integration; L2 actions and Auto posts run after the reads (see Delegation).'
 # Paired with the two pins above: neither write ban stands without its L2 exception.
 nsw=$(grep -cF -e 'the sweep itself still writes nothing.' -e 'it never writes to any integration.' "$O")
 [ "$nsw" = 0 ] || { echo "FAIL: ops -- a sweep write ban lacks its L2 exception ($nsw hit)"; fail=1; }
@@ -142,9 +142,14 @@ fpin "$O" "deleg: never ask for them"   'Neither is a missing key: never ask for
 nak=$(grep -c 'Ops adds no keys of its own' "$O")
 [ "$nak" = 0 ] || { echo "FAIL: ops -- still says 'Ops adds no keys of its own' ($nak hit)"; fail=1; }
 fpin "$O" "deleg: classify after reads" 'Then classify what the sweep read (see Delegation).'
-fpin "$O" "deleg: L2 lines written"     'and the L2 lines (see Delegation)'
-fpin "$O" "deleg: one exception"        'An L2 action your delegation policy lists is the one exception (see Delegation).'
-fpin "$O" "deleg: L3 untouchable"       'L3 is untouchable: a production change, a send to anyone, a merge or a delete always waits for a yes'
+fpin "$O" "deleg: L2 lines written"     'and the L2 and Auto lines (see Delegation)'
+fpin "$O" "deleg: one exception"        'An L2 action or Auto post your delegation policy lists is the one exception (see Delegation).'
+fpin "$O" "deleg: L3 untouchable"       'L3 is untouchable: a production change, a direct send, a merge or a delete always waits for a yes'
+# Paired with the direct-send pins: the old "send to anyone" wording is gone everywhere it lived.
+for f in "$O" "$C" "$R"; do
+  nsa=$(tr -s '[:space:]' ' ' < "$f" | grep -c 'send to anyone')
+  [ "$nsa" = 0 ] || { echo "FAIL: $f -- still says 'send to anyone'"; fail=1; }
+done
 pin  "$O" "deleg: section"              '^### Delegation$'
 fpin "$O" "deleg: absent is S1"         'With no `### Delegation` section, nothing here applies and every outward action waits for a yes.'
 fpin "$O" "deleg: classify inbound"     'Classify every inbound item the sweep reads against the policy:'
@@ -161,27 +166,49 @@ ndo=$(grep -cF 'any action you have not done yourself at least once' "$O")
 fpin "$O" "deleg: L1 deadline shows"    'An L1 item whose deadline falls before the next approval window touches the critical path, so its draft shows now.'
 fpin "$O" "deleg: no focuses L0"        'With no focuses set, each L0 item shows as one line instead of being hidden.'
 fpin "$O" "window: draft wait loop"     'An approved window draft that awaits a reply or a state change is held as a wait loop, as in Step 5.'
-fpin "$O" "deleg: strictness order"     'When an item matches two levels, the stricter one wins, in this order: L3, L1, L0, Noise, L2.'
-fpin "$O" "deleg: L2 only match"        'An item runs at L2 only when L2 is its only match.'
-fpin "$O" "deleg: send is L3"           'A send is any message, email, comment or post another person receives; no policy line makes one L2.'
-fpin "$O" "deleg: link read first"      'reads the link first and acts only when it holds'
-fpin "$O" "deleg: failed L2"            'A failed L2 action gets one line naming it; it logs nothing and is not retried.'
-fpin "$O" "deleg: L2 after reads"       "L2 actions run after the sweep's reads end, never inside them."
+fpin "$O" "deleg: strictness order"     'When an item matches two levels, the stricter one wins, in this order: L3, L1, L0, Noise, Auto/L2.'
+fpin "$O" "deleg: L2 only match"        'An item runs at L2 or Auto only when that level is its only match.'
+fpin "$O" "deleg: send is L3"           'A direct send is any message, email, channel post, thread reply or comment a person receives, except an Auto post as its policy line describes; no policy line makes one L2.'
+fpin "$O" "deleg: Auto and L2 tie is L3" 'An item that matches both Auto and L2 is L3.'
+fpin "$O" "auto: level line"            '- Auto: post into a channel the policy names as automated, an intake queue'
+fpin "$O" "auto: log text"              'text `Auto: <what was posted where>`'
+fpin "$O" "auto: held as wait loop"     'An Auto post of an item that awaits a review or a reply is also held as a wait loop, with the Step 5 snippet.'
+fpin "$O" "auto: mention is direct"     'An @-mention in an Auto post makes it a direct send, so L3, unless its policy line names the person mentioned.'
+fpin "$O" "auto: unnamed channel L3"    'A channel the policy does not name stays L3.'
+fpin "$O" "auto: sweep reads channel"   "The sweep reads each Auto channel the policy names once, looking back 5 days, for the item's link in any message there whoever posted it, and never posts an item already there nor proposes a direct ask for one."
+fpin "$O" "auto: worklog blocks repost" 'An open `wait:` line or a `moved: Auto:` line for the same item also blocks a new post.'
+fpin "$O" "auto: failed read is L3"     'An Auto channel read that fails or cannot be read holds every item it covers at L3, named in one line.'
+fpin "$O" "auto: exact channel match"   'Auto posts only to a channel whose name matches the policy line exactly and resolves to one channel; a near match, more than one match, no match or a DM is L3, named in one line.'
+fpin "$O" "auto: unconfirmed state L3"  'A state the line names that ops cannot confirm (for example ready while checks are pending, failing or unreadable, or a draft PR) holds the item at L3.'
+fpin "$O" "auto: named as what moved"   'text `Auto: <what was posted where>`, and name it once as what moved.'
+fpin "$O" "auto: sweep reads own items" 'For each Auto line, also read your own items it covers (for example your open PRs).'
+OJ=$(tr -s '[:space:]' ' ' < "$O")
+for old in 'A send is any message' \
+  'A direct send is any message, email, thread reply or comment' \
+  'once, for your own items, so it never proposes' \
+  'An L2 action that rests on a link,' \
+  'reads the link first and acts only when it holds'; do
+  case $OJ in *"$old"*) echo "FAIL: ops -- replaced wording is back: $old"; fail=1 ;; esac
+done
+fpin "$O" "deleg: link read first"      'An L2 action or Auto post that rests on a link or a state, such as a ticket linked to a PR you authored, reads it first and acts only when it holds.'
+fpin "$O" "deleg: failed L2"            'A failed L2 action or Auto post gets one line naming it; it logs nothing and is not retried.'
+fpin "$O" "deleg: L2 after reads"       "L2 actions and Auto posts run after the sweep's reads end, never inside them."
 fpin "$O" "window: once per sweep"      'Check the approval window once per sweep, after the situation:'
 fpin "$O" "window: one screen"          'approved with one yes or "all but N"'
 fpin "$O" "window: empty or error"      'Empty output or an error: no window is due; say nothing about drafts.'
 fpin "$O" "window: no stored queue"     'No draft is kept between windows: each window reads fresh, so there is no pending list.'
 fpin "$O" "window: after situation"     'In the sweep, the window screen follows the situation, and approving it is the one smallest move.'
 fpin "$O" "window: not in a tick"       'A tick never runs the window.'
-fpin "$O" "deleg: does-not send"        'Send anything without a yes, or write to any integration without one beyond the L2 actions your policy lists'
+fpin "$O" "deleg: does-not send"        'Send anything without a yes, or write to any integration without one beyond the L2 actions and Auto posts your policy lists'
 nwi=$(grep -c 'Write to any integration, or send anything, without a yes' "$O")
 [ "$nwi" = 0 ] || { echo "FAIL: ops -- still has the old does-not send line ($nwi hit)"; fail=1; }
 
 # --- constitution: the Delegation section, paid for by four repeats removed
 fpin "$C" "const: delegation heading"   '## Delegation'
-fpin "$C" "const: L2 from policy"       'an L2 item from their delegation policy'
+fpin "$C" "const: L2 from policy"       'an L2 item in their policy'
 fpin "$C" "const: L2 logs, nothing else" 'runs without a yes and logs one moved: L2: line. Nothing else is L2: a'
-fpin "$C" "const: L3 always waits"      'production change, a send to anyone, a merge or a delete always waits for'
+fpin "$C" "const: L3 always waits"      'production change, a direct send (not an Auto post in that turn), a merge or a'
+case $(tr -s '[:space:]' ' ' < "$C") in *'not an Auto channel post'*) echo "FAIL: const -- the unscoped Auto clause is back"; fail=1 ;; esac
 fpin "$C" "const: whatever the policy"  'whatever the policy says.'
 fpin "$C" "const: merged no-count"      'Never count missed days, streaks, staleness, or'
 fpin "$C" "const: primary-thing lead-in" 'Match on the primary thing the user is'
@@ -192,6 +219,7 @@ nrp=$(grep -c 'Route on the primary thing' "$C")
 fpin "$R" "README: delegation policy"   'With a `### Delegation` policy in `~/.clutch/rituals.md`, ops sorts what it reads'
 fpin "$R" "README: L2 chore"            'L2 does a chore you listed and logs it'
 fpin "$R" "README: L3 waits"            'always waits for a yes'
+fpin "$R" "README: Auto channels"       'An `- Auto:` line names an intake channel'
 fpin "$R" "README: window opens"        'which opens on your next sweep'
 # The handoff path: /clutch:intent ops must be able to invoke the skill, so
 # model invocation stays enabled (negative pin).

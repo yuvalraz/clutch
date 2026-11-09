@@ -73,6 +73,10 @@ fpin "$R" "ops: policy line shape"     '- <level>: <what it covers>'
 fpin "$R" "ops: L2 starts empty"       'the L2 list starts empty'
 fpin "$R" "ops: L2 done once"          'List at L2 only a chore you have done yourself at least once.'
 fpin "$R" "ops: L3 whatever the list"  'stays L3 whatever this list says'
+fpin "$R" "ops: Auto line shape"       '- Auto: <channel> — <what to post>'
+fpin "$R" "ops: direct send stays L3"  'A production change, a direct send, a merge or a delete stays L3'
+nsa=$(tr -s '[:space:]' ' ' < "$R" | grep -c 'send to anyone')
+[ "$nsa" = 0 ] || { echo "FAIL: rituals -- still says 'send to anyone'"; fail=1; }
 pin  "$R" "ops: windows heading"       '^### Windows$'
 fpin "$R" "ops: windows separators"    'comma or line separated'
 fpin "$R" "ops: default windows"       'the default is 11:00 and 16:30'
