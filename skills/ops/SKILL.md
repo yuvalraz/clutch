@@ -84,7 +84,7 @@ today's focuses from the focus file when one is set.
 
 Bounds (HARD):
 
-- The sweep reads; it never writes to any integration; L2 actions run after the reads (see Delegation).
+- The sweep reads; it never writes to any integration; L2 actions and Auto posts run after the reads (see Delegation).
 - Today's horizon only: nothing past the next workday.
 - It reads each reachable tool once and ends. It never polls, never loops,
   never watches anything in the background.
@@ -121,7 +121,7 @@ what it needs now, never as overdue, late, or missed.
 
 The situation is at most seven lines. It is a read of now, not a dashboard
 and not a report for later. Nothing from the sweep is written anywhere
-except the tick pass's `moved:` lines and the L2 lines (see Delegation); the rest
+except the tick pass's `moved:` lines and the L2 and Auto lines (see Delegation); the rest
 lives in the turn, and a fresh sweep replaces it.
 After the situation, check the approval window (see Delegation).
 
@@ -145,8 +145,8 @@ behavior:
 - **Outward-facing actions keep a human checkpoint.** Sending a message,
   accepting or moving a meeting, changing a ticket's state, anything another
   person will see: draft it, show it, send on a yes. Reading is free.
-  An L2 action your delegation policy lists is the one exception (see Delegation).
-  L3 is untouchable: a production change, a send to anyone, a merge or a delete always waits for a yes, whatever the policy says.
+  An L2 action or Auto post your delegation policy lists is the one exception (see Delegation).
+  L3 is untouchable: a production change, a direct send, a merge or a delete always waits for a yes, whatever the policy says.
 - **An outward action that awaits a reply or a state change becomes a wait
   loop.** Its yes ask ends with "(I'll hold this as an open loop)". On the
   yes, once the action succeeds, append its `wait:` line with the snippet
@@ -185,7 +185,7 @@ behavior:
   second sweep.
 - **A closed loop logs one line.** Append its `moved:` line with the
   constitution's worklog snippet, silently; speak on MISS or an error.
-  That line is the only thing a closed loop writes; the sweep itself still writes nothing beyond its L2 lines.
+  That line is the only thing a closed loop writes; the sweep itself still writes nothing beyond its L2 and Auto lines.
   A tick's `moved:` line, the sweep's tick pass included, is the closed loop's one line.
 
 ### Tick
@@ -241,6 +241,10 @@ Classify every inbound item the sweep reads against the policy:
 - L2: do it without a yes, then append one `moved:` line with the
   constitution's worklog snippet, verb `moved:`, text `L2: <what was done>`,
   and name it once as what moved.
+- Auto: post into a channel the policy names as automated, an intake queue
+  a process reads, exactly as its policy line describes, without a yes;
+  then append one `moved:` line the same way, text `Auto: <what was posted where>`.
+  An Auto post of an item that awaits a review or a reply is also held as a wait loop, with the Step 5 snippet.
 - L1: draft it. A draft that touches the critical path shows now;
   any other draft waits for the next approval window, unmentioned until then.
 - L0: one line, only when it touches the critical path.
@@ -250,13 +254,16 @@ The critical path is today's focuses from the focus file.
 With no focuses set, each L0 item shows as one line instead of being hidden.
 An L1 item whose deadline falls before the next approval window touches the critical path, so its draft shows now.
 Anything the policy does not name is L3.
-When an item matches two levels, the stricter one wins, in this order: L3, L1, L0, Noise, L2.
-An item runs at L2 only when L2 is its only match.
-A send is any message, email, comment or post another person receives; no policy line makes one L2.
+When an item matches two levels, the stricter one wins, in this order: L3, L1, L0, Noise, Auto/L2.
+An item runs at L2 or Auto only when that level is its only match.
+A direct send is any message, email, thread reply or comment a person receives; no policy line makes one L2 or Auto.
+An @-mention in an Auto post makes it a direct send, so L3, unless its policy line names the person mentioned.
+A channel the policy does not name stays L3.
+The sweep reads each Auto channel the policy names once, for your own items, so it never proposes a direct ask for an item already posted there.
 An L2 action that rests on a link, such as a ticket linked to a PR you
 authored, reads the link first and acts only when it holds.
-A failed L2 action gets one line naming it; it logs nothing and is not retried.
-L2 actions run after the sweep's reads end, never inside them.
+A failed L2 action or Auto post gets one line naming it; it logs nothing and is not retried.
+L2 actions and Auto posts run after the sweep's reads end, never inside them.
 
 Check the approval window once per sweep, after the situation:
 
@@ -294,7 +301,7 @@ and the one open loop with its next move. Nothing else is written.
 ## What this skill does NOT do
 
 - Fire on its own, re-sweep on its own, or watch anything in the background
-- Send anything without a yes, or write to any integration without one beyond the L2 actions your policy lists
+- Send anything without a yes, or write to any integration without one beyond the L2 actions and Auto posts your policy lists
 - Produce a dashboard, a report, or a list for later
 - Count unread, waiting, overdue, or missed anything
 - Write code or design anything: that is a build session

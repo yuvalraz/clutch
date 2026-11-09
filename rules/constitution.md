@@ -116,7 +116,7 @@ mkdir -p "$HOME/.clutch" 2>/dev/null && printf '%s %s %s %.200s\n' "$(date +%s)"
 
 ## Delegation
 
-In an ops turn the user invoked, an L2 item from their delegation policy
+In a user-invoked ops turn, an L2 item in their policy
 runs without a yes and logs one moved: L2: line. Nothing else is L2: a
-production change, a send to anyone, a merge or a delete always waits for
-a yes, whatever the policy says.
+production change, a direct send (not an Auto channel post), a merge or a
+delete waits for a yes, whatever the policy says.

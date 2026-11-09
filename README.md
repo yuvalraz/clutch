@@ -133,7 +133,8 @@ An approved step that awaits a reply is held as a `wait:` loop.
 It also says so in one line when the waits cannot be read. Entering ops runs
 one tick pass as part of the sweep.
 With a `### Delegation` policy in `~/.clutch/rituals.md`, ops sorts what it reads: L3 waits for your yes as before, L2 does a chore you listed and logs it, L1 drafts, L0 shows only what touches today's focuses, and Noise stays hidden.
-A production change, a send, a merge or a delete always waits for a yes.
+A production change, a direct send, a merge or a delete always waits for a yes.
+An `- Auto:` line names an intake channel, such as a review-request queue: ops posts there without a yes and logs it, and an @-mention the line does not name still waits for your yes.
 Non-critical drafts wait for an approval window, 11:00 and 16:30 by default, which opens on your next sweep.
 
 **Review.** `/clutch:review` closes one PR at a time with your written

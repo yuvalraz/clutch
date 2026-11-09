@@ -90,7 +90,8 @@ and offer to write the answer back here, so nothing is asked twice.
 Under `### Delegation`, each line is `- <level>: <what it covers>`, with level L3, L2, L1, L0 or Noise. L3 asks for a yes every time, L2 does a chore and logs it, L1 drafts for your yes, L0 is named only when it touches today's focuses, and Noise is never shown.
 Anything the policy does not name is L3, and the L2 list starts empty: only you add to it.
 List at L2 only a chore you have done yourself at least once.
-A production change, a send to anyone, a merge or a delete stays L3 whatever this list says.
+A production change, a direct send, a merge or a delete stays L3 whatever this list says.
+An Auto line, `- Auto: <channel> — <what to post>`, names a channel a process reads, such as a review-request queue; ops posts there without a yes, logs it, and an @-mention the line does not name still waits for your yes.
 Under `### Windows`, the approval window times, 24-hour, comma or line separated; the default is 11:00 and 16:30, used when the section is absent, empty or holds no valid time.
 A window opens on the first ops sweep at or after its time; nothing fires on its own.
 
@@ -101,6 +102,7 @@ A window opens on the first ops sweep at or after its time; nothing fires on its
 - L0: <inbound to name only when it touches today's focuses>
 - Noise: <inbound never to show>
 - L2:
+- Auto: <channel> — <what to post>
 ### Windows
 - 11:00, 16:30
 ```
