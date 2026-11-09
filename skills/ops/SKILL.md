@@ -264,6 +264,7 @@ A channel the policy does not name stays L3.
 Auto posts only to a channel whose name matches the policy line exactly and resolves to one channel; a near match, more than one match, no match or a DM is L3, named in one line.
 The sweep reads each Auto channel the policy names once, looking back 5 days, for the item's link in any message there whoever posted it, and never posts an item already there nor proposes a direct ask for one.
 An open `wait:` line or a `moved: Auto:` line for the same item also blocks a new post.
+An Auto channel read that fails or cannot be read holds every item it covers at L3, named in one line.
 An L2 action or Auto post that rests on a link or a state, such as a ticket linked to a PR you authored, reads it first and acts only when it holds.
 A state the line names that ops cannot confirm (for example ready while checks are pending, failing or unreadable, or a draft PR) holds the item at L3.
 A failed L2 action or Auto post gets one line naming it; it logs nothing and is not retried.

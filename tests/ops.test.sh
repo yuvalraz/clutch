@@ -177,6 +177,7 @@ fpin "$O" "auto: mention is direct"     'An @-mention in an Auto post makes it a
 fpin "$O" "auto: unnamed channel L3"    'A channel the policy does not name stays L3.'
 fpin "$O" "auto: sweep reads channel"   "The sweep reads each Auto channel the policy names once, looking back 5 days, for the item's link in any message there whoever posted it, and never posts an item already there nor proposes a direct ask for one."
 fpin "$O" "auto: worklog blocks repost" 'An open `wait:` line or a `moved: Auto:` line for the same item also blocks a new post.'
+fpin "$O" "auto: failed read is L3"     'An Auto channel read that fails or cannot be read holds every item it covers at L3, named in one line.'
 fpin "$O" "auto: exact channel match"   'Auto posts only to a channel whose name matches the policy line exactly and resolves to one channel; a near match, more than one match, no match or a DM is L3, named in one line.'
 fpin "$O" "auto: unconfirmed state L3"  'A state the line names that ops cannot confirm (for example ready while checks are pending, failing or unreadable, or a draft PR) holds the item at L3.'
 fpin "$O" "auto: named as what moved"   'text `Auto: <what was posted where>`, and name it once as what moved.'
