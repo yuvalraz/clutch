@@ -71,6 +71,7 @@ fpin "$R" "ops: never asked, kept"     'this skill never asks for it and keeps i
 pin  "$R" "ops: delegation heading"    '^### Delegation$'
 fpin "$R" "ops: policy line shape"     '- <level>: <what it covers>'
 fpin "$R" "ops: L2 starts empty"       'the L2 list starts empty'
+fpin "$R" "ops: L2 done once"          'List at L2 only a chore you have done yourself at least once.'
 fpin "$R" "ops: L3 whatever the list"  'stays L3 whatever this list says'
 pin  "$R" "ops: windows heading"       '^### Windows$'
 fpin "$R" "ops: windows separators"    'comma or line separated'

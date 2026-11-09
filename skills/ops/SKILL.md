@@ -84,7 +84,7 @@ today's focuses from the focus file when one is set.
 
 Bounds (HARD):
 
-- The sweep reads; it never writes to any integration.
+- The sweep reads; it never writes to any integration; L2 actions run after the reads (see Delegation).
 - Today's horizon only: nothing past the next workday.
 - It reads each reachable tool once and ends. It never polls, never loops,
   never watches anything in the background.
@@ -185,7 +185,7 @@ behavior:
   second sweep.
 - **A closed loop logs one line.** Append its `moved:` line with the
   constitution's worklog snippet, silently; speak on MISS or an error.
-  That line is the only thing a closed loop writes; the sweep itself still writes nothing.
+  That line is the only thing a closed loop writes; the sweep itself still writes nothing beyond its L2 lines.
   A tick's `moved:` line, the sweep's tick pass included, is the closed loop's one line.
 
 ### Tick
@@ -247,7 +247,9 @@ Classify every inbound item the sweep reads against the policy:
 - Noise: never shown.
 
 The critical path is today's focuses from the focus file.
-Anything the policy does not name is L3, and so is any action you have not done yourself at least once.
+With no focuses set, each L0 item shows as one line instead of being hidden.
+An L1 item whose deadline falls before the next approval window touches the critical path, so its draft shows now.
+Anything the policy does not name is L3.
 When an item matches two levels, the stricter one wins, in this order: L3, L1, L0, Noise, L2.
 An item runs at L2 only when L2 is its only match.
 A send is any message, email, comment or post another person receives; no policy line makes one L2.
@@ -270,6 +272,7 @@ Empty output or an error: no window is due; say nothing about drafts.
 No draft is kept between windows: each window reads fresh, so there is no pending list.
 In the sweep, the window screen follows the situation, and approving it is the one smallest move.
 A tick never runs the window.
+An approved window draft that awaits a reply or a state change is held as a wait loop, as in Step 5.
 
 ### Session close
 

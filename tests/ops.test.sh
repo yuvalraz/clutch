@@ -99,7 +99,11 @@ nfr=$(grep -c 'failed read means' "$O")
 pin "$O" "ops: closed loop logs"        'A closed loop logs one line'
 pin "$O" "ops: snippet speaks on MISS"  'silently; speak on MISS or an error'
 pin "$O" "ops: only write"              'the only thing a closed loop writes'
-pin "$O" "ops: sweep still writes none" 'the sweep itself still writes nothing'
+fpin "$O" "ops: sweep writes only L2"  'the sweep itself still writes nothing beyond its L2 lines'
+fpin "$O" "ops: sweep bound L2 exception" '- The sweep reads; it never writes to any integration; L2 actions run after the reads (see Delegation).'
+# Paired with the two pins above: neither write ban stands without its L2 exception.
+nsw=$(grep -cF -e 'the sweep itself still writes nothing.' -e 'it never writes to any integration.' "$O")
+[ "$nsw" = 0 ] || { echo "FAIL: ops -- a sweep write ban lacks its L2 exception ($nsw hit)"; fail=1; }
 # The old unqualified Step 3 ban cannot come back beside the tick pass's write.
 nwa=$(grep -c 'is written anywhere;' "$O")
 [ "$nwa" = 0 ] || { echo "FAIL: ops -- still says 'is written anywhere;' ($nwa hit)"; fail=1; }
@@ -150,7 +154,13 @@ fpin "$O" "deleg: L1 waits"             'any other draft waits for the next appr
 fpin "$O" "deleg: L0 line"              '- L0: one line, only when it touches the critical path.'
 fpin "$O" "deleg: Noise line"           '- Noise: never shown.'
 fpin "$O" "deleg: critical path"        'The critical path is today'"'"'s focuses from the focus file.'
-fpin "$O" "deleg: unnamed is L3"        'Anything the policy does not name is L3, and so is any action you have not done yourself at least once.'
+fpin "$O" "deleg: unnamed is L3"        'Anything the policy does not name is L3.'
+# Paired with the pin above: the done-it-once rule is an authoring rule in rituals, never a run-time check.
+ndo=$(grep -cF 'any action you have not done yourself at least once' "$O")
+[ "$ndo" = 0 ] || { echo "FAIL: ops -- still checks 'done yourself at least once' at run time ($ndo hit)"; fail=1; }
+fpin "$O" "deleg: L1 deadline shows"    'An L1 item whose deadline falls before the next approval window touches the critical path, so its draft shows now.'
+fpin "$O" "deleg: no focuses L0"        'With no focuses set, each L0 item shows as one line instead of being hidden.'
+fpin "$O" "window: draft wait loop"     'An approved window draft that awaits a reply or a state change is held as a wait loop, as in Step 5.'
 fpin "$O" "deleg: strictness order"     'When an item matches two levels, the stricter one wins, in this order: L3, L1, L0, Noise, L2.'
 fpin "$O" "deleg: L2 only match"        'An item runs at L2 only when L2 is its only match.'
 fpin "$O" "deleg: send is L3"           'A send is any message, email, comment or post another person receives; no policy line makes one L2.'

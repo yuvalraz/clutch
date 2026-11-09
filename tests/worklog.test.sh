@@ -637,6 +637,13 @@ due brief soon; dis "D8 soon" ""
 due brief "2026-11-09 0905"; dis "D8 control" due
 dend
 
+# --- D9 a CRLF rituals.md keeps its ### Windows times
+dhome d9
+printf '## Ops\r\n### Windows\r\n- 9:30\r\n' > "$HOME/.clutch/rituals.md"
+due window "2026-11-09 0930"; dis "D9 CRLF 0930" due
+due window "2026-11-09 1100"; dis "D9 CRLF 1100" ""
+dend
+
 # ===== P2: the stop.sh writer =====
 # No global or system git config may leak an identity into the scratch repos.
 unset XDG_CONFIG_HOME

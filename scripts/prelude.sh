@@ -150,6 +150,7 @@ clutch_ops_due() {
       DRIT="$HOME/.clutch/rituals.md"; [ -r "$DRIT" ] || DRIT=/dev/null
       DWIN=$(LC_ALL=C awk -v hm="${DNOW#* }" '
         BEGIN { best = -1 }
+        { sub(/\r$/, "") }
         /^[ \t]*#/ { on = ($0 ~ /^###[ \t]+Windows[ \t]*$/); next }
         on { s = $0
              while (match(s, /[0-9]?[0-9]:[0-5][0-9]/)) {
