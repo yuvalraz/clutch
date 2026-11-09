@@ -7,6 +7,11 @@
 # wait: loops: open until a moved: line names the same ref or 5 days pass,
 # kept after live claims and printed first in the window, and listed raw by
 # clutch_open_loops (rc 1 with no worklog, rc 2 when it is unreadable).
+# W24-W26 cover the ref key: a trailing ,;:. or CR is ignored on the wait and
+# the moved side alike, and a moved: L2: line never closes a wait.
+# D1-D8 cover clutch_ops_due: brief is due once per local day, window once
+# per window time (### Windows in rituals.md, default 11:00 and 16:30), never
+# creating ~/.clutch and printing nothing on a bad argument or a bad date.
 # P2 covers the
 # stop.sh writer (S1-S12, S4b): one moved: landed line per forward move of the
 # user's newest authored commit, deduped by subject, silent on stdout. C covers
@@ -474,6 +479,170 @@ printf '%s\n' "$WOUT" | grep -qxF "proj on: claim-23" \
 LOUT=$(cd "$PLAIN" && export LC_ALL=en_US.UTF-8 && . "$T/scripts/prelude.sh" && clutch_open_loops 2>/dev/null); LRC=$?
 [ "$LRC" = 0 ] || { echo "FAIL: W23 loops -- rc $LRC, want 0"; fail=1; }
 lhas "W23 loops" "control-23"
+
+# --- W24 a moved: ref with a trailing comma or colon closes its wait; a
+# longer ref is not a prefix match.
+seed
+add $((3 * H)) "proj wait: gh:o/r#2 b w24-a"
+add $((3 * H)) "proj wait: slack:C1/1.1 b w24-b"
+add $((3 * H)) "proj wait: gh:o/r#20 b w24-c"
+add $((2 * H)) "proj moved: gh:o/r#2, merged"
+add $((2 * H)) "proj moved: slack:C1/1.1: replied"
+loops
+lcount "W24 loops" 1
+lhas "W24 loops" "w24-c"
+llacks "W24 comma" "w24-a"
+llacks "W24 colon" "w24-b"
+
+# --- W24b a wait: ref with a trailing comma is closed by the clean ref.
+seed
+add $((3 * H)) "proj wait: gh:o/r#5, b w24b"
+add $((3 * H)) "proj wait: gh:o/r#6 b w24b-ctl"
+add $((2 * H)) "proj moved: gh:o/r#5 merged"
+loops
+lcount "W24b loops" 1
+lhas "W24b control" "w24b-ctl"
+llacks "W24b" "gh:o/r#5,"
+
+# --- W25 a moved: L2: line never closes a wait; the plain moved: line does.
+seed
+add $((3 * H)) "proj wait: linear:ENG-1 b w25"
+add $((2 * H)) "proj moved: L2: linear:ENG-1 Done"
+loops
+lcount "W25 loops" 1
+lhas "W25 L2" "w25"
+add "$H" "proj moved: linear:ENG-1 Done"
+loops
+lcount "W25 closed" 0
+
+# --- W26 a 4-field moved: line ending in CRLF closes its wait.
+seed
+add $((3 * H)) "proj wait: gh:o/r#7 b w26"
+add $((3 * H)) "proj wait: gh:o/r#8 b w26-ctl"
+printf '%s proj moved: gh:o/r#7\r\n' "$((NOW - 2 * H))" >> "$W"
+loops
+lcount "W26 loops" 1
+lhas "W26 control" "w26-ctl"
+llacks "W26" "gh:o/r#7 "
+
+# ===== clutch_ops_due: the day brief and approval window checks =====
+# D1-D8 run clutch_ops_due from the staged prelude with a PATH-shim date that
+# answers only '+%Y-%m-%d %H%M' (FAKE_NOW; "fail" exits 1) and execs /bin/date
+# otherwise, each case in a fresh HOME under $T.
+mkdir -p "$T/fakebin" "$T/dh"
+cat > "$T/fakebin/date" <<'EOF'
+#!/bin/sh
+if [ "$#" = 1 ] && [ "$1" = '+%Y-%m-%d %H%M' ]; then
+  [ "$FAKE_NOW" = fail ] && exit 1
+  printf '%s\n' "$FAKE_NOW"
+  exit 0
+fi
+exec /bin/date "$@"
+EOF
+chmod +x "$T/fakebin/date"
+OHOME=$HOME
+# dhome <name>: a fresh HOME with ~/.clutch; restored by dend.
+dhome() { HOME=$T/dh/$1; export HOME; mkdir -p "$HOME/.clutch"; }
+dend() { HOME=$OHOME; export HOME; }
+# due <kind> <now>: sets DOUT and DRC.
+DOUT=""
+DRC=0
+due() {
+  DOUT=$(cd "$PLAIN" && PATH="$T/fakebin:$PATH" FAKE_NOW="$2" sh -c ". '$T/scripts/prelude.sh' && clutch_ops_due $1" 2>"$T/derr"); DRC=$?
+}
+# dis <label> <want>: DOUT equals want ("" for nothing) with rc 0.
+dis() {
+  [ "$DRC" = 0 ] || { echo "FAIL: $1 -- rc $DRC, want 0 ($(cat "$T/derr"))"; fail=1; }
+  [ "$DOUT" = "$2" ] || { echo "FAIL: $1 -- printed '$DOUT', want '$2'"; fail=1; }
+}
+# dmark <label> <file> <want>: the marker file holds exactly want.
+dmark() {
+  got=$(cat "$HOME/.clutch/$2" 2>/dev/null)
+  [ "$got" = "$3" ] || { echo "FAIL: $1 -- $2 holds '$got', want '$3'"; fail=1; }
+}
+
+# --- D1 the brief is due once per local day
+dhome d1
+due brief "2026-11-09 0905"; dis "D1 first" due
+dmark "D1 marker" ops-brief-last 2026-11-09
+due brief "2026-11-09 1500"; dis "D1 again" ""
+due brief "2026-11-10 0800"; dis "D1 next day" due
+dend
+
+# --- D2 default windows 11:00 and 16:30 with no rituals.md
+dhome d2
+due window "2026-11-09 1059"; dis "D2 1059" ""
+[ -e "$HOME/.clutch/ops-window-last" ] && { echo "FAIL: D2 1059 -- marker written before the first window"; fail=1; }
+due window "2026-11-09 1100"; dis "D2 1100" due
+due window "2026-11-09 1500"; dis "D2 1500" ""
+due window "2026-11-09 1631"; dis "D2 1631" due
+dmark "D2 marker" ops-window-last "2026-11-09 1630"
+due window "2026-11-09 2300"; dis "D2 2300" ""
+due window "2026-11-10 1700"; dis "D2 next day" due
+due window "2026-11-10 1701"; dis "D2 next day again" ""
+dend
+
+# --- D3 ### Windows times count only inside the section and below 24:00
+dhome d3
+printf '## Ops\n### Windows\n- 9:30, 14:00 and 25:00\n### Other\n- 18:00\n' > "$HOME/.clutch/rituals.md"
+due window "2026-11-09 0929"; dis "D3 0929" ""
+due window "2026-11-09 0930"; dis "D3 0930" due
+due window "2026-11-09 1700"; dis "D3 1700" due
+dmark "D3 marker" ops-window-last "2026-11-09 1400"
+due window "2026-11-09 1800"; dis "D3 1800" ""
+dend
+
+# --- D4 no ~/.clutch: due every time, and ~/.clutch is never created
+dhome d4
+rmdir "$HOME/.clutch"
+due window "2026-11-09 1200"; dis "D4 first" due
+due window "2026-11-09 1200"; dis "D4 second" due
+{ [ -e "$HOME/.clutch" ] || [ -L "$HOME/.clutch" ]; } && { echo "FAIL: D4 -- clutch_ops_due created ~/.clutch"; fail=1; }
+dend
+
+# --- D5 a failed stamp still prints due
+if [ "$(id -u)" = 0 ]; then
+  echo "SKIP: D5 (root writes into mode 555 dirs)"
+else
+  dhome d5
+  chmod 555 "$HOME/.clutch"
+  due brief "2026-11-09 0905"; dis "D5 first" due
+  due brief "2026-11-09 0906"; dis "D5 second" due
+  chmod 755 "$HOME/.clutch"
+  dend
+fi
+
+# --- D6 no argument or an unknown argument: nothing, no marker
+dhome d6
+due "" "2026-11-09 1200"; dis "D6 no arg" ""
+due bogus "2026-11-09 1200"; dis "D6 bogus" ""
+for m in ops-brief-last ops-window-last; do
+  [ -e "$HOME/.clutch/$m" ] && { echo "FAIL: D6 -- $m written"; fail=1; }
+done
+due brief "2026-11-09 1200"; dis "D6 control" due
+dend
+
+# --- D7 a garbage marker is overwritten
+dhome d7
+printf 'xx\n' > "$HOME/.clutch/ops-brief-last"
+due brief "2026-11-09 0905"; dis "D7" due
+dmark "D7 marker" ops-brief-last 2026-11-09
+dend
+
+# --- D8 a failed or malformed date: nothing
+dhome d8
+due brief fail; dis "D8 fail" ""
+due window fail; dis "D8 window fail" ""
+due brief soon; dis "D8 soon" ""
+due brief "2026-11-09 0905"; dis "D8 control" due
+dend
+
+# --- D9 a CRLF rituals.md keeps its ### Windows times
+dhome d9
+printf '## Ops\r\n### Windows\r\n- 9:30\r\n' > "$HOME/.clutch/rituals.md"
+due window "2026-11-09 0930"; dis "D9 CRLF 0930" due
+due window "2026-11-09 1100"; dis "D9 CRLF 1100" ""
+dend
 
 # ===== P2: the stop.sh writer =====
 # No global or system git config may leak an identity into the scratch repos.

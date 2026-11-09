@@ -86,6 +86,25 @@ file is yours: hand-edit it any time, and a re-run of this skill respects
 what it finds. Keys you leave unset stay unset — the rituals ask once when they first need it
 and offer to write the answer back here, so nothing is asked twice.
 
+`/clutch:ops` reads an optional `## Ops` section you write by hand; this skill never asks for it and keeps it on a re-run.
+Under `### Delegation`, each line is `- <level>: <what it covers>`, with level L3, L2, L1, L0 or Noise. L3 asks for a yes every time, L2 does a chore and logs it, L1 drafts for your yes, L0 is named only when it touches today's focuses, and Noise is never shown.
+Anything the policy does not name is L3, and the L2 list starts empty: only you add to it.
+List at L2 only a chore you have done yourself at least once.
+A production change, a send to anyone, a merge or a delete stays L3 whatever this list says.
+Under `### Windows`, the approval window times, 24-hour, comma or line separated; the default is 11:00 and 16:30, used when the section is absent, empty or holds no valid time.
+A window opens on the first ops sweep at or after its time; nothing fires on its own.
+
+```markdown
+## Ops
+### Delegation
+- L1: <inbound you want drafted for your yes>
+- L0: <inbound to name only when it touches today's focuses>
+- Noise: <inbound never to show>
+- L2:
+### Windows
+- 11:00, 16:30
+```
+
 ### Step 4: Confirm
 
 Show the written file, then name the next thing: resume the ritual that sent you here,

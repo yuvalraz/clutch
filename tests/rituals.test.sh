@@ -56,6 +56,29 @@ pin "$R" "rituals: never unbidden"     'Never runs unbidden'
 pin "$R" "rituals: unset-key note"     'ask once when they first need it'
 pin "$R" "rituals: exit resumes sender" 'resume the ritual that sent you here'
 
+# --- rituals: the hand-written Ops section (delegation policy, windows)
+fpin() {
+  file=$1; label=$2; pat=$3
+  grep -qF -- "$pat" "$file"
+  rc=$?
+  case $rc in
+    0) ;;
+    1) echo "FAIL: $label -- text not found: $pat"; fail=1 ;;
+    *) echo "FAIL: $label -- grep error rc=$rc: $pat"; fail=1 ;;
+  esac
+}
+fpin "$R" "ops: never asked, kept"     'this skill never asks for it and keeps it on a re-run'
+pin  "$R" "ops: delegation heading"    '^### Delegation$'
+fpin "$R" "ops: policy line shape"     '- <level>: <what it covers>'
+fpin "$R" "ops: L2 starts empty"       'the L2 list starts empty'
+fpin "$R" "ops: L2 done once"          'List at L2 only a chore you have done yourself at least once.'
+fpin "$R" "ops: L3 whatever the list"  'stays L3 whatever this list says'
+pin  "$R" "ops: windows heading"       '^### Windows$'
+fpin "$R" "ops: windows separators"    'comma or line separated'
+fpin "$R" "ops: default windows"       'the default is 11:00 and 16:30'
+fpin "$R" "ops: default when invalid"  'used when the section is absent, empty or holds no valid time'
+fpin "$R" "ops: window on a sweep"     'A window opens on the first ops sweep at or after its time; nothing fires on its own.'
+
 # --- morning + eod: handoff and shared error contracts
 for f in "$M" "$E"; do
   pin "$f" "handoff to setup ($f)"      '/clutch:rituals'
