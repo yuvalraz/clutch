@@ -4,16 +4,19 @@ Run: /usr/bin/python3 tools/aipaper/test_pull.py
 """
 import collections
 import contextlib
+import errno
 import fcntl
 import http.server
 import io
 import json
 import os
+import shutil
 import socket
 import sys
 import tempfile
 import threading
 import unittest
+import unittest.mock
 import urllib.parse
 import zipfile
 
@@ -53,6 +56,17 @@ def notebook(name, pages):
     return build_zip(members)
 
 
+def password_protected(blob):
+    """The same archive with the 'encrypted' flag set on every member."""
+    blob = bytearray(blob)
+    for signature, offset in ((b"PK\x03\x04", 6), (b"PK\x01\x02", 8)):
+        at = blob.find(signature)
+        while at != -1:
+            blob[at + offset] |= 1
+            at = blob.find(signature, at + 4)
+    return bytes(blob)
+
+
 class Fake:
     """The three LAN Transfer endpoints, served from an in-memory tree."""
 
@@ -61,6 +75,9 @@ class Fake:
         self.archives = {}             # noteId -> bytes that /download returns
         self.package_code = {}         # noteId -> error code from /packageFile
         self.fail_listing = set()      # appTypes whose listing answers code 500
+        self.null_listing = set()      # appTypes whose listing answers 200 with data null
+        self.garbage_listing = set()   # appTypes whose listing answers a line that is not HTTP
+        self.on_download = None        # called with the download's number before it is answered
         self.reset_download = set()    # noteIds whose download drops the connection
         self.die_at_download = None    # from this download on (1-based) the device is gone
         self.paths = {}
@@ -120,6 +137,12 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if url.path == "/getChildFolderList":
             if query["appType"] in fake.fail_listing:
                 return self.reply({"code": 500, "msg": "boom", "reguestId": ""})
+            if query["appType"] in fake.garbage_listing:
+                self.wfile.write(b"NOPE \x1b[2J\x85 x\r\n\r\n")
+                self.close_connection = True
+                return None
+            if query["appType"] in fake.null_listing:
+                return self.reply({"code": 200, "msg": "", "data": None})
             return self.reply({"code": 200, "msg": "",
                                "data": fake.tree.get((query["appType"], query["folderId"]), [])})
         if url.path == "/packageFile":
@@ -132,6 +155,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if url.path == "/download":
             fake.downloads += 1
             note_id = fake.paths[query["filePath"]]
+            if fake.on_download:
+                fake.on_download(fake.downloads)
             if fake.die_at_download and fake.downloads >= fake.die_at_download:
                 fake.stop()  # the listening port closes before this connection drops
                 self.close_connection = True
@@ -207,6 +232,13 @@ class PullTest(unittest.TestCase):
         """A one-page notebook note that was not there at baseline."""
         self.fake.tree.setdefault((app, ""), []).append(note(app, note_id, name, stamp, **extra))
         self.fake.archives[note_id] = notebook(name, [("p-" + note_id, 0, stamp, image)])
+
+    def paper(self, note_id, name, stamp, pages, **extra):
+        """Put one Paper notebook note at the section root, replacing the note with that id."""
+        items = self.fake.tree.setdefault(("APP_PAPER", ""), [])
+        items[:] = [i for i in items if i.get("noteId") != note_id]
+        items.append(note("APP_PAPER", note_id, name, stamp, **extra))
+        self.fake.archives[note_id] = notebook(name, pages)
 
     # 1
     def test_baseline_journals_every_note_and_downloads_nothing(self):
@@ -346,12 +378,14 @@ class PullTest(unittest.TestCase):
         self.assertEqual(out, "aipaper: 1 notes, 1 pages -> %s\n" % self.inbox)
         lines = err.splitlines()
         self.assertEqual(len(lines), 3, err)
-        for line, name in zip(lines, ("Not zip", "Refused", "No marker")):
+        for line, name in zip(lines, ("Not_zip", "Refused", "No_marker")):
             self.assertIn("APP_PAPER", line)
             self.assertIn(name, line)
         notes = self.journal()["notes"]
-        self.assertEqual(notes["APP_PAPER/11111111-bad"], {"updateTime": 5000, "skipped": "unsupported"})
-        self.assertEqual(notes["APP_PAPER/33333333-odd"], {"updateTime": 5000, "skipped": "unsupported"})
+        self.assertEqual(notes["APP_PAPER/11111111-bad"],
+                         {"updateTime": 5000, "skipped": "not a ZIP", "since": 0})
+        self.assertEqual(notes["APP_PAPER/33333333-odd"],
+                         {"updateTime": 5000, "skipped": "unsupported", "since": 0})
         self.assertEqual(notes["APP_PAPER/22222222-404"]["updateTime"], 5000)
         self.assertIn("404", notes["APP_PAPER/22222222-404"]["skipped"])
         self.assertEqual(os.listdir(os.path.join(self.inbox, "APP_PAPER")), ["Good--44444444"])
@@ -466,7 +500,7 @@ class PullTest(unittest.TestCase):
         self.fake.fail_listing = {"APP_MEETING"}  # the third section walked
         out, err = self.pull()
         self.assertEqual(out, "")
-        self.assertEqual(len(err.splitlines()), 1, err)
+        self.assertEqual(len(err.splitlines()), 2, err)  # the failed listing, the incomplete baseline
         journal = self.journal()
         self.assertIs(journal["baseline_complete"], False)
         self.assertEqual(sorted(journal["notes"]),
@@ -480,7 +514,7 @@ class PullTest(unittest.TestCase):
         journal = self.journal()
         self.assertIs(journal["baseline_complete"], True)
         self.assertEqual(len(journal["notes"]), 4)
-        self.assertEqual(journal["notes"]["APP_PAPER/aaaaaaaa-1111"]["updateTime"], 2000)
+        self.assertEqual(journal["notes"]["APP_PAPER/aaaaaaaa-1111"]["updateTime"], 1000)
         self.two_pages(stamp=3000, second=(2500, b"B3"))
         out, _ = self.pull()
         self.assertEqual(out, "aipaper: 1 notes, 1 pages -> %s\n" % self.inbox)
@@ -498,7 +532,7 @@ class PullTest(unittest.TestCase):
         self.assertIn("Two", err)
         self.assertEqual(self.fake.counts["/download"], 5)  # 1 + (1 try + 2 retries) + 1
         self.assertEqual(self.journal()["notes"]["APP_PAPER/22222222-b"],
-                         {"updateTime": 5000, "skipped": "download failed"})
+                         {"updateTime": -1, "since": 0, "failures": 1})
         self.assertEqual(sorted(os.listdir(os.path.join(self.inbox, "APP_PAPER"))),
                          ["One--11111111", "Three--33333333"])
 
@@ -509,11 +543,15 @@ class PullTest(unittest.TestCase):
         self.fake.tree[("APP_PAPER", "")].append({"appType": "APP_PAPER", "fileName": "Paper", "isFolder": True})
         self.fake.tree[("APP_PAPER", "")].append({"appType": "APP_PAPER", "fileName": "Loose", "updateTime": 9})
         out, err = self.pull()
-        self.assertEqual((out, err), ("", ""))
+        self.assertEqual(out, "")
+        self.assertEqual(len(err.splitlines()), 1, err)
+        self.assertIn("APP_PAPER/Locked", err)
+        self.assertIn("encrypted", err)
         self.assertEqual(self.fake.counts["/packageFile"], 0)
-        self.assertEqual(self.journal()["notes"],
-                         {"APP_PAPER/66666666-lock": {"updateTime": 5000, "skipped": "encrypted"}})
+        self.assertEqual(self.journal()["notes"], {
+            "APP_PAPER/66666666-lock": {"updateTime": 5000, "skipped": "encrypted", "since": 0}})
         self.assertEqual(self.fake.listed().count(("APP_PAPER", "")), 1)
+        self.assertEqual(self.pull(), ("", ""))  # one line, once
 
     # 18
     def test_unreadable_journal_stops_the_run_untouched(self):
@@ -554,6 +592,292 @@ class PullTest(unittest.TestCase):
             self.assertEqual(os.path.realpath(base)[:len(os.path.realpath(section))], os.path.realpath(section))
             found += names
         self.assertEqual(sorted(found), ["note.json", "note.json", "p00-_._...png", "p00-_._.._...png"])
+
+    PAGE_A = ("pageaaaa-1", 0, 900, b"A1")
+    PAGE_B = ("pagebbbb-2", 1, 1500, b"B2")
+    PAGE_C = ("pagecccc-3", 2, 2500, b"C3")
+
+    # 20a
+    def test_download_failed_skip_keeps_the_page_edited_before_it(self):
+        self.paper("11111111-a", "Fail", 1000, [self.PAGE_A])
+        self.pull()  # baseline
+        self.paper("11111111-a", "Fail", 2000, [self.PAGE_A, self.PAGE_B])
+        self.fake.reset_download = {"11111111-a"}
+        for _ in range(3):
+            self.pull()
+        self.pull()
+        self.assertEqual(self.fake.counts["/packageFile"], 0)  # skipped: waits for an edit
+        self.fake.reset_download = set()
+        self.paper("11111111-a", "Fail", 3000, [self.PAGE_A, self.PAGE_B, self.PAGE_C])
+        self.pull()
+        self.assertEqual(self.files("APP_PAPER", "Fail--11111111"),
+                         ["note.json", "p01-pagebbbb.png", "p02-pagecccc.png"])
+        entry = self.journal()["notes"]["APP_PAPER/11111111-a"]
+        self.assertEqual(sorted(entry), ["pages", "updateTime"])
+
+    # 20b
+    def test_package_error_skip_keeps_the_hashes_of_a_pulled_note(self):
+        self.pull()
+        self.paper("22222222-b", "Refuse", 2000, [self.PAGE_A, self.PAGE_B])
+        self.pull()
+        shutil.rmtree(self.note_dir("APP_PAPER", "Refuse--22222222"))  # the consumer read it
+        edited_b = ("pagebbbb-2", 1, 1500, b"B3")  # new bytes, old lastModifiedTime: only the hash tells
+        self.paper("22222222-b", "Refuse", 3000, [self.PAGE_A, edited_b])
+        self.fake.package_code["22222222-b"] = 500
+        out, err = self.pull()
+        self.assertEqual(out, "")
+        self.assertEqual(len(err.splitlines()), 1, err)
+        del self.fake.package_code["22222222-b"]
+        self.paper("22222222-b", "Refuse", 4000, [("pageaaaa-1", 0, 3500, b"A4"), edited_b])
+        self.pull()
+        self.assertEqual(self.files("APP_PAPER", "Refuse--22222222"),
+                         ["note.json", "p00-pageaaaa.png", "p01-pagebbbb.png"])
+        self.assertEqual(self.read("APP_PAPER", "Refuse--22222222", "p01-pagebbbb.png"), b"B3")
+
+    # 20c
+    def test_new_note_skipped_as_not_a_zip_later_delivers_every_page(self):
+        self.pull()
+        self.paper("33333333-c", "Garble", 5000, [])
+        self.fake.archives["33333333-c"] = b"<html>busy</html>"
+        out, err = self.pull()
+        self.assertEqual(out, "")
+        self.assertIn("not a ZIP", err)
+        self.paper("33333333-c", "Garble", 6000, [("pageaaaa-1", 0, 4000, b"A1"), ("pagebbbb-2", 1, 5500, b"B2")])
+        self.pull()
+        self.assertEqual(self.files("APP_PAPER", "Garble--33333333"),
+                         ["note.json", "p00-pageaaaa.png", "p01-pagebbbb.png"])
+
+    # 20d
+    def test_locked_then_unlocked_note_delivers_the_page_added_while_locked(self):
+        self.paper("44444444-d", "Lock", 1000, [self.PAGE_A])
+        self.pull()  # baseline
+        self.paper("44444444-d", "Lock", 2000, [self.PAGE_A, self.PAGE_B], encryption=True)
+        out, _ = self.pull()
+        self.assertEqual(out, "")
+        self.assertEqual(self.fake.counts["/packageFile"], 0)
+        self.paper("44444444-d", "Lock", 3000, [self.PAGE_A, self.PAGE_B, self.PAGE_C])
+        self.pull()
+        self.assertEqual(self.files("APP_PAPER", "Lock--44444444"),
+                         ["note.json", "p01-pagebbbb.png", "p02-pagecccc.png"])
+
+    # 21
+    def test_transient_download_failure_is_retried_next_run_then_skipped_on_the_third(self):
+        self.pull()
+        self.add_new("APP_PAPER", "11111111-a", "Flaky")
+        self.add_new("APP_PAPER", "22222222-b", "Dead")
+        self.fake.reset_download = {"11111111-a", "22222222-b"}
+        out, err = self.pull()
+        self.assertEqual(out, "")
+        self.assertEqual(len(err.splitlines()), 2, err)
+        self.assertEqual(self.journal()["notes"]["APP_PAPER/11111111-a"],
+                         {"updateTime": -1, "since": 0, "failures": 1})
+        self.fake.reset_download = {"22222222-b"}
+        out, err = self.pull()  # no edit in between
+        self.assertEqual(out, "aipaper: 1 notes, 1 pages -> %s\n" % self.inbox)
+        notes = self.journal()["notes"]
+        self.assertEqual(sorted(notes["APP_PAPER/11111111-a"]), ["pages", "updateTime"])
+        self.assertEqual(notes["APP_PAPER/11111111-a"]["updateTime"], 5000)
+        self.assertEqual(notes["APP_PAPER/22222222-b"], {"updateTime": -1, "since": 0, "failures": 2})
+        out, err = self.pull()  # the third consecutive failed run
+        self.assertEqual(len(err.splitlines()), 1, err)
+        self.assertEqual(self.journal()["notes"]["APP_PAPER/22222222-b"],
+                         {"updateTime": 5000, "skipped": "download failed", "since": 0})
+        self.assertEqual(self.pull(), ("", ""))
+        self.assertEqual(self.fake.counts["/packageFile"], 0)
+
+    # 22
+    def test_section_that_lists_empty_is_not_pruned(self):
+        self.fake.tree[("APP_PAPER", "")] = [note("APP_PAPER", "n-one", "One", 1),
+                                             note("APP_PAPER", "n-two", "Two", 2)]
+        self.fake.tree[("APP_MEETING", "")] = [note("APP_MEETING", "n-meet", "Sync", 3)]
+        self.pull()
+        listing = self.fake.tree.pop(("APP_PAPER", ""))
+        out, err = self.pull()
+        self.assertEqual(out, "")
+        self.assertEqual(len(err.splitlines()), 1, err)
+        self.assertIn("APP_PAPER", err)
+        self.assertEqual(len(self.journal()["notes"]), 3)
+        self.fake.tree[("APP_PAPER", "")] = listing
+        self.assertEqual(self.pull(), ("", ""))
+        self.assertEqual(self.fake.counts["/packageFile"], 0)
+
+    # 23
+    def test_archive_that_cannot_be_parsed_is_skipped_and_the_next_note_pulled(self):
+        self.pull()
+        self.add_new("APP_PAPER", "11111111-enc", "Sealed")
+        self.fake.archives["11111111-enc"] = password_protected(self.fake.archives["11111111-enc"])
+        self.add_new("APP_PAPER", "22222222-inf", "Endless")
+        self.fake.archives["22222222-inf"] = build_zip({
+            "Endless_PageListFileInfo.json": [{"id": "p1", "order": float("inf"), "lastModifiedTime": 1}],
+            "screenshotBmp_p1.png": b"X"})
+        self.add_new("APP_PAPER", "33333333-noimg", "Hollow")
+        self.fake.archives["33333333-noimg"] = notebook("Hollow", [("p1", 0, 1, None), ("p2", 1, 2, None)])
+        self.add_new("APP_PAPER", "44444444-zero", "Blank")
+        self.fake.archives["44444444-zero"] = notebook("Blank", [])
+        self.add_new("APP_PAPER", "55555555-ok", "Good")
+        out, err = self.pull()
+        self.assertEqual(out, "aipaper: 1 notes, 1 pages -> %s\n" % self.inbox)
+        lines = err.splitlines()
+        self.assertEqual(len(lines), 3, err)
+        self.assertIn("Hollow: no page images", lines[2])
+        notes = self.journal()["notes"]
+        self.assertEqual(notes["APP_PAPER/11111111-enc"], {"updateTime": 5000, "skipped": "bad archive", "since": 0})
+        self.assertEqual(notes["APP_PAPER/22222222-inf"], {"updateTime": 5000, "skipped": "bad archive", "since": 0})
+        self.assertEqual(notes["APP_PAPER/33333333-noimg"],
+                         {"updateTime": 5000, "skipped": "no page images", "since": 0})
+        self.assertEqual(notes["APP_PAPER/44444444-zero"], {"updateTime": 5000, "pages": {}})
+        self.assertEqual(os.listdir(os.path.join(self.inbox, "APP_PAPER")), ["Good--55555555"])
+
+    # 23, the write side
+    def test_write_error_ends_the_run_with_one_line_and_retries_the_note(self):
+        self.pull()
+        self.add_new("APP_PAPER", "11111111-a", "One")
+        blocker = os.path.join(self.state, "inbox")
+        with open(blocker, "w"):  # a file where the inbox directory goes
+            pass
+        out, err = self.pull(expect=1)
+        self.assertEqual(out, "")
+        self.assertEqual(len(err.splitlines()), 1, err)
+        self.assertEqual(self.journal()["notes"], {})
+        os.remove(blocker)
+        out, _ = self.pull()
+        self.assertEqual(out, "aipaper: 1 notes, 1 pages -> %s\n" % self.inbox)
+
+    # 24
+    def test_journal_on_disk_holds_note_one_while_note_two_downloads(self):
+        self.pull()
+        self.add_new("APP_PAPER", "11111111-a", "One")
+        self.add_new("APP_PAPER", "22222222-b", "Two")
+        seen = {}
+
+        def peek(number):
+            if number == 2:
+                seen["notes"] = sorted(self.journal()["notes"])
+        self.fake.on_download = peek
+        self.pull()
+        self.assertEqual(seen, {"notes": ["APP_PAPER/11111111-a"]})
+
+    # 25
+    def test_oversized_body_and_member_are_skipped_not_read(self):
+        self.pull()
+        self.add_new("APP_PAPER", "11111111-big", "Big", image=b"x" * 5000)
+        self.add_new("APP_PAPER", "22222222-mem", "Wide", image=b"y" * 600)
+        self.add_new("APP_PAPER", "33333333-ok", "Good")
+        with unittest.mock.patch.object(pull, "MAX_BODY", 3000, create=True), \
+                unittest.mock.patch.object(pull, "MAX_MEMBER", 500, create=True):
+            out, err = self.pull()
+        self.assertEqual(out, "aipaper: 1 notes, 1 pages -> %s\n" % self.inbox)
+        self.assertEqual(len(err.splitlines()), 2, err)
+        notes = self.journal()["notes"]
+        self.assertIn("over 3000 bytes", notes["APP_PAPER/11111111-big"]["skipped"])
+        self.assertEqual(notes["APP_PAPER/22222222-mem"]["skipped"], "bad archive")
+        self.assertEqual(os.listdir(os.path.join(self.inbox, "APP_PAPER")), ["Good--33333333"])
+
+    # 25
+    def test_folder_chain_deeper_than_the_cap_is_not_walked(self):
+        self.pull()
+        parent = ""
+        for level in range(20):
+            self.fake.tree[("APP_PAPER", parent)] = [folder("APP_PAPER", "f%d" % level, "lvl\n%d" % level)]
+            parent = "f%d" % level
+        self.fake.tree[("APP_PAPER", "f15")].append(note("APP_PAPER", "11111111-in", "Inside", 5000))
+        self.fake.archives["11111111-in"] = notebook("Inside", [("p1", 0, 1, b"IN")])
+        self.fake.tree[("APP_PAPER", "f19")] = [note("APP_PAPER", "22222222-deep", "Deep", 5000)]
+        self.fake.archives["22222222-deep"] = notebook("Deep", [("p1", 0, 1, b"DEEP")])
+        out, err = self.pull()
+        self.assertEqual(out, "aipaper: 1 notes, 1 pages -> %s\n" % self.inbox)
+        self.assertEqual(len(err.splitlines()), 1, err)
+        self.assertIn("listing APP_PAPER/lvl_0/lvl_1/", err)
+        self.assertEqual([q for q in self.fake.listed() if q[0] == "APP_PAPER"],
+                         [("APP_PAPER", "")] + [("APP_PAPER", "f%d" % level) for level in range(16)])
+        self.assertEqual(sorted(self.journal()["notes"]), ["APP_PAPER/11111111-in"])
+
+    # 25
+    def test_null_listing_is_an_empty_folder_and_device_text_stays_on_one_line(self):
+        self.fake.null_listing = {"APP_MEMO"}
+        self.assertEqual(self.pull(), ("aipaper: baseline recorded for 0 notes\n", ""))
+        self.add_new("APP_PAPER", "11111111-nl", "Two\nlines\x1b[2J")
+        self.fake.package_code["11111111-nl"] = "4\n04 x"
+        out, err = self.pull()
+        self.assertEqual(out, "")
+        self.assertEqual(len(err.splitlines()), 1, err)
+        self.assertNotIn("\x1b", err)
+        self.assertIn("skipped APP_PAPER/Two_lines__2J: device error: code 4_04_x", err)
+        # The device's own bytes inside an error text, not only its names.
+        self.fake.garbage_listing = {"APP_MEMO"}
+        _, err = self.pull()
+        self.assertEqual(len(err.splitlines()), 1, err)
+        self.assertNotIn("\x1b", err)
+        self.assertIn("listing APP_MEMO failed: NOPE", err)
+
+    # 26
+    def test_stuck_baseline_keeps_the_first_stamp_and_the_edit_is_pulled_later(self):
+        self.two_pages()
+        self.fake.fail_listing = {"APP_MEETING"}
+        out, err = self.pull()
+        self.assertEqual(out, "")
+        self.assertEqual(len(err.splitlines()), 2, err)
+        self.assertIn("baseline", err.splitlines()[1])
+        self.two_pages(stamp=2000, second=(1500, b"B2"))  # edited while the baseline is stuck
+        self.pull()
+        self.fake.fail_listing = set()
+        out, _ = self.pull()
+        self.assertEqual(out, "aipaper: baseline recorded for 1 notes\n")
+        self.assertEqual(self.fake.counts["/packageFile"], 0)
+        self.assertEqual(self.journal()["notes"]["APP_PAPER/aaaaaaaa-1111"], {"updateTime": 1000})
+        out, _ = self.pull()
+        self.assertEqual(out, "aipaper: 1 notes, 1 pages -> %s\n" % self.inbox)
+        self.assertEqual(self.read("APP_PAPER", "Plan--aaaaaaaa", "p01-pagebbbb.png"), b"B2")
+
+    def test_page_image_is_replaced_not_written_in_place(self):
+        self.pull()
+        self.two_pages(stamp=2000)
+        self.pull()
+        page = os.path.join(self.note_dir("APP_PAPER", "Plan--aaaaaaaa"), "p01-pagebbbb.png")
+        witness = os.path.join(self.root, "witness")
+        os.link(page, witness)  # a second name for the old bytes
+        self.two_pages(stamp=3000, second=(950, b"B-new"))
+        self.pull()
+        with open(page, "rb") as handle:
+            self.assertEqual(handle.read(), b"B-new")
+        with open(witness, "rb") as handle:
+            self.assertEqual(handle.read(), b"B1")
+        self.assertEqual(self.files("APP_PAPER", "Plan--aaaaaaaa"),
+                         ["note.json", "p00-pageaaaa.png", "p01-pagebbbb.png"])
+
+    def test_lock_error_other_than_held_is_reported(self):
+        with unittest.mock.patch.object(pull.fcntl, "flock",
+                                        side_effect=OSError(errno.ENOLCK, "No locks available")):
+            out, err = self.pull(expect=1)
+        self.assertEqual(out, "")
+        self.assertEqual(len(err.splitlines()), 1, err)
+        self.assertEqual(sum(self.fake.counts.values()), 0)
+
+    def test_host_that_cannot_be_a_name_is_a_closed_probe(self):
+        code, out, err = self.run_pull("--host", "a..b", "--port", str(self.port), "--state-dir", self.state)
+        self.assertEqual((code, out, err), (0, "", ""))
+        self.assertEqual(os.listdir(self.state), [])
+
+    def test_journal_written_by_the_first_release_still_loads_and_behaves(self):
+        self.paper("11111111-a", "Pulled", 1000, [self.PAGE_A])
+        self.paper("22222222-b", "Skipped", 5000, [])
+        self.paper("33333333-c", "Locked", 5000, [], encryption=True)
+        old = {"version": 1, "baseline_complete": True, "notes": {
+            "APP_PAPER/11111111-a": {"updateTime": 1000, "pages": {"pageaaaa-1": "0" * 64}},
+            "APP_PAPER/22222222-b": {"updateTime": 5000, "skipped": "unsupported"},
+            "APP_PAPER/33333333-c": {"updateTime": 5000, "skipped": "encrypted"}}}
+        os.mkdir(os.path.join(self.state, "aipaper"))
+        with open(self.journal_path, "w") as handle:
+            json.dump(old, handle)
+        self.assertEqual(self.pull(), ("", ""))
+        self.assertEqual(self.fake.counts["/packageFile"], 0)
+        self.assertEqual(self.journal(), old)
+        # The old skipped entry has no `since`: its updateTime is the base.
+        self.paper("22222222-b", "Skipped", 6000, [("pageaaaa-1", 0, 4000, b"A1"), ("pagebbbb-2", 1, 5500, b"B2")])
+        out, _ = self.pull()
+        self.assertEqual(out, "aipaper: 1 notes, 1 pages -> %s\n" % self.inbox)
+        self.assertEqual(self.files("APP_PAPER", "Skipped--22222222"), ["note.json", "p01-pagebbbb.png"])
+        self.assertEqual(self.journal()["version"], 1)
 
 
 if __name__ == "__main__":
