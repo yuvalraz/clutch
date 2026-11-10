@@ -137,6 +137,7 @@ A production change, a direct send, a merge or a delete always waits for a yes.
 An `- Auto:` line names an intake channel, such as a review-request queue: ops posts there without a yes and logs it, and an @-mention the line does not name still waits for your yes.
 Non-critical drafts wait for an approval window, 11:00 and 16:30 by default, which opens on your next sweep.
 A `## Critical path` in your focus file makes the first sweep of the day open with a brief.
+When the tablet inbox has new pages or typed tasks, the sweep files each line once: work under `## From the tablet` in today's focus file and work ideas in the fomo pool, personal and unsure ones in `~/.clutch/personal.md`, and it names what arrived without counting it.
 
 **Review.** `/clutch:review` closes one PR at a time with your written
 conventions applied. When your call on a finding implies a rule, one line
@@ -256,6 +257,7 @@ Some commands read more, and only when you fire them: `/clutch:dream` and
 `/clutch:morning`, `/clutch:eod`, `/clutch:ops` and `/clutch:review` read
 `~/.clutch/rituals.md` for your day's facts, integrations and conventions path.
 Morning and eod also read the state dir it names and your focus files.
+Ops also reads the tablet inbox under `~/.clutch/inbox/`, and `~/.clutch/people.md` when it exists, to sort what arrived.
 
 One thing to know before you mix contexts: a brain entry banked at home surfaces in
 whatever repo you run these skills in, a work repo included. Whether that is
@@ -278,9 +280,11 @@ straight to the brain. `/clutch:rituals` writes `~/.clutch/rituals.md`.
 `/clutch:dream` and `/clutch:interview` write the auto-memory directory.
 `/clutch:morning` writes today's focus file when it is missing, and
 `/clutch:eod` writes tomorrow's, in the state dir your `~/.clutch/rituals.md`
-names, which can sit outside both `.clutch/` and `~/.clutch`. When a key they
+names, which can sit outside both `.clutch/` and `~/.clutch`.
+When a key they
 need is unset, morning, eod, ops and review ask for it, and most of the time
 offer to save a missing key into `~/.clutch/rituals.md`, on a yes.
+When the tablet inbox has new pages or typed tasks, `/clutch:ops` files them: work lines into today's focus file (or, with no focus file set, `~/.clutch/personal.md`), work ideas into `~/.clutch/captures.md`, the rest into `~/.clutch/personal.md`, which it creates; it keeps a ledger of what it filed under `~/.clutch` and deletes each capture once filed.
 
 Some commands reach out, and only when you invoke them. `/clutch:fomo` fetches
 a banked link, and a spark, daydream, dream-spark, or ideate pass may run a web
@@ -295,6 +299,7 @@ grep -rE 'curl|wget|/dev/tcp|nc ' scripts/
 ```
 
 That returns nothing.
+The one Python helper in `scripts/` sends nothing either: its test suite parses its imports and fails on any network module.
 
 It is read-mostly and fails open, so it sits underneath whatever else you run.
 On a repo with stricter guardrails, the strictest rule wins: the

@@ -60,7 +60,7 @@ Sections walked: Paper, Daily, Meeting, Memo, Knowledge base.
 
 | Exit | Meaning |
 | --- | --- |
-| 0 | done, or the tablet is not serving, or another run holds the lock |
+| 0 | done, or the tablet is not serving, or another run or the tablet inbox reader holds the lock |
 | 1 | the lock, the journal or a page could not be written; one line on stderr |
 | 2 | no host, or the state directory is missing |
 | 3 | the tablet stopped serving mid-run; the journal keeps what was done |
@@ -93,9 +93,16 @@ Under `~/.clutch`:
 - `aipaper/journal.json`: per note, the last `updateTime` and a hash per page;
   for a skipped note also `skipped`, `since` and, while a download is being
   retried, `failures`.
-- `aipaper/lock`: one run at a time.
+- `aipaper/lock`: one run at a time; the tablet inbox reader
+  (`scripts/tablet_inbox.py`) takes it too.
 - `aipaper/pull.log`: the LaunchAgent's output.
 - `inbox/aipaper/`: the pulled pages.
+- `aipaper/reading/`: captures the reader claimed, each with a `.claims` count.
+- `aipaper/held/`: captures the reader gave up on when it claimed them: `not read`
+  (claimed five times without filing) or `unreadable` (no usable `note.json`). A
+  capture that fails while being filed stays in `aipaper/reading/`; the next sweep
+  retries it, and after five claims it moves here as `not read`.
+- `aipaper/ledger.json`: what the reader filed.
 
 ## Inbox layout
 
@@ -116,7 +123,14 @@ Daily) and, for a Daily note, `todos`.
 
 A later pull of the same note overwrites files with the same name; `pages`
 then lists what is still in the directory plus the new pages. Whoever reads a
-directory deletes it afterwards.
+directory deletes it afterwards: the tablet inbox reader renames a directory into `aipaper/reading/`
+and deletes it once every item in it is filed.
+
+To retry a folder in `aipaper/held/`, delete its `.claims` file first, then move
+the folder into `aipaper/reading/`; the next sweep that starts ten minutes or
+more later picks it up (the delete gives the folder a fresh ten-minute lease).
+A folder held as `unreadable` needs its `note.json` repaired first, or it returns
+to `held/` on the next sweep that takes it. To drop it, delete it.
 
 ## Limits
 
