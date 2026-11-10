@@ -136,6 +136,7 @@ With a `### Delegation` policy in `~/.clutch/rituals.md`, ops sorts what it read
 A production change, a direct send, a merge or a delete always waits for a yes.
 An `- Auto:` line names an intake channel, such as a review-request queue: ops posts there without a yes and logs it, and an @-mention the line does not name still waits for your yes.
 Non-critical drafts wait for an approval window, 11:00 and 16:30 by default, which opens on your next sweep.
+A `## Critical path` in your focus file makes the first sweep of the day open with a brief.
 
 **Review.** `/clutch:review` closes one PR at a time with your written
 conventions applied. When your call on a finding implies a rule, one line

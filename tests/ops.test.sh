@@ -158,7 +158,16 @@ fpin "$O" "deleg: L2 log text"          'text `L2: <what was done>`'
 fpin "$O" "deleg: L1 waits"             'any other draft waits for the next approval window, unmentioned until then'
 fpin "$O" "deleg: L0 line"              '- L0: one line, only when it touches the critical path.'
 fpin "$O" "deleg: Noise line"           '- Noise: never shown.'
-fpin "$O" "deleg: critical path"        'The critical path is today'"'"'s focuses from the focus file.'
+fpin "$O" "deleg: critical path"        'The critical path is the focus file'"'"'s `## Critical path` steps, or today'"'"'s focuses when it has none.'
+ncp=$(grep -cF 'The critical path is today'"'"'s focuses from the focus file.' "$O")
+[ "$ncp" = 0 ] || { echo "FAIL: ops -- still says the critical path is only today's focuses ($ncp hit)"; fail=1; }
+# --- the day brief: the first sweep of a day opens with it, from `## Critical path`
+fpin "$O" "brief: due is first sweep"   '`due` means this is the first sweep today'
+fpin "$O" "brief: silent otherwise"     'with nothing said about a brief'
+fpin "$O" "brief: the move"             'its move (the first step neither done nor blocked)'
+fpin "$O" "brief: never late"           'never calls anything late'
+fpin "$O" "window: empty due is silent" 'A due window with nothing to draft says nothing either.'
+fpin "$R" "readme: brief sentence"      'A `## Critical path` in your focus file makes the first sweep of the day open with a brief.'
 fpin "$O" "deleg: unnamed is L3"        'Anything the policy does not name is L3.'
 # Paired with the pin above: the done-it-once rule is an authoring rule in rituals, never a run-time check.
 ndo=$(grep -cF 'any action you have not done yourself at least once' "$O")
@@ -464,5 +473,21 @@ W1=$(cd "$T/armdir" && sh -c "$WCMD" 2>&1); R1=$?
 W2=$(cd "$T/armdir" && sh -c "$WCMD" 2>&1); R2=$?
 [ "$R1" = 0 ] && [ "$W1" = due ] && [ "$R2" = 0 ] && [ -z "$W2" ] \
   || { echo "FAIL: O-window -- want due then nothing; rc $R1: $W1 / rc $R2: $W2"; exit 1; }
+
+# --- O-brief: the skill's one brief line, root substituted like O-window. In a
+# fresh HOME the first sweep of the day is due; the second, same day, is not.
+BLINE=$(grep -F 'sh -c' "$O" | grep -F 'clutch_ops_due brief')
+[ "$(printf '%s\n' "$BLINE" | grep -c .)" = 1 ] \
+  || { echo "FAIL: O-brief wants exactly one sh -c line running clutch_ops_due brief, got: $BLINE"; exit 1; }
+BCMD=$(subroot "$BLINE")
+case "$BCMD" in
+  *CLAUDE_PLUGIN_ROOT*) echo "FAIL: O-brief -- plugin root left unsubstituted: $BCMD"; exit 1 ;;
+esac
+armhome b
+mkdir -p "$HOME/.clutch"
+B1=$(cd "$T/armdir" && sh -c "$BCMD" 2>&1); R1=$?
+B2=$(cd "$T/armdir" && sh -c "$BCMD" 2>&1); R2=$?
+[ "$R1" = 0 ] && [ "$B1" = due ] && [ "$R2" = 0 ] && [ -z "$B2" ] \
+  || { echo "FAIL: O-brief -- want due then nothing; rc $R1: $B1 / rc $R2: $B2"; exit 1; }
 
 echo PASS
