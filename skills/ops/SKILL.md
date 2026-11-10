@@ -306,8 +306,9 @@ An approved window draft that awaits a reply or a state change is held as a wait
 ### Tablet inbox
 
 The tablet inbox holds pages and typed tasks pulled from a paper tablet,
-where work and personal lines mix. The sweep reads it once, after the tick
-pass:
+where work and personal lines mix.
+When `~/.clutch/rituals.md` sets a focus file and today's does not exist yet, skip the tablet inbox this sweep, unmentioned: morning creates it.
+Otherwise the sweep reads it once, after the tick pass:
 
 ```sh
 sh -c '. "${CLAUDE_PLUGIN_ROOT}/scripts/prelude.sh" && sh "${CLAUDE_PLUGIN_ROOT}/scripts/tablet-inbox.sh" claim'
@@ -316,12 +317,14 @@ sh -c '. "${CLAUDE_PLUGIN_ROOT}/scripts/prelude.sh" && sh "${CLAUDE_PLUGIN_ROOT}
 Empty output: nothing arrived; say nothing about the tablet.
 Each output line is one capture: its `folder`, `section` and `note`, its `pages` (each an image `file` and its `page_id`, with the `known_lines` already filed from it) and its new typed `todos`.
 A line with `held` names a capture that cannot be read: name it once, in one line.
-Exit status 3 means the tablet inbox is busy; it waits for the next sweep, unmentioned. Any other error: one line, run release, and the sweep goes on.
+Exit status 3 means the tablet inbox is busy; it waits for the next sweep, unmentioned. Any other error: one line, and the sweep goes on.
+A claim or route that exits 0 but prints a `tablet:` line on stderr: name it once, in one line.
 
 Read every page image and split it into items, one per written line or bullet: a task, a note, an action or an idea.
 Skip a line already in its page's `known_lines`, even spelled a little differently. Each typed task is one task item.
-Sort each item into a bucket from these hints, in order: the `### Buckets` list under `## Ops` in `~/.clutch/rituals.md` (`- work: <terms>`, `- personal: <terms>`); today's focuses and critical path, which mark work; names in `~/.clutch/people.md` when it exists, which mark work; the section, where Meeting is work.
-With no hint and no clear reading, the item is unsure.
+Sort each item by its own reading first: one that reads clearly as work or as personal takes that bucket.
+Only an item that reads unclear takes a hint, in order: the `### Buckets` list under `## Ops` in `~/.clutch/rituals.md` (`- work: <terms>`, `- personal: <terms>`); today's focuses and critical path, which mark work; names in `~/.clutch/people.md` when it exists, which mark work; the section, where Meeting is work.
+A hint alone never makes work of an item that reads personal. With no hint and no clear reading, the item is unsure.
 Never guess work: an unsure item files with the personal ones, marked unsure.
 Tablet items are filed, never classified against the delegation policy: no L2 or Auto line acts on one.
 
@@ -333,27 +336,30 @@ sh "${CLAUDE_PLUGIN_ROOT}/scripts/tablet-inbox.sh" route --work-state-dir '<stat
 TABLET_ITEMS
 ```
 
-Fill `<state dir>` and `<today's focus file>` with absolute paths, never a `~` form.
+Fill `<state dir>` and `<today's focus file>` with absolute paths, never a `~` form; inside the single quotes, escape ' as '\''.
 With no focus file set in `~/.clutch/rituals.md`, drop `--focus-file`, and with no state dir drop `--work-state-dir` too: work items then file in `~/.clutch/personal.md` marked work, and the work line says so.
 Pass every claimed folder but a `held` one, and under it in `pages_read` list only the `page_id`s you actually read, even when it has no new items: a folder whose pages were all read is retired.
 A folder with a page you did not read is held, not retired, and the next sweep reads it again.
-A typed task carries `todo_id` instead of `page_id`; `date` is the item's day as YYYY-MM-DD (a typed task's comes with it; a Daily page's is its note name).
+A typed task carries `todo_id` instead of `page_id`. `date` is the item's day as YYYY-MM-DD: a typed task's own `date`, or a Daily page's note name read as a date (`day_2026_1_5` is 2026-01-05).
+Leave `date` out when the item has no day of its own: a typed task whose `date` is empty, a page outside Daily.
 The heredoc is quoted, so the items need JSON escaping only.
 Work tasks, notes and actions land under `## From the tablet` in today's focus file and work ideas in the fomo pool; every personal and unsure item, ideas included, in `~/.clutch/personal.md` under today's date. Nothing here goes to any integration.
-A route that exits non-zero filed nothing; say so in one line and run release.
+A route that exits non-zero filed nothing.
+Exit status 2 names on stderr what it refused: fix the items once and run the route again; if that fails too, say so in one line.
+Exit status 3 means the tablet inbox is busy, unmentioned; any other error gets one line.
 Each output line is one capture: `routed` with what it filed per bucket, `held` with a reason, or `gone`.
 Speak one line per bucket that got items, naming them shortened, never counting them: work, personal, unsure (named as unsure), and ideas named as banked.
 A capture held for a missing focus file gets one line: the tablet pages wait for today's focus file.
 A capture held for another reason gets one line naming the reason.
 
-If the sweep stops after the claim and before the route, release them so the next sweep reads them again:
+If the sweep stops after the claim and before any route call, release them so the next sweep reads them again:
 
 ```sh
 sh -c '. "${CLAUDE_PLUGIN_ROOT}/scripts/prelude.sh" && sh "${CLAUDE_PLUGIN_ROOT}/scripts/tablet-inbox.sh" release'
 ```
 
-Run release only when no route call happened or the route exited non-zero, never after a route that exited 0.
-When the user says an unsure item is work, or a filed item sits in the wrong bucket, move its line between today's focus file and `~/.clutch/personal.md` in that turn.
+Never release after a route call, whatever its exit status: the leases lapse on their own, and the claim count moves a capture that keeps failing to held.
+When the user says an unsure item is work, or a filed item sits in the wrong bucket, move its line between today's focus file, `~/.clutch/captures.md` and `~/.clutch/personal.md` in that turn.
 A personal or unsure item never goes to the state dir, the fomo pool or any integration.
 A tick never reads the tablet inbox.
 

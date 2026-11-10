@@ -435,6 +435,14 @@ class RouteTest(Base):
         self.assertEqual(lines, [{"folder": folder, "status": "held", "reason": "not fully read"}])
         self.assertFalse(os.path.exists(self.personal) or os.path.exists(self.ledger_path))
 
+    def test_an_empty_typed_task_is_neither_claimed_nor_required(self):
+        line = self.claimed(section="APP_DAILY", name="day_2026_11_10--dddddddd", fmt="daily",
+                            todos=[todo("t1", "  "), todo("t2", ""), todo("t3", "buy stamps")])
+        self.assertEqual([t["todo_id"] for t in line["todos"]], ["t3"])
+        items = [self.item(line["folder"], "buy stamps", bucket="personal", todo_id="t3")]
+        code, lines, _ = self.route([line["folder"]], items)
+        self.assertEqual((code, lines[0]["status"]), (0, "routed"))
+
     def test_route_typed_task_coverage_spans_the_batch(self):
         kw = dict(section="APP_DAILY", fmt="daily", todos=[todo("t1", "call the plumber")],
                   pages=(("pageaaaa-1", "p00-pageaaaa.png"), ("pagebbbb-2", "p01-pagebbbb.png")))

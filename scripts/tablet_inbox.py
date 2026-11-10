@@ -153,10 +153,12 @@ def todo_date(todo):
 
 
 def typed_tasks(meta):
-    """The typed tasks of a note that are not deleted."""
+    """The typed tasks of a note that are not deleted and not empty (route refuses empty text,
+    so an empty one could never be filed and would hold its folder for good)."""
     todos = meta.get("todos")
     return [t for t in (todos if isinstance(todos, list) else [])
-            if isinstance(t, dict) and "id" in t and t.get("isDelete") is not True]
+            if isinstance(t, dict) and "id" in t and t.get("isDelete") is not True
+            and str(t.get("content", "")).strip()]
 
 
 def view(folder, meta, ledger):
