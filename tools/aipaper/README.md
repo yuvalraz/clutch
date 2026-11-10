@@ -98,7 +98,10 @@ Under `~/.clutch`:
 - `aipaper/pull.log`: the LaunchAgent's output.
 - `inbox/aipaper/`: the pulled pages.
 - `aipaper/reading/`: captures the reader claimed, each with a `.claims` count.
-- `aipaper/held/`: captures the reader could not file.
+- `aipaper/held/`: captures the reader gave up on when it claimed them: `not read`
+  (claimed five times without filing) or `unreadable` (no usable `note.json`). A
+  capture that fails while being filed stays in `aipaper/reading/`; the next sweep
+  retries it, and after five claims it moves here as `not read`.
 - `aipaper/ledger.json`: what the reader filed.
 
 ## Inbox layout
@@ -126,7 +129,8 @@ and deletes it once every item in it is filed.
 To retry a folder in `aipaper/held/`, delete its `.claims` file first, then move
 the folder into `aipaper/reading/`; the next sweep that starts ten minutes or
 more later picks it up (the delete gives the folder a fresh ten-minute lease).
-To drop it, delete it.
+A folder held as `unreadable` needs its `note.json` repaired first, or it returns
+to `held/` on the next sweep that takes it. To drop it, delete it.
 
 ## Limits
 
