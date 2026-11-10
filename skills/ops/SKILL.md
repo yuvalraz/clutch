@@ -70,6 +70,7 @@ the morning and close-of-day anchors read. Today's focuses come from the
 focus file when one is set. Ops reads two optional sections of its own,
 `### Delegation` and `### Windows` (see Delegation).
 Neither is a missing key: never ask for them.
+An optional `### Buckets` list under `## Ops` sorts the tablet inbox (see Tablet inbox); it is not a missing key either.
 
 ### Step 2: The sweep
 
@@ -121,6 +122,8 @@ sh -c '. "${CLAUDE_PLUGIN_ROOT}/scripts/prelude.sh" && clutch_ops_due brief'
 
 `due` means this is the first sweep today: speak the situation as the day brief (Step 3). Empty output or an error: the situation as usual, with nothing said about a brief.
 
+Read the tablet inbox once, after the tick pass (see Tablet inbox).
+
 Then classify what the sweep read (see Delegation).
 
 ### Step 3: The situation
@@ -131,11 +134,12 @@ what it needs now, never as overdue, late, or missed.
 
 The situation is at most seven lines. It is a read of now, not a dashboard
 and not a report for later. Nothing from the sweep is written anywhere
-except the tick pass's `moved:` lines and the L2 and Auto lines (see Delegation); the rest
+except the tick pass's `moved:` lines and the L2 and Auto lines (see Delegation) and the tablet inbox items (see Tablet inbox); the rest
 lives in the turn, and a fresh sweep replaces it.
 The day brief, when due: for each delivery under `## Critical path`, its move (the first step neither done nor blocked), each blocked step with who it waits on, and today's meetings that touch a step.
 It fits the seven lines, names steps instead of counting them, and never calls anything late.
 The brief leads the situation: what moved, the L2 and Auto lines and the L0 lines still follow, inside the same seven lines.
+The tablet lines follow what moved, inside the same seven lines.
 After the situation, check the approval window (see Delegation).
 
 ### Step 4: One smallest move
@@ -198,7 +202,7 @@ behavior:
   second sweep.
 - **A closed loop logs one line.** Append its `moved:` line with the
   constitution's worklog snippet, silently; speak on MISS or an error.
-  That line is the only thing a closed loop writes; the sweep itself still writes nothing beyond its L2 and Auto lines.
+  That line is the only thing a closed loop writes; the sweep itself still writes nothing beyond its L2 and Auto lines and the tablet inbox items.
   A tick's `moved:` line, the sweep's tick pass included, is the closed loop's one line.
 
 ### Tick
@@ -298,6 +302,60 @@ No draft is kept between windows: each window reads fresh, so there is no pendin
 In the sweep, the window screen follows the situation, and approving it is the one smallest move.
 A tick never runs the window.
 An approved window draft that awaits a reply or a state change is held as a wait loop, as in Step 5.
+
+### Tablet inbox
+
+The tablet inbox holds pages and typed tasks pulled from a paper tablet,
+where work and personal lines mix. The sweep reads it once, after the tick
+pass:
+
+```sh
+sh -c '. "${CLAUDE_PLUGIN_ROOT}/scripts/prelude.sh" && sh "${CLAUDE_PLUGIN_ROOT}/scripts/tablet-inbox.sh" claim'
+```
+
+Empty output: nothing arrived; say nothing about the tablet.
+Each output line is one capture: its `folder`, `section` and `note`, its `pages` (each an image `file` and its `page_id`, with the `known_lines` already filed from it) and its new typed `todos`.
+A line with `held` names a capture that cannot be read: name it once, in one line.
+Exit status 3 means the tablet inbox is busy; it waits for the next sweep, unmentioned. Any other error: one line, run release, and the sweep goes on.
+
+Read every page image and split it into items, one per written line or bullet: a task, a note, an action or an idea.
+Skip a line already in its page's `known_lines`, even spelled a little differently. Each typed task is one task item.
+Sort each item into a bucket from these hints, in order: the `### Buckets` list under `## Ops` in `~/.clutch/rituals.md` (`- work: <terms>`, `- personal: <terms>`); today's focuses and critical path, which mark work; names in `~/.clutch/people.md` when it exists, which mark work; the section, where Meeting is work.
+With no hint and no clear reading, the item is unsure.
+Never guess work: an unsure item files with the personal ones, marked unsure.
+Tablet items are filed, never classified against the delegation policy: no L2 or Auto line acts on one.
+
+File the claimed captures in one call, one quoted folder argument each, with the state dir and today's focus file:
+
+```sh
+sh "${CLAUDE_PLUGIN_ROOT}/scripts/tablet-inbox.sh" route --work-state-dir '<state dir>' --focus-file '<today's focus file>' '<folder>' <<'TABLET_ITEMS'
+{"pages_read": {"<folder>": ["<page>"]}, "items": [{"folder": "<folder>", "text": "<item>", "kind": "<task|note|action|idea>", "bucket": "<work|personal|unsure>", "page_id": "<page>", "date": "<date>"}]}
+TABLET_ITEMS
+```
+
+Fill `<state dir>` and `<today's focus file>` with absolute paths, never a `~` form.
+With no focus file set in `~/.clutch/rituals.md`, drop `--focus-file`, and with no state dir drop `--work-state-dir` too: work items then file in `~/.clutch/personal.md` marked work, and the work line says so.
+Pass every claimed folder but a `held` one, and under it in `pages_read` list only the `page_id`s you actually read, even when it has no new items: a folder whose pages were all read is retired.
+A folder with a page you did not read is held, not retired, and the next sweep reads it again.
+A typed task carries `todo_id` instead of `page_id`; `date` is the item's day as YYYY-MM-DD (a typed task's comes with it; a Daily page's is its note name).
+The heredoc is quoted, so the items need JSON escaping only.
+Work tasks, notes and actions land under `## From the tablet` in today's focus file and work ideas in the fomo pool; every personal and unsure item, ideas included, in `~/.clutch/personal.md` under today's date. Nothing here goes to any integration.
+A route that exits non-zero filed nothing; say so in one line and run release.
+Each output line is one capture: `routed` with what it filed per bucket, `held` with a reason, or `gone`.
+Speak one line per bucket that got items, naming them shortened, never counting them: work, personal, unsure (named as unsure), and ideas named as banked.
+A capture held for a missing focus file gets one line: the tablet pages wait for today's focus file.
+A capture held for another reason gets one line naming the reason.
+
+If the sweep stops after the claim and before the route, release them so the next sweep reads them again:
+
+```sh
+sh -c '. "${CLAUDE_PLUGIN_ROOT}/scripts/prelude.sh" && sh "${CLAUDE_PLUGIN_ROOT}/scripts/tablet-inbox.sh" release'
+```
+
+Run release only when no route call happened or the route exited non-zero, never after a route that exited 0.
+When the user says an unsure item is work, or a filed item sits in the wrong bucket, move its line between today's focus file and `~/.clutch/personal.md` in that turn.
+A personal or unsure item never goes to the state dir, the fomo pool or any integration.
+A tick never reads the tablet inbox.
 
 ### Session close
 

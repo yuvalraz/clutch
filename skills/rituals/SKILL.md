@@ -94,6 +94,7 @@ A production change, a direct send, a merge or a delete stays L3 whatever this l
 An Auto line, `- Auto: <channel> — <what to post>`, names a channel a process reads, such as a review-request queue; ops posts there without a yes, logs it, and an @-mention the line does not name still waits for your yes.
 Under `### Windows`, the approval window times, 24-hour, comma or line separated; the default is 11:00 and 16:30, used when the section is absent, empty or holds no valid time.
 A window opens on the first ops sweep at or after its time; nothing fires on its own.
+Under `### Buckets`, optional, `- work: <terms>` and `- personal: <terms>` name words that mark a tablet item as work or personal; ops reads them when it files the tablet inbox, and an item neither marks stays unsure.
 
 ```markdown
 ## Ops
@@ -105,6 +106,9 @@ A window opens on the first ops sweep at or after its time; nothing fires on its
 - Auto: <channel> — <what to post>
 ### Windows
 - 11:00, 16:30
+### Buckets
+- work: <your team, your product>
+- personal: <home, family>
 ```
 
 Your focus file may hold a `## Critical path`: one `###` block per delivery, each step a `- [ ]` or `- [x]` line, and a blocked step ending in `waits on: <who>`.

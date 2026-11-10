@@ -260,6 +260,40 @@ fpin "$R" "README: closing ref"        'A later `moved:` line that starts with t
 fpin "$R" "README: three verbs"      '`on:` claim or `wait:` loop'
 fpin "$R" "README: tick sentence"      '`/clutch:ops tick` checks only those waits, on request, and speaks only when one moved.'
 
+# --- the tablet inbox: the sweep claims, reads, sorts and routes it once
+pin  "$O" "tablet: section"             '^### Tablet inbox$'
+fpin "$O" "tablet: read in the sweep"   'Read the tablet inbox once, after the tick pass (see Tablet inbox).'
+fpin "$O" "tablet: Step 3 writes"       'and the tablet inbox items (see Tablet inbox); the rest'
+fpin "$O" "tablet: Step 5 writes"       'the sweep itself still writes nothing beyond its L2 and Auto lines and the tablet inbox items.'
+fpin "$O" "tablet: buckets not a key"   'An optional `### Buckets` list under `## Ops` sorts the tablet inbox (see Tablet inbox); it is not a missing key either.'
+fpin "$O" "tablet: empty is silent"     'Empty output: nothing arrived; say nothing about the tablet.'
+fpin "$O" "tablet: other error"         'Any other error: one line, run release, and the sweep goes on.'
+fpin "$O" "tablet: never guess work"    'Never guess work: an unsure item files with the personal ones, marked unsure.'
+fpin "$O" "tablet: pass every folder"   'Pass every claimed folder but a `held` one, and under it in `pages_read` list only the `page_id`s you actually read'
+fpin "$O" "tablet: unread page holds"   'A folder with a page you did not read is held, not retired, and the next sweep reads it again.'
+fpin "$O" "tablet: personal sink"       'every personal and unsure item, ideas included, in `~/.clutch/personal.md`'
+fpin "$O" "tablet: route non-zero"      'A route that exits non-zero filed nothing; say so in one line and run release.'
+fpin "$O" "tablet: release only then"   'Run release only when no route call happened or the route exited non-zero, never after a route that exited 0.'
+fpin "$O" "tablet: never counted"       'one line per bucket that got items, naming them shortened, never counting them'
+fpin "$O" "tablet: focus file missing"  'A capture held for a missing focus file gets one line: the tablet pages wait for today'"'"'s focus file.'
+fpin "$O" "tablet: other hold"          'A capture held for another reason gets one line naming the reason.'
+fpin "$O" "tablet: personal stays"      'A personal or unsure item never goes to the state dir, the fomo pool or any integration.'
+fpin "$O" "tablet: tick never reads"    'A tick never reads the tablet inbox.'
+fpin "$O" "tablet: inside seven lines"  'The tablet lines follow what moved, inside the same seven lines.'
+fpin "$O" "tablet: never delegated"     'Tablet items are filed, never classified against the delegation policy: no L2 or Auto line acts on one.'
+fpin "$O" "tablet: no focus file"       'With no focus file set in `~/.clutch/rituals.md`, drop `--focus-file`'
+fpin "$O" "tablet: absolute paths"      'Fill `<state dir>` and `<today'"'"'s focus file>` with absolute paths, never a `~` form.'
+# Paired with the pins above: the skill calls only the wrapper, and an unread
+# folder is passed (held by route), never left out (its claim would go uncounted).
+npy=$(grep -ci python "$O")
+[ "$npy" = 0 ] || { echo "FAIL: ops -- the skill names python ($npy hit)"; fail=1; }
+case $OJ in *'Leave out a folder'*|*'Pass a folder only when'*)
+  echo "FAIL: ops -- the skill still tells the model to leave out an unread folder"; fail=1 ;; esac
+fpin "$R" "README: tablet inbox"        'When the tablet inbox has new pages, the sweep files each line once: work under `## From the tablet` in today'"'"'s focus file and work ideas in the fomo pool, personal and unsure ones in `~/.clutch/personal.md`, and it names what arrived without counting it.'
+fpin "$R" "README safe: ops reads"      'Ops also reads the tablet inbox under `~/.clutch/inbox/`, and `~/.clutch/people.md` when it exists, to sort what arrived.'
+fpin "$R" "README safe: ops writes"     '`/clutch:ops` files them: work lines into today'"'"'s focus file (or, with no focus file set, `~/.clutch/personal.md`)'
+fpin "$R" "README safe: helper imports" 'its test suite parses its imports and fails on any network module'
+
 # --- local mirror of the private-vocab, intent, F and G wording gates.
 # Same regex strings as de-private.test.sh; rc 1 = clean, 0 = leak,
 # >=2 = loud grep failure.
@@ -495,5 +529,94 @@ B1=$(cd "$T/armdir" && sh -c "$BCMD" 2>&1); R1=$?
 B2=$(cd "$T/armdir" && sh -c "$BCMD" 2>&1); R2=$?
 [ "$R1" = 0 ] && [ "$B1" = due ] && [ "$R2" = 0 ] && [ -z "$B2" ] \
   || { echo "FAIL: O-brief -- want due then nothing; rc $R1: $B1 / rc $R2: $B2"; exit 1; }
+
+# --- O-tablet: the skill's own claim, route and release lines. With no tablet
+# inbox, (a)(b)(d) prove parity: no output, no file, no python3 started, with or
+# without one on PATH; (e) is their positive control. (c)(f)(g) run the route
+# template filled the way the prose says, against a real python3.
+CL=$(grep -F 'tablet-inbox.sh" claim' "$O"); RL=$(grep -F 'tablet-inbox.sh" release' "$O")
+[ "$(printf '%s\n' "$CL" | grep -c .)" = 1 ] && [ "$(printf '%s\n' "$RL" | grep -c .)" = 1 ] \
+  || { echo "FAIL: O-tablet wants exactly one claim and one release line, got: $CL / $RL"; exit 1; }
+CCMD=$(subroot "$(subroot "$CL")"); RCMD=$(subroot "$(subroot "$RL")")
+nrb=$(awk '/^[ \t]*```sh/{n++; f=1; b[n] = ""; next} /^[ \t]*```/{f=0} f{b[n] = b[n] $0 "\n"}
+  END {k = 0; for (i = 1; i <= n; i++) if (index(b[i], "tablet-inbox.sh\" route")) {k++; s = b[i]}
+       printf "%s", s > out; print k}' out="$T/route.raw" "$O")
+[ "$nrb" = 1 ] || { echo "FAIL: O-tablet wants exactly one sh block running route, got $nrb"; exit 1; }
+subroot "$(cat "$T/route.raw")" > "$T/route.tpl"
+case "$CCMD $RCMD $(cat "$T/route.tpl")" in
+  *CLAUDE_PLUGIN_ROOT*) echo "FAIL: O-tablet -- plugin root left unsubstituted"; exit 1 ;;
+esac
+# $T/nopy holds only sh; $T/stubpy also holds a python3 that records it ran.
+# Neither holds git, so the prelude's git block is skipped.
+mkdir -p "$T/nopy" "$T/stubpy" "$T/tplain"
+ln -s /bin/sh "$T/nopy/sh"; ln -s /bin/sh "$T/stubpy/sh"
+printf '#!/bin/sh\n: > "%s/py-ran"\n' "$T" > "$T/stubpy/python3"
+chmod +x "$T/stubpy/python3"
+# tquiet <label> <pathdir> <cmd>: rc 0, no output, no python3, HOME listing unchanged.
+tquiet() {
+  rm -f "$T/py-ran"
+  find "$HOME" | sort > "$T/tb"
+  TO=$(cd "$T/tplain" && PATH="$T/$2" /bin/sh -c "$3" 2>&1); TR=$?
+  find "$HOME" | sort > "$T/ta"
+  [ "$TR" = 0 ] && [ -z "$TO" ] && [ ! -e "$T/py-ran" ] && cmp -s "$T/tb" "$T/ta" \
+    || { echo "FAIL: O-tablet $1 -- rc $TR, python3 ran: $([ -e "$T/py-ran" ] && echo yes || echo no), output: $TO"; exit 1; }
+}
+armhome ta
+tquiet "(a) claim, no ~/.clutch" stubpy "$CCMD"
+armhome tb; mkdir "$HOME/.clutch"
+tquiet "(b) claim, no inbox" stubpy "$CCMD"
+tquiet "(b) release, no inbox" stubpy "$RCMD"
+armhome td; mkdir "$HOME/.clutch"
+tquiet "(d) claim, no python3" nopy "$CCMD"
+tquiet "(d) release, no python3" nopy "$RCMD"
+armhome te; mkdir -p "$HOME/.clutch/inbox/aipaper"; rm -f "$T/py-ran"
+(cd "$T/tplain" && PATH="$T/stubpy" /bin/sh -c "$CCMD" >/dev/null 2>&1)
+[ -e "$T/py-ran" ] || { echo "FAIL: O-tablet (e) -- an inbox did not reach the helper, so (a)(b) cannot bite"; exit 1; }
+
+if ! command -v python3 >/dev/null 2>&1; then
+  echo "SKIP: O-tablet (c)(f)(g) (no python3)"
+else
+  # tcap <case>: a fresh HOME holding one invented capture, a focus file '# day',
+  # and the claim run; TF is the folder it printed.
+  tcap() {
+    armhome "$1"
+    TC="$HOME/.clutch/inbox/aipaper/APP_PAPER/Fixture--abcd1234"
+    mkdir -p "$TC" "$T/$1-work"
+    printf '{"appType": "APP_PAPER", "fileName": "Fixture", "format": "notebook", "pages": [{"file": "p00-pg000001.png", "pageId": "pg000001-x", "order": 0}], "todos": []}\n' > "$TC/note.json"
+    printf '\211PNG\r\n\032\n' > "$TC/p00-pg000001.png"
+    printf '# day\n' > "$T/$1-work/focus.md"
+    TF=$(cd "$T/tplain" && sh -c "$CCMD" | python3 -c 'import json,sys; print(json.loads(sys.stdin.readline())["folder"])')
+    [ -n "$TF" ] && [ -d "$TF" ] || { echo "FAIL: O-tablet ($1) -- the claim printed no folder: $TF"; exit 1; }
+  }
+  # troute <case> <bucket> [literal to drop] [pages_read literal to empty]: fill
+  # every placeholder of the route template, then run it; output in TO, rc in TR.
+  troute() {
+    TW="$T/$1-work" TFD="$TF" TB="$2" TX="${3:-}" TP="${4:-}" TD=$(date +%Y-%m-%d) awk '
+      function ra(s, a, b,   i, o) { o = ""; while ((i = index(s, a)) > 0) { o = o substr(s, 1, i - 1) b; s = substr(s, i + length(a)) } return o s }
+      { if (ENVIRON["TX"] != "") $0 = ra($0, ENVIRON["TX"], "")
+        if (ENVIRON["TP"] != "") $0 = ra($0, ENVIRON["TP"], "[]")
+        $0 = ra($0, "<state dir>", ENVIRON["TW"]); $0 = ra($0, "<today" sq "s focus file>", ENVIRON["TW"] "/focus.md")
+        $0 = ra($0, "<folder>", ENVIRON["TFD"]); $0 = ra($0, "<item>", "buy stamps")
+        $0 = ra($0, "<task|note|action|idea>", "task"); $0 = ra($0, "<work|personal|unsure>", ENVIRON["TB"])
+        $0 = ra($0, "<page>", "pg000001-x"); print ra($0, "<date>", ENVIRON["TD"]) }' sq="'" "$T/route.tpl" > "$T/$1-route.sh"
+    grep -q '<[a-z|]*>\|<today' "$T/$1-route.sh" && { echo "FAIL: O-tablet ($1) -- a placeholder is left unfilled"; exit 1; }
+    TO=$(cd "$T/tplain" && sh "$T/$1-route.sh" 2>&1); TR=$?
+  }
+  # (c) a personal item lands in personal.md only; the folder is retired.
+  tcap tc; troute tc personal
+  [ "$TR" = 0 ] && grep -qxF -- '- [ ] buy stamps' "$HOME/.clutch/personal.md" 2>/dev/null \
+    && [ "$(cat "$T/tc-work/focus.md")" = '# day' ] && [ ! -e "$HOME/.clutch/captures.md" ] && [ ! -e "$TF" ] \
+    || { echo "FAIL: O-tablet (c) -- rc $TR: $TO"; exit 1; }
+  # (f) a page left out of pages_read holds the folder; nothing is filed.
+  tcap tf; troute tf personal '' '["<page>"]'
+  [ "$TR" = 0 ] && printf '%s\n' "$TO" | grep -qF '"status": "held"' && printf '%s\n' "$TO" | grep -qF 'not fully read' \
+    && [ ! -e "$HOME/.clutch/personal.md" ] && [ -d "$TF" ] \
+    || { echo "FAIL: O-tablet (f) -- rc $TR: $TO"; exit 1; }
+  # (g) with no focus file and no state dir set, a work item files in personal.md marked work.
+  tcap tg; troute tg work " --work-state-dir '<state dir>' --focus-file '<today's focus file>'"
+  [ "$TR" = 0 ] && grep -qxF -- '- [ ] buy stamps (work)' "$HOME/.clutch/personal.md" 2>/dev/null \
+    && [ "$(cat "$T/tg-work/focus.md")" = '# day' ] && [ ! -e "$TF" ] \
+    || { echo "FAIL: O-tablet (g) -- rc $TR: $TO"; exit 1; }
+fi
 
 echo PASS
