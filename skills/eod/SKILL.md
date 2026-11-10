@@ -63,6 +63,7 @@ If `state dir` or `focus file` is unset, ask once where tomorrow's focuses
 should live and offer to persist the answer into the config — the write
 below needs a target. Write the focus file for that day, the ONE tweak from
 the retro next to the focuses, so `/clutch:morning` finds both waiting.
+Carry the `## Critical path` section into tomorrow's focus file as it is; it is yours, never rewritten here.
 
 ### 5. Fun slot
 

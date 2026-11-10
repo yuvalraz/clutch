@@ -47,6 +47,7 @@ unset, resolve the path first: ask once where today's focuses should live,
 and offer to persist the answer into the config. If the file is missing or empty,
 set today's focuses with the user now and write the file — the day does not
 start focusless.
+When you create the focus file, copy the `## Critical path` section from the most recent earlier focus file into it as it is, when one has it.
 
 ### 4. Deep ping
 

@@ -112,6 +112,15 @@ Run one tick pass (see Tick) before the situation, and fold each loop that
 moved into the situation as what moved, instead of its own line.
 A loop that did not move stays unmentioned. The tick pass is part of this
 pulse: one read of the wait loops, then it reads each wait loop once, by its kind.
+
+When today's focus file has a `## Critical path`, check the day brief once, after the tick pass:
+
+```sh
+sh -c '. "${CLAUDE_PLUGIN_ROOT}/scripts/prelude.sh" && clutch_ops_due brief'
+```
+
+`due` means this is the first sweep today: speak the situation as the day brief (Step 3). Empty output or an error: the situation as usual, with nothing said about a brief.
+
 Then classify what the sweep read (see Delegation).
 
 ### Step 3: The situation
@@ -124,6 +133,9 @@ The situation is at most seven lines. It is a read of now, not a dashboard
 and not a report for later. Nothing from the sweep is written anywhere
 except the tick pass's `moved:` lines and the L2 and Auto lines (see Delegation); the rest
 lives in the turn, and a fresh sweep replaces it.
+The day brief, when due: for each delivery under `## Critical path`, its move (the first step neither done nor blocked), each blocked step with who it waits on, and today's meetings that touch a step.
+It fits the seven lines, names steps instead of counting them, and never calls anything late.
+The brief leads the situation: what moved, the L2 and Auto lines and the L0 lines still follow, inside the same seven lines.
 After the situation, check the approval window (see Delegation).
 
 ### Step 4: One smallest move
@@ -251,7 +263,7 @@ Classify every inbound item the sweep reads against the policy:
 - L0: one line, only when it touches the critical path.
 - Noise: never shown.
 
-The critical path is today's focuses from the focus file.
+The critical path is today's focuses and the steps under the focus file's `## Critical path`.
 With no focuses set, each L0 item shows as one line instead of being hidden.
 An L1 item whose deadline falls before the next approval window touches the critical path, so its draft shows now.
 Anything the policy does not name is L3.
@@ -281,6 +293,7 @@ default 11:00 and 16:30). Draft every L1 item that does not touch the
 critical path, from the sweep's fresh read, and show the drafts in one
 screen, numbered, approved with one yes or "all but N".
 Empty output or an error: no window is due; say nothing about drafts.
+A due window with nothing to draft says nothing either.
 No draft is kept between windows: each window reads fresh, so there is no pending list.
 In the sweep, the window screen follows the situation, and approving it is the one smallest move.
 A tick never runs the window.

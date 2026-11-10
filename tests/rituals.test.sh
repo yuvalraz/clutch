@@ -82,6 +82,11 @@ fpin "$R" "ops: windows separators"    'comma or line separated'
 fpin "$R" "ops: default windows"       'the default is 11:00 and 16:30'
 fpin "$R" "ops: default when invalid"  'used when the section is absent, empty or holds no valid time'
 fpin "$R" "ops: window on a sweep"     'A window opens on the first ops sweep at or after its time; nothing fires on its own.'
+pin  "$R" "ops: critical path heading" '^## Critical path$'
+fpin "$R" "ops: blocked step shape"    'waits on: <who>'
+fpin "$R" "ops: brief from the path"   'The first ops sweep of a day opens with a brief built from it.'
+fpin "$E" "eod: carry critical path"   'Carry the `## Critical path` section into tomorrow'"'"'s focus file as it is; it is yours, never rewritten here.'
+fpin "$M" "morning: copy critical path" 'When you create the focus file, copy the `## Critical path` section from the most recent earlier focus file into it as it is, when one has it.'
 
 # --- morning + eod: handoff and shared error contracts
 for f in "$M" "$E"; do
