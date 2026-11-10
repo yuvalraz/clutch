@@ -107,6 +107,17 @@ A window opens on the first ops sweep at or after its time; nothing fires on its
 - 11:00, 16:30
 ```
 
+Your focus file may hold a `## Critical path`: one `###` block per delivery, each step a `- [ ]` or `- [x]` line, and a blocked step ending in `waits on: <who>`.
+The first ops sweep of a day opens with a brief built from it.
+
+```markdown
+## Critical path
+### Launch the export
+- [x] Draft the spec
+- [ ] Legal review waits on: Ada Example
+- [ ] Ship the flag
+```
+
 ### Step 4: Confirm
 
 Show the written file, then name the next thing: resume the ritual that sent you here,
