@@ -113,14 +113,13 @@ moved into the situation as what moved, instead of its own line.
 A loop that did not move stays unmentioned. The tick pass is part of this
 pulse: one read of the wait loops, then it reads each wait loop once, by its kind.
 
-Check the day brief once, after the tick pass:
+When today's focus file has a `## Critical path`, check the day brief once, after the tick pass:
 
 ```sh
 sh -c '. "${CLAUDE_PLUGIN_ROOT}/scripts/prelude.sh" && clutch_ops_due brief'
 ```
 
-`due` means this is the first sweep today: read `## Critical path` from the focus file and speak the situation as the day brief (Step 3).
-Empty output, an error, a missing focus file or no critical path: the situation as usual, with nothing said about a brief.
+`due` means this is the first sweep today: speak the situation as the day brief (Step 3). Empty output or an error: the situation as usual, with nothing said about a brief.
 
 Then classify what the sweep read (see Delegation).
 
@@ -134,8 +133,9 @@ The situation is at most seven lines. It is a read of now, not a dashboard
 and not a report for later. Nothing from the sweep is written anywhere
 except the tick pass's `moved:` lines and the L2 and Auto lines (see Delegation); the rest
 lives in the turn, and a fresh sweep replaces it.
-The day brief, when due: for each delivery under `## Critical path`, its move (the first step neither done nor blocked), each blocked step with who it waits on, and today's meetings or wait loops that touch a step.
+The day brief, when due: for each delivery under `## Critical path`, its move (the first step neither done nor blocked), each blocked step with who it waits on, and today's meetings that touch a step.
 It fits the seven lines, names steps instead of counting them, and never calls anything late.
+The brief leads the situation: what moved, the L2 and Auto lines and the L0 lines still follow, inside the same seven lines.
 After the situation, check the approval window (see Delegation).
 
 ### Step 4: One smallest move
@@ -263,7 +263,7 @@ Classify every inbound item the sweep reads against the policy:
 - L0: one line, only when it touches the critical path.
 - Noise: never shown.
 
-The critical path is the focus file's `## Critical path` steps, or today's focuses when it has none.
+The critical path is today's focuses and the steps under the focus file's `## Critical path`.
 With no focuses set, each L0 item shows as one line instead of being hidden.
 An L1 item whose deadline falls before the next approval window touches the critical path, so its draft shows now.
 Anything the policy does not name is L3.

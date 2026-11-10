@@ -158,12 +158,18 @@ fpin "$O" "deleg: L2 log text"          'text `L2: <what was done>`'
 fpin "$O" "deleg: L1 waits"             'any other draft waits for the next approval window, unmentioned until then'
 fpin "$O" "deleg: L0 line"              '- L0: one line, only when it touches the critical path.'
 fpin "$O" "deleg: Noise line"           '- Noise: never shown.'
-fpin "$O" "deleg: critical path"        'The critical path is the focus file'"'"'s `## Critical path` steps, or today'"'"'s focuses when it has none.'
+fpin "$O" "deleg: critical path"        'The critical path is today'"'"'s focuses and the steps under the focus file'"'"'s `## Critical path`.'
 ncp=$(grep -cF 'The critical path is today'"'"'s focuses from the focus file.' "$O")
 [ "$ncp" = 0 ] || { echo "FAIL: ops -- still says the critical path is only today's focuses ($ncp hit)"; fail=1; }
+nwh=$(grep -cF 'or today'"'"'s focuses when it has none' "$O")
+[ "$nwh" = 0 ] || { echo "FAIL: ops -- a critical path still drops today's focuses ($nwh hit)"; fail=1; }
 # --- the day brief: the first sweep of a day opens with it, from `## Critical path`
+fpin "$O" "brief: gated on a path"      'When today'"'"'s focus file has a `## Critical path`, check the day brief once'
 fpin "$O" "brief: due is first sweep"   '`due` means this is the first sweep today'
 fpin "$O" "brief: silent otherwise"     'with nothing said about a brief'
+fpin "$O" "brief: leads the situation"  'The brief leads the situation: what moved, the L2 and Auto lines and the L0 lines still follow, inside the same seven lines.'
+nbw=$(grep -c 'meetings or wait loops that touch a step' "$O")
+[ "$nbw" = 0 ] || { echo "FAIL: ops -- the brief still lists wait loops ($nbw hit)"; fail=1; }
 fpin "$O" "brief: the move"             'its move (the first step neither done nor blocked)'
 fpin "$O" "brief: never late"           'never calls anything late'
 fpin "$O" "window: empty due is silent" 'A due window with nothing to draft says nothing either.'
