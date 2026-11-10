@@ -80,7 +80,15 @@ HOME=$T/home3
 mkdir -p "$HOME/.clutch" "$T/d/inbox/aipaper"
 wrap stubpy --state-dir "$T/d" claim
 ran wrapper_honors_state_dir "-B scripts/tablet_inbox.py --state-dir $T/d claim"
+wrap stubpy --state-dir="$T/d" claim
+ran wrapper_honors_state_dir_equals "-B scripts/tablet_inbox.py --state-dir=$T/d claim"
+# An explicit --state-dir is the helper's to judge: it refuses a missing one with rc 2.
+wrap stubpy --state-dir "$T/missing" claim
+ran wrapper_lets_the_helper_refuse_a_missing_state_dir "--state-dir $T/missing claim"
 
+mkdir "$T/net"
+printf 'curl x\n' > "$T/net/f"
+[ -n "$(grep -rE 'curl|wget|/dev/tcp|nc ' "$T/net/")" ] || { echo "FAIL: readme_network_grep positive control"; fail=1; }
 [ -z "$(grep -rE 'curl|wget|/dev/tcp|nc ' scripts/)" ] || { echo "FAIL: readme_network_grep_stays_empty"; fail=1; }
 
 # The puller's README names the reader's state and how to clear held/.

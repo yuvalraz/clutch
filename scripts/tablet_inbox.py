@@ -7,7 +7,10 @@ route   files the items read from claimed folders (JSON on stdin) in their sinks
 release lapses the lease of every claimed folder, for a sweep that stopped.
 
 Called only through scripts/tablet-inbox.sh. Standard library only; runs on
-/usr/bin/python3 (3.9). Every non-zero exit prints one stderr line `tablet: ...`.
+/usr/bin/python3 (3.9). Exit codes: 0 done (per-folder held and gone included);
+1 a file or directory could not be used; 2 bad usage or input, nothing written;
+3 lock busy; 4 ledger unusable; 5 (wrapper only) no python3. Every non-zero
+exit prints one stderr line `tablet: ...`.
 """
 import argparse
 import datetime
@@ -52,17 +55,29 @@ def warn(message):
 def replace_file(path, data, mode):
     """All of it or the old file: a kill mid-write leaves no half file under the real name."""
     tmp = path + ".tmp"
-    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, mode)
-    with os.fdopen(fd, "wb") as handle:
-        os.fchmod(handle.fileno(), mode)
-        handle.write(data)
-        handle.flush()
-        os.fsync(handle.fileno())
-    os.replace(tmp, path)
+    try:
+        fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, mode)
+        with os.fdopen(fd, "wb") as handle:
+            os.fchmod(handle.fileno(), mode)
+            handle.write(data)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(tmp, path)
+    except BaseException:
+        try:
+            os.remove(tmp)
+        except OSError:
+            pass
+        raise
 
 
 def norm(text):
     return " ".join(re.sub(r"[^\w\s]", "", text.lower()).split())
+
+
+def key(text):
+    """The dedup form of a line; a line of symbols only is its own key."""
+    return norm(text) or one_line(text)
 
 
 def one_line(text):
@@ -109,7 +124,10 @@ def insert_in_section(text, heading, lines):
 
 
 def overlaps(a, b):
-    """True when two real paths are the same or one sits inside the other."""
+    """True when two real paths are the same or one sits inside the other. macOS volumes
+    ignore case by default, so there the comparison does too."""
+    if sys.platform == "darwin":
+        a, b = a.lower(), b.lower()
     return os.path.commonpath([a, b]) in (a, b)
 
 
@@ -210,6 +228,18 @@ def emit(value):
     print(json.dumps(value, ensure_ascii=False))
 
 
+def subdirs(parent):
+    """The directories in parent, sorted. A symlink is never followed: it is named and skipped."""
+    found = []
+    for name in sorted(os.listdir(parent)):
+        path = os.path.join(parent, name)
+        if os.path.islink(path):
+            warn("skipped %s: a symlink" % name)
+        elif os.path.isdir(path):
+            found.append(path)
+    return found
+
+
 def claim(state):
     inbox = os.path.join(state, "inbox", "aipaper")
     reading = os.path.join(state, "aipaper", "reading")
@@ -220,29 +250,31 @@ def claim(state):
         ledger = load_ledger(os.path.join(state, "aipaper", "ledger.json"))
         os.makedirs(reading, exist_ok=True)
         now = time.time()
-        taken = [os.path.join(reading, name) for name in os.listdir(reading)
-                 if os.path.isdir(os.path.join(reading, name))
-                 and os.stat(os.path.join(reading, name)).st_mtime <= now - LEASE]
-        if os.path.isdir(inbox):
-            for section in sorted(os.listdir(inbox)):
-                if not os.path.isdir(os.path.join(inbox, section)):
+        taken = [folder for folder in subdirs(reading) if os.stat(folder).st_mtime <= now - LEASE]
+        for section in subdirs(inbox) if os.path.isdir(inbox) else []:
+            for source in subdirs(section):
+                target = os.path.join(reading, "%s__%s__%d" % (
+                    os.path.basename(section), os.path.basename(source), time.time_ns()))
+                try:
+                    os.rename(source, target)
+                except OSError as exc:  # one bad entry must not stop every later claim
+                    warn("skipped %s: %s" % (os.path.basename(source), exc.strerror or exc))
                     continue
-                for capture in sorted(os.listdir(os.path.join(inbox, section))):
-                    source = os.path.join(inbox, section, capture)
-                    if os.path.isdir(source):
-                        target = os.path.join(reading, "%s__%s__%d" % (section, capture, time.time_ns()))
-                        os.rename(source, target)
-                        taken.append(target)
+                taken.append(target)
         for folder in sorted(taken, key=os.path.basename):
-            count, meta = read_claims(folder), read_meta(folder)
-            reason = "not read" if count >= MAX_CLAIMS else "unreadable" if meta is None else None
-            if reason:
-                os.makedirs(held, exist_ok=True)
-                os.rename(folder, os.path.join(held, os.path.basename(folder)))
-                emit({"folder": os.path.join(held, os.path.basename(folder)), "held": reason})
+            try:
+                count, meta = read_claims(folder), read_meta(folder)
+                reason = "not read" if count >= MAX_CLAIMS else "unreadable" if meta is None else None
+                if reason:
+                    os.makedirs(held, exist_ok=True)
+                    os.rename(folder, os.path.join(held, os.path.basename(folder)))
+                    emit({"folder": os.path.join(held, os.path.basename(folder)), "held": reason})
+                    continue
+                write_claims(folder, count + 1)
+                os.utime(folder, None)
+            except OSError as exc:
+                warn("skipped %s: %s" % (os.path.basename(folder), exc.strerror or exc))
                 continue
-            write_claims(folder, count + 1)
-            os.utime(folder, None)
             pages, todos = view(folder, meta, ledger)
             emit({"folder": folder, "section": section_name(meta.get("appType", "")),
                   "note": str(meta.get("fileName", "")), "format": str(meta.get("format", "")),
@@ -258,18 +290,19 @@ def release(state):
         return 0
     with lock(state):
         now = time.time()
-        for name in os.listdir(reading):
-            folder = os.path.join(reading, name)
-            if not os.path.isdir(folder):
-                continue
-            if os.stat(folder).st_mtime > now - LEASE:
-                write_claims(folder, max(read_claims(folder) - 1, 0))
-            lapse(folder)
+        for folder in subdirs(reading):
+            try:
+                if os.stat(folder).st_mtime > now - LEASE:
+                    write_claims(folder, max(read_claims(folder) - 1, 0))
+                lapse(folder)
+            except OSError as exc:
+                warn("skipped %s: %s" % (os.path.basename(folder), exc.strerror or exc))
     return 0
 
 
-def validate(payload, folders, todo_ids):
-    """Raise Refused unless the route stdin is well formed. todo_ids: folder -> its typed task ids."""
+def validate(payload, folders, ids):
+    """Raise Refused unless the route stdin is well formed. ids: existing folder -> (page ids,
+    typed task ids); an item's id must be one of its own folder's."""
     if not isinstance(payload, dict) or not isinstance(payload.get("items"), list) \
             or not isinstance(payload.get("pages_read"), dict):
         raise Refused('stdin must be {"pages_read": {...}, "items": [...]}')
@@ -292,8 +325,10 @@ def validate(payload, folders, todo_ids):
             raise Refused(where + "needs exactly one of page_id and todo_id")
         if not isinstance(item.get("page_id", item.get("todo_id")), str):
             raise Refused(where + "the id must be a string")
-        if "todo_id" in item and item["todo_id"] not in todo_ids.get(item["folder"], ()):
-            raise Refused(where + "todo_id is not a typed task of its folder")
+        if item["folder"] in ids:
+            page_ids, todo_ids = ids[item["folder"]]
+            if item["page_id"] not in page_ids if "page_id" in item else item["todo_id"] not in todo_ids:
+                raise Refused(where + "page_id or todo_id is not one of its folder's")
         if "date" in item and not valid_date(item["date"]):
             raise Refused(where + "date must be YYYY-MM-DD")
 
@@ -311,27 +346,36 @@ def route(state, args):
         raise Refused("--today must be YYYY-MM-DD")
     today = args.today or datetime.date.today().isoformat()
     state_real = os.path.realpath(state)
-    if args.work_state_dir and overlaps(state_real, real(args.work_state_dir)):
+    work = real(args.work_state_dir) if args.work_state_dir else None
+    if work and overlaps(state_real, work):
         raise Refused("the work state dir and the tablet state dir overlap")
-    focus = os.path.expanduser(args.focus_file) if args.focus_file else None
-    if focus and os.path.commonpath([state_real, real(focus)]) == state_real:
+    focus = real(args.focus_file) if args.focus_file else None
+    if focus and overlaps(state_real, focus):
         raise Refused("the focus file sits inside the tablet state dir")
+    # Resolved once: checks, reads, writes and restores all act on the link target, never the link.
+    paths = {"focus": focus, "personal": real(os.path.join(state, "personal.md")),
+             "pool": real(os.path.join(state, "captures.md")),
+             "ledger": real(os.path.join(state, "aipaper", "ledger.json"))}
+    if work and any(overlaps(work, paths[name]) for name in ("personal", "pool", "ledger")):
+        raise Refused("a tablet state file links into the work state dir")
     reading = os.path.realpath(os.path.join(state, "aipaper", "reading"))
     for folder in args.folders:
         if os.path.dirname(os.path.realpath(folder)) != reading:
             raise Refused("a folder argument is outside aipaper/reading")
     metas = {f: read_meta(f) for f in args.folders if os.path.isdir(f)}
-    todo_ids = {f: set(str(t["id"]) for t in typed_tasks(m)) for f, m in metas.items() if m is not None}
+    ids = {}  # readable folder -> (page ids, typed task ids); a gone or unreadable one is not checked
+    for f, m in metas.items():
+        if m is None:
+            continue
+        pages, todos = view(f, m, {"pages": {}, "todos": {}})
+        ids[f] = (set(p["page_id"] for p in pages), set(t["todo_id"] for t in todos))
     try:
         payload = json.loads(sys.stdin.read())
     except ValueError:
         raise Refused("stdin is not JSON")
-    validate(payload, args.folders, todo_ids)
+    validate(payload, args.folders, ids)
     pages_read, items = payload["pages_read"], payload["items"]
     batch_todos = set(item["todo_id"] for item in items if "todo_id" in item)
-    paths = {"focus": focus, "personal": os.path.join(state, "personal.md"),
-             "pool": os.path.join(state, "captures.md"),
-             "ledger": os.path.join(state, "aipaper", "ledger.json")}
     with lock(state):
         ledger = load_ledger(paths["ledger"])
         for folder in args.folders:
@@ -344,12 +388,14 @@ def route(state, args):
 
 
 def hold(folder, reason):
-    if reason != "not fully read":
-        try:
+    """Keep a folder for the next sweep. Only a missing focus file resets the claim count:
+    a write failure can last, and MAX_CLAIMS must still bound it."""
+    try:
+        if reason == "focus file missing" and os.path.exists(os.path.join(folder, ".claims")):
             os.remove(os.path.join(folder, ".claims"))  # before the lapse: a delete moves the mtime
-        except FileNotFoundError:
-            pass
-    lapse(folder)
+        lapse(folder)
+    except OSError as exc:  # the other folders of this route still go on
+        warn("%s: could not reset its lease (%s)" % (os.path.basename(folder), exc))
     emit({"folder": folder, "status": "held", "reason": reason})
 
 
@@ -367,13 +413,13 @@ def route_folder(folder, meta, items, pages_read, batch_todos, ledger, paths, to
     for item in items:
         text = one_line(item["text"])
         if "todo_id" in item:
-            key = ("todo", item["todo_id"])
+            mark = ("todo", item["todo_id"])
             known = item["todo_id"] in ledger["todos"]
         else:
-            key = ("page", item["page_id"], norm(text))
-            known = norm(text) in [norm(line) for line in ledger["pages"].get(item["page_id"], [])]
-        if not known and key not in seen:
-            seen.add(key)
+            mark = ("page", item["page_id"], key(text))
+            known = key(text) in [key(line) for line in ledger["pages"].get(item["page_id"], [])]
+        if not known and mark not in seen:
+            seen.add(mark)
             kept.append(dict(item, text=text))
     focus_items = [i for i in kept if i["bucket"] == "work" and i["kind"] != "idea"] if paths["focus"] else []
     if focus_items and not os.path.isfile(paths["focus"]):
@@ -399,7 +445,8 @@ def route_folder(folder, meta, items, pages_read, batch_todos, ledger, paths, to
         if pool_items:
             # shortcut: a fomo append to captures.md in the same instant as this replace can be
             # lost; switch to append plus truncate-on-failure if that ever bites.
-            tag = " (tablet: %s %s)" % (section_name(meta.get("appType", "")), meta.get("fileName", ""))
+            tag = " (tablet: %s %s)" % (one_line(section_name(meta.get("appType", "")))[:80],
+                                        one_line(str(meta.get("fileName", "")))[:80])
             stamp = int(time.time())
             changes.append(("pool", lambda old: old + ("" if old.endswith("\n") or not old else "\n") + "".join(
                 "%d fomo: [work] %s%s\n" % (stamp, i["text"], tag) for i in pool_items)))
@@ -420,7 +467,8 @@ def route_folder(folder, meta, items, pages_read, batch_todos, ledger, paths, to
         for path, old, mode, new in prepared:
             replace_file(path, new, mode)
             done.append((path, old, mode))
-    except Exception:
+    except Exception as exc:
+        warn("%s: write failed (%s: %s)" % (os.path.basename(folder), type(exc).__name__, exc))
         for path, old, mode in reversed(done):
             try:
                 if old is None:
@@ -435,7 +483,6 @@ def route_folder(folder, meta, items, pages_read, batch_todos, ledger, paths, to
         shutil.rmtree(folder)
     except OSError as exc:  # every item is ledgered: the next route files nothing and deletes it
         warn("could not delete %s (%s); the next sweep retires it" % (os.path.basename(folder), exc))
-        lapse(folder)
     emit({"folder": folder, "status": "routed",
           "work": [i["text"] for i in kept if i["bucket"] == "work" and i["kind"] != "idea"],
           "personal": [i["text"] for i in kept if i["bucket"] == "personal"],
@@ -479,6 +526,9 @@ def main(argv=None):
     except Unusable as exc:
         warn(exc)
         return 4
+    except OSError as exc:  # a file or directory error: one line, not a traceback
+        warn(exc)
+        return 1
 
 
 if __name__ == "__main__":

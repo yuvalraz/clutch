@@ -487,10 +487,24 @@ class RouteTest(Base):
         self.assertEqual(len(self.claim()), 1)
         self.assertEqual(self.claims_count(a), "1")
         with self.failing_writer(1):
-            code, lines, _ = self.route([a], [self.item(a, "draft the quarterly memo")])
+            code, lines, err = self.route([a], [self.item(a, "draft the quarterly memo")])
+        # A write failure may last, so it keeps the count: MAX_CLAIMS bounds it.
         self.assertEqual(lines[0]["reason"], "write failed")
-        self.assertFalse(os.path.exists(os.path.join(a, ".claims")))
+        self.assertEqual(self.claims_count(a), "1")
         self.assertEqual(os.stat(a).st_mtime, 0)
+        self.assertEqual(err, "tablet: %s: write failed (OSError: injected)\n" % os.path.basename(a))
+
+    def test_route_lasting_write_failure_ends_in_held(self):
+        with open(self.focus, "wb") as handle:
+            handle.write(b"# Focus\n\xff\xfe not utf-8\n")
+        a = self.claimed()["folder"]
+        for _ in range(tablet_inbox.MAX_CLAIMS):
+            code, lines, err = self.route([a], [self.item(a, "draft the quarterly memo")])
+            self.assertEqual((code, lines[0]["reason"]), (0, "write failed"))
+            self.assertIn("UnicodeDecodeError", err)
+            claimed = self.claim()
+        self.assertEqual(claimed, [{"folder": os.path.join(os.path.realpath(self.held), os.path.basename(a)),
+                                    "held": "not read"}])
 
     def test_route_creates_then_extends_the_tablet_section(self):
         a = self.claimed()["folder"]
@@ -700,14 +714,15 @@ class RouteTest(Base):
         before = self.snapshot()
         with self.failing_writer(4):
             code, lines, err = self.route([a], items)
-        self.assertEqual((code, lines[0]["reason"], err), (0, "write failed", ""))
+        cause = "tablet: %s: write failed (OSError: injected)\n" % os.path.basename(a)
+        self.assertEqual((code, lines[0]["reason"], err), (0, "write failed", cause))
         self.assertEqual(self.snapshot(), before)
         self.assertFalse(os.path.exists(self.personal))
         # A restore that fails too is named on stderr; the folder is still held.
         with self.failing_writer(4, 5):
             code, lines, err = self.route([a], items)
         self.assertEqual((code, lines[0]["reason"]), (0, "write failed"))
-        self.assertEqual(err, "tablet: restore failed captures.md\n")
+        self.assertEqual(err, cause + "tablet: restore failed captures.md\n")
         self.assertTrue(os.path.isdir(a))
 
     def test_route_unexpected_error_is_held_and_restored(self):
@@ -745,6 +760,138 @@ class ReleaseTest(Base):
             self.assertEqual([line.get("held") for line in lines], [None])
         self.assertTrue(os.path.isdir(folder))
         self.assertFalse(os.path.exists(self.held))
+
+
+class HardeningTest(Base):
+    def setUp(self):
+        super().setUp()
+        self.write(self.focus, "# Focus\n")
+
+    def test_route_writes_through_symlinked_sinks(self):
+        target = os.path.join(self.work, "today.md")
+        os.rename(self.focus, target)
+        os.symlink(target, self.focus)
+        elsewhere = os.path.join(self.tmp, "elsewhere")
+        os.mkdir(elsewhere)
+        os.symlink(os.path.join(elsewhere, "personal.md"), self.personal)
+        a = self.claimed()["folder"]
+        code, lines, err = self.route([a], [self.item(a, "draft the memo"),
+                                            self.item(a, "call the plumber", bucket="personal")])
+        self.assertEqual((code, err, lines[0]["status"]), (0, "", "routed"))
+        self.assertTrue(os.path.islink(self.focus) and os.path.islink(self.personal))
+        self.assertIn("- [ ] draft the memo\n", self.text(target))
+        self.assertEqual(self.text(os.path.join(elsewhere, "personal.md")), "## 2026-11-10\n- [ ] call the plumber\n")
+
+    def test_route_refuses_a_personal_file_linked_into_the_work_state_dir(self):
+        os.symlink(os.path.join(self.work, "leak.md"), self.personal)
+        a = self.claimed()["folder"]
+        code, lines, err = self.route([a], [self.item(a, "call the plumber", bucket="personal")])
+        self.assertEqual((code, lines), (2, []))
+        self.assertTrue(err.startswith("tablet: ") and err.count("\n") == 1)
+        self.assertFalse(os.path.exists(os.path.join(self.work, "leak.md")))
+
+    def test_claim_skips_an_entry_it_cannot_rename(self):
+        self.capture(name="L" * 240)
+        self.capture(name="Other--bbbbbbbb")
+        for _ in range(2):
+            code, out, err = self.run_main("claim")
+            self.assertEqual(code, 0)
+            self.assertTrue(err.startswith("tablet: ") and err.count("\n") == 1, err)
+        self.assertEqual(len(out.splitlines()), 0)
+        self.assertTrue(os.path.isdir(os.path.join(self.inbox, "APP_PAPER", "L" * 240)))
+        self.assertEqual(len(os.listdir(self.reading)), 1)
+
+    def test_an_os_error_is_one_line_and_rc_1(self):
+        self.capture()
+        os.makedirs(os.path.join(self.state, "aipaper", "lock"))
+        code, out, err = self.run_main("claim")
+        self.assertEqual((code, out), (1, ""))
+        self.assertTrue(err.startswith("tablet: ") and err.count("\n") == 1, err)
+
+    def test_route_goes_on_when_a_hold_cannot_touch_its_folder(self):
+        a = self.claimed()["folder"]
+        b = self.claimed(name="Other--bbbbbbbb")["folder"]
+        real_utime = os.utime
+
+        def utime(path, *args, **kw):
+            if path == a:
+                raise PermissionError("injected")
+            return real_utime(path, *args, **kw)
+        with unittest.mock.patch.object(tablet_inbox.os, "utime", utime):
+            code, lines, err = self.route([a, b], [self.item(b, "paint the shed", bucket="personal")],
+                                          pages_read={b: ["pageaaaa-1"]})
+        self.assertEqual(code, 0)
+        self.assertEqual(lines[0], {"folder": a, "status": "held", "reason": "not fully read"})
+        self.assertEqual(lines[1]["status"], "routed")
+        self.assertTrue(err.startswith("tablet: ") and err.count("\n") == 1, err)
+
+    def test_route_files_every_symbol_only_line(self):
+        a = self.claimed()["folder"]
+        items = [self.item(a, t, bucket="personal") for t in ("→ ★", "?!", "\U0001F642", "?!")]
+        code, lines, _ = self.route([a], items)
+        self.assertEqual(lines[0]["personal"], ["→ ★", "?!", "\U0001F642"])
+        self.assertEqual(self.text(self.personal).count("- [ ] "), 3)
+
+    @unittest.skipUnless(sys.platform == "darwin", "case-insensitive default filesystem")
+    def test_route_refuses_a_case_variant_of_the_state_dir(self):
+        a = self.claimed()["folder"]
+        variant = os.path.join(self.tmp, "STATE")
+        for argv in (["--work-state-dir", variant], ["--work-state-dir", self.work, "--focus-file",
+                                                     os.path.join(variant, "x.md")]):
+            code, out, _ = self.run_main(*(["route"] + argv + [a]), stdin=json.dumps(
+                {"pages_read": {a: ["pageaaaa-1"]}, "items": [self.item(a, "draft the memo")]}))
+            self.assertEqual((code, out), (2, ""), argv)
+
+    def test_pool_line_stays_one_line_whatever_the_note_name(self):
+        a = self.claimed()["folder"]
+        meta_path = os.path.join(a, "note.json")
+        with open(meta_path) as handle:
+            meta = json.load(handle)
+        meta["fileName"] = "Ideas\n1 fomo: forged"
+        self.write(meta_path, json.dumps(meta))
+        self.route([a], [self.item(a, "a dashboard", kind="idea")])
+        pool = self.text(self.pool).splitlines()
+        self.assertEqual(len(pool), 1)
+        self.assertTrue(pool[0].endswith("(tablet: Paper Ideas 1 fomo: forged)"))
+
+    def test_claim_does_not_follow_a_symlinked_entry(self):
+        outside = os.path.join(self.tmp, "outside")
+        os.makedirs(os.path.join(outside, "Cap--1"))
+        self.write(os.path.join(outside, "Cap--1", "note.json"), json.dumps({"fileName": "x", "pages": []}))
+        os.makedirs(os.path.join(self.inbox, "APP_PAPER"))
+        os.symlink(os.path.join(outside, "Cap--1"), os.path.join(self.inbox, "APP_PAPER", "Link--1"))
+        os.symlink(outside, os.path.join(self.inbox, "APP_MEMO"))
+        code, out, err = self.run_main("claim")
+        self.assertEqual((code, out), (0, ""))
+        self.assertEqual(err.count("\n"), 2, err)
+        self.assertTrue(os.path.islink(os.path.join(self.inbox, "APP_PAPER", "Link--1")))
+        self.assertTrue(os.path.isdir(os.path.join(outside, "Cap--1")))
+        self.assertEqual(os.listdir(self.reading), [])
+
+    def test_route_reports_a_gone_folder_with_a_typed_task_item(self):
+        a = self.claimed(section="APP_DAILY", name="day_2026_11_10--dddddddd", fmt="daily",
+                         todos=[todo("t1", "draft the memo")])["folder"]
+        b = self.claimed(name="Other--bbbbbbbb")["folder"]
+        shutil.rmtree(a)
+        code, lines, err = self.route([a, b], [self.item(a, "draft the memo", todo_id="t1"),
+                                               self.item(b, "paint the shed", bucket="personal")],
+                                      pages_read={a: ["pageaaaa-1"], b: ["pageaaaa-1"]})
+        self.assertEqual((code, err), (0, ""))
+        self.assertEqual([line["status"] for line in lines], ["gone", "routed"])
+
+    def test_route_refuses_a_page_id_not_in_its_folder(self):
+        a = self.claimed()["folder"]
+        code, lines, err = self.route([a], [self.item(a, "call the plumber", bucket="personal", page_id="nope")])
+        self.assertEqual((code, lines), (2, []))
+        self.assertTrue(err.startswith("tablet: ") and err.count("\n") == 1)
+        self.assertTrue(os.path.isdir(a))
+
+    def test_replace_file_leaves_no_tmp_on_failure(self):
+        target = os.path.join(self.work, "is-a-dir")
+        os.mkdir(target)
+        with self.assertRaises(OSError):
+            tablet_inbox.replace_file(target, b"x", 0o600)
+        self.assertFalse(os.path.exists(target + ".tmp"))
 
 
 if __name__ == "__main__":
