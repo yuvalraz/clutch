@@ -302,7 +302,7 @@ case $OJ in *'Leave out a folder'*|*'Pass a folder only when'*)
 # Release after a failed route un-counts the claim, so a refusal would loop forever.
 case $OJ in *'and run release'*|*'run release, and the sweep'*|*'Run release only when'*|*'note name).'*)
   echo "FAIL: ops -- a replaced release or date rule is back"; fail=1 ;; esac
-fpin "$R" "README: tablet inbox"        'When the tablet inbox has new pages, the sweep files each line once: work under `## From the tablet` in today'"'"'s focus file and work ideas in the fomo pool, personal and unsure ones in `~/.clutch/personal.md`, and it names what arrived without counting it.'
+fpin "$R" "README: tablet inbox"        'When the tablet inbox has new pages or typed tasks, the sweep files each line once: work under `## From the tablet` in today'"'"'s focus file and work ideas in the fomo pool, personal and unsure ones in `~/.clutch/personal.md`, and it names what arrived without counting it.'
 fpin "$R" "README safe: ops reads"      'Ops also reads the tablet inbox under `~/.clutch/inbox/`, and `~/.clutch/people.md` when it exists, to sort what arrived.'
 fpin "$R" "README safe: ops writes"     '`/clutch:ops` files them: work lines into today'"'"'s focus file (or, with no focus file set, `~/.clutch/personal.md`)'
 fpin "$R" "README safe: helper imports" 'its test suite parses its imports and fails on any network module'
