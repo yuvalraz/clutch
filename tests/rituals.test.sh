@@ -89,8 +89,13 @@ fpin "$R" "ops: blocked step shape"    'waits on: <who>'
 fpin "$R" "ops: brief from the path"   'The first ops sweep of a day opens with a brief built from it.'
 fpin "$E" "eod: carry critical path"   'Carry the `## Critical path` section into tomorrow'"'"'s focus file as it is; it is yours, never rewritten here.'
 fpin "$M" "morning: copy critical path" 'When you create the focus file, copy the `## Critical path` section from the most recent earlier focus file into it as it is, when one has it.'
-fpin "$M" "morning: fold tablet lines"  'When you create the focus file and `<state dir>/tablet.md` has lines, move its item lines under `## From the tablet` at the end of the new file, then empty `tablet.md` only after the focus file write succeeded; never delete it.'
-fpin "$M" "morning: past lines dated"   'A moved line from a block dated before today that carries no date tag gains `(from Ddd MM-DD)` with its block'"'"'s date.'
+fpin "$M" "morning: fold when focus exists" 'Whenever today'"'"'s focus file exists, created now or earlier, and a state dir is set, move what waits in `<state dir>/tablet.md` into it:'
+fpin "$M" "morning: fold command"       'sh "${CLAUDE_PLUGIN_ROOT}/scripts/tablet-inbox.sh" fold --work-state-dir '"'"'<state dir>'"'"' --focus-file '"'"'<today'
+fpin "$M" "morning: fold paths"         'Fill both paths with absolute paths, never a `~` form; inside the single quotes, escape '"'"' as '"'"'\'"'"''"'"'.'
+fpin "$M" "morning: fold error line"    'A non-zero exit gets one line naming `<state dir>/tablet.md`; never edit `tablet.md` by hand.'
+MJ=$(tr -s '[:space:]' ' ' < "$M")
+case $MJ in *'then empty `tablet.md`'*|*'When you create the focus file and `<state dir>/tablet.md`'*)
+  echo "FAIL: morning -- the model still empties tablet.md by hand"; fail=1 ;; esac
 
 # --- morning + eod: handoff and shared error contracts
 for f in "$M" "$E"; do

@@ -5,6 +5,8 @@ claim   renames each capture in <state>/inbox/aipaper into <state>/aipaper/readi
 route   files the items read from claimed folders (JSON on stdin) in their sinks,
         records them in the ledger and deletes each folder once filed.
 release lapses the lease of every claimed folder, for a sweep that stopped.
+fold    moves the work lines waiting in <work state dir>/tablet.md into today's focus
+        file once it exists.
 
 Called only through scripts/tablet-inbox.sh. Standard library only; runs on
 /usr/bin/python3 (3.9). Exit codes: 0 done (per-folder held and gone included);
@@ -340,14 +342,9 @@ def real(path):
     return os.path.realpath(os.path.expanduser(path))
 
 
-def route(state, args):
-    if not args.folders:
-        raise Refused("route needs at least one folder")
-    if args.focus_file and not args.work_state_dir:
-        raise Refused("--focus-file needs --work-state-dir")
-    if args.today and not valid_date(args.today):
-        raise Refused("--today must be YYYY-MM-DD")
-    today = args.today or datetime.date.today().isoformat()
+def sink_paths(state, args):
+    """Every path route and fold may write, resolved once: checks, reads, writes and restores
+    all act on the link target, never the link. Refused when two of them overlap."""
     state_real = os.path.realpath(state)
     work = real(args.work_state_dir) if args.work_state_dir else None
     if work and overlaps(state_real, work):
@@ -355,16 +352,37 @@ def route(state, args):
     focus = real(args.focus_file) if args.focus_file else None
     if focus and overlaps(state_real, focus):
         raise Refused("the focus file sits inside the tablet state dir")
-    # Resolved once: checks, reads, writes and restores all act on the link target, never the link.
     paths = {"focus": focus, "personal": real(os.path.join(state, "personal.md")),
              "pool": real(os.path.join(state, "captures.md")),
              "ledger": real(os.path.join(state, "aipaper", "ledger.json")),
-             "work": work, "waiting": real(os.path.join(work, "tablet.md")) if work else None}
+             "work": work, "waiting": real(os.path.join(work, "tablet.md")) if work else None,
+             "reading": os.path.realpath(os.path.join(state, "aipaper", "reading"))}
     if work and any(overlaps(work, paths[name]) for name in ("personal", "pool", "ledger")):
         raise Refused("a tablet state file links into the work state dir")
     if work and overlaps(state_real, paths["waiting"]):
         raise Refused("the waiting file links into the tablet state dir")
-    reading = os.path.realpath(os.path.join(state, "aipaper", "reading"))
+    names = [n for n in ("focus", "waiting", "personal", "pool", "ledger", "reading") if paths[n]]
+    for i, a in enumerate(names):
+        for b in names[i + 1:]:
+            if overlaps(paths[a], paths[b]):
+                raise Refused("the %s and %s paths resolve to one place" % (a, b))
+    return paths
+
+
+def check_today(args):
+    if args.today and not valid_date(args.today):
+        raise Refused("--today must be YYYY-MM-DD")
+    return args.today or datetime.date.today().isoformat()
+
+
+def route(state, args):
+    if not args.folders:
+        raise Refused("route needs at least one folder")
+    if args.focus_file and not args.work_state_dir:
+        raise Refused("--focus-file needs --work-state-dir")
+    today = check_today(args)
+    paths = sink_paths(state, args)
+    reading = paths["reading"]
     for folder in args.folders:
         if os.path.dirname(os.path.realpath(folder)) != reading:
             raise Refused("a folder argument is outside aipaper/reading")
@@ -505,6 +523,61 @@ def route_folder(folder, meta, items, pages_read, batch_todos, ledger, paths, to
     return new_ledger
 
 
+def fold(state, args):
+    """Move the item lines of the waiting file's date blocks under the tablet section of today's
+    focus file, then drop exactly those lines and the date headings they leave empty."""
+    if not args.work_state_dir or not args.focus_file:
+        raise Refused("fold needs --work-state-dir and --focus-file")
+    today = check_today(args)
+    paths = sink_paths(state, args)
+    focus, waiting = paths["focus"], paths["waiting"]
+    if not (os.path.isdir(paths["work"]) and os.path.isfile(focus) and os.path.isfile(waiting)):
+        return 0
+    with lock(state):
+        files = {}
+        for path in (focus, waiting):
+            try:
+                with open(path, "rb") as handle:
+                    files[path] = (handle.read(), os.stat(path).st_mode & 0o777)
+            except FileNotFoundError:
+                return 0
+        sections, date, moved, texts = [[]], None, [], []
+        for row in files[waiting][0].decode("utf-8").split("\n"):
+            if row.startswith("## "):
+                sections.append([])
+                date = row[3:].strip() if valid_date(row[3:].strip()) else None
+            if date and row.startswith("- "):
+                texts.append(re.sub(r"^- (\[ \] )?", "", row))
+                if date < today and "(from " not in row and "(for " not in row:
+                    row += " (from %s)" % datetime.date.fromisoformat(date).strftime("%a %m-%d")
+                moved.append(row)
+            else:
+                sections[-1].append(row)
+        if not moved:
+            return 0
+        kept = [s for s in sections if not (s and s[0].startswith("## ") and valid_date(s[0][3:].strip())
+                                            and not "".join(s[1:]).strip())]
+        rows = [row for s in kept for row in s]
+        while rows and not rows[-1].strip():
+            rows.pop()
+        new_waiting = "\n".join(rows) + "\n" if rows else ""
+        new_focus = insert_in_section(files[focus][0].decode("utf-8"), TABLET_HEADING, moved)
+        done = []
+        try:
+            for path, new in ((focus, new_focus), (waiting, new_waiting)):
+                replace_file(path, new.encode("utf-8"), files[path][1])
+                done.append(path)
+        except Exception as exc:
+            for path in reversed(done):
+                try:
+                    replace_file(path, files[path][0], files[path][1])
+                except Exception:
+                    warn("restore failed %s" % os.path.basename(path))
+            raise OSError("fold write failed (%s: %s)" % (type(exc).__name__, exc))
+    emit({"folded": texts})
+    return 0
+
+
 def main(argv=None):
     parser = Parser(prog="tablet-inbox.sh", description=__doc__.splitlines()[0])
     parser.add_argument("--state-dir", help="replaces $HOME/.clutch; must already exist")
@@ -516,10 +589,14 @@ def main(argv=None):
     routing.add_argument("--focus-file")
     routing.add_argument("--today")
     routing.add_argument("folders", nargs="*")
+    folding = verbs.add_parser("fold")
+    folding.add_argument("--work-state-dir")
+    folding.add_argument("--focus-file")
+    folding.add_argument("--today")
     try:
         args = parser.parse_args(argv)
         if args.verb is None:
-            raise Refused("claim, route or release")
+            raise Refused("claim, route, release or fold")
         state = args.state_dir or os.path.join(os.path.expanduser("~"), ".clutch")
         if not os.path.isdir(state):  # never created here: its existence switches clutch's brain mode on
             if args.state_dir is None and args.verb != "route":
@@ -530,6 +607,8 @@ def main(argv=None):
             return claim(state)
         if args.verb == "release":
             return release(state)
+        if args.verb == "fold":
+            return fold(state, args)
         return route(state, args)
     except Refused as exc:
         warn(exc)

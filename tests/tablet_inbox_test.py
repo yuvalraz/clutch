@@ -852,6 +852,131 @@ class WaitingTest(Base):
             self.assertTrue(os.path.isdir(a))
             self.assertEqual(self.claims_count(a), "1")
 
+    def test_route_refuses_any_two_sinks_that_resolve_to_one_path(self):
+        a = self.claimed()["folder"]
+        items = [self.item(a, "draft the memo"), self.item(a, "call the plumber", bucket="personal")]
+        shared = os.path.join(self.tmp, "shared.md")
+        for links in ((self.personal, self.waiting), (self.pool, self.waiting)):
+            for link in links:
+                os.symlink(shared, link)
+            code, lines, err = self.route([a], items)
+            self.assertEqual((code, lines), (2, []), links)
+            self.assertTrue(err.startswith("tablet: ") and err.count("\n") == 1, err)
+            self.assertFalse(os.path.exists(shared) or os.path.exists(self.ledger_path))
+            self.assertTrue(os.path.isdir(a))
+            for link in links:
+                os.remove(link)
+
+    def test_route_refuses_a_dangling_waiting_link_to_the_focus_file(self):
+        os.symlink(self.focus, self.waiting)
+        a = self.claimed()["folder"]
+        code, lines, err = self.route([a], [self.item(a, "draft the memo")])
+        self.assertEqual((code, lines), (2, []))
+        self.assertTrue(err.startswith("tablet: ") and err.count("\n") == 1, err)
+        self.assertFalse(os.path.exists(self.focus) or os.path.exists(self.ledger_path))
+        self.assertTrue(os.path.isdir(a))
+
+    def test_route_refuses_a_personal_file_linked_to_the_focus_file(self):
+        focus = os.path.join(self.tmp, "focus-elsewhere.md")  # outside the work state dir
+        self.write(focus, "# Focus\n")
+        os.symlink(focus, self.personal)
+        a = self.claimed()["folder"]
+        code, lines, _ = self.route([a], [self.item(a, "call the plumber", bucket="personal")],
+                                    focus=False, extra=["--focus-file", focus])
+        self.assertEqual((code, lines), (2, []))
+        self.assertEqual(self.text(focus), "# Focus\n")
+
+
+class FoldTest(Base):
+    """fold moves the waiting file's lines into today's focus file once it exists."""
+
+    def setUp(self):
+        super().setUp()
+        self.waiting = os.path.join(self.work, "tablet.md")
+
+    def fold(self, *extra):
+        code, out, err = self.run_main("fold", "--work-state-dir", self.work, "--focus-file", self.focus,
+                                       "--today", TODAY, *extra)
+        return code, [json.loads(line) for line in out.splitlines()], err
+
+    def test_fold_moves_item_lines_and_keeps_other_content(self):
+        self.write(self.focus, "# Focus\n\n## From the tablet\n- [ ] earlier\n\n## Notes\n- n\n")
+        self.write(self.waiting, "stray text\n\n## 2026-11-09\n- [ ] file the expenses\n"
+                   "- [ ] draft the memo (for Thu 11-12)\n\n## Other\n- keep me\n\n"
+                   "## 2026-11-10\n- budget is due friday\n")
+        code, lines, err = self.fold()
+        self.assertEqual((code, err), (0, ""))
+        self.assertEqual(lines, [{"folded": ["file the expenses", "draft the memo (for Thu 11-12)",
+                                             "budget is due friday"]}])
+        self.assertEqual(self.text(self.focus), "# Focus\n\n## From the tablet\n- [ ] earlier\n"
+                         "- [ ] file the expenses (from Mon 11-09)\n- [ ] draft the memo (for Thu 11-12)\n"
+                         "- budget is due friday\n\n## Notes\n- n\n")
+        self.assertEqual(self.text(self.waiting), "stray text\n\n## Other\n- keep me\n")
+        before = (self.read(self.focus), self.read(self.waiting))
+        self.assertEqual(self.fold(), (0, [], ""))  # idempotent: nothing left to move
+        self.assertEqual((self.read(self.focus), self.read(self.waiting)), before)
+
+    def test_fold_empties_the_waiting_file_but_keeps_it(self):
+        self.write(self.focus, "# Focus\n")
+        self.write(self.waiting, "## 2026-11-10\n- [ ] draft the memo\n")
+        os.chmod(self.waiting, 0o640)
+        code, lines, err = self.fold()
+        self.assertEqual((code, err, lines), (0, "", [{"folded": ["draft the memo"]}]))
+        self.assertEqual(self.text(self.focus), "# Focus\n\n## From the tablet\n- [ ] draft the memo\n")
+        self.assertEqual(self.text(self.waiting), "")
+        self.assertEqual(stat.S_IMODE(os.stat(self.waiting).st_mode), 0o640)
+
+    def test_fold_is_a_silent_no_op_without_its_files(self):
+        self.write(self.waiting, "## 2026-11-10\n- [ ] draft the memo\n")
+        self.assertEqual(self.fold(), (0, [], ""))  # focus file missing
+        self.assertFalse(os.path.exists(self.focus))
+        self.assertEqual(self.text(self.waiting), "## 2026-11-10\n- [ ] draft the memo\n")
+        os.remove(self.waiting)
+        self.write(self.focus, "# Focus\n")
+        self.assertEqual(self.fold(), (0, [], ""))  # no waiting file
+        self.assertFalse(os.path.exists(self.waiting))
+        self.write(self.waiting, "stray text\n## 2026-11-10\n")
+        self.assertEqual(self.fold(), (0, [], ""))  # no item lines
+        self.assertEqual(self.text(self.focus), "# Focus\n")
+        code, out, err = self.run_main("fold", "--work-state-dir", os.path.join(self.tmp, "gone"),
+                                       "--focus-file", self.focus)
+        self.assertEqual((code, out, err), (0, "", ""))
+        self.assertFalse(os.path.exists(os.path.join(self.tmp, "gone")))
+
+    def test_fold_write_failure_restores_both_files(self):
+        focus, waiting = "# Focus\n", "## 2026-11-10\n- [ ] draft the memo\n"
+        for fail_on in (1, 2):
+            self.write(self.focus, focus)
+            self.write(self.waiting, waiting)
+            with self.failing_writer(fail_on):
+                code, lines, err = self.fold()
+            self.assertEqual((code, lines), (1, []), fail_on)
+            self.assertTrue(err.startswith("tablet: ") and err.count("\n") == 1, err)
+            self.assertEqual((self.text(self.focus), self.text(self.waiting)), (focus, waiting))
+
+    def test_fold_refuses_overlapping_sinks_and_waits_for_the_lock(self):
+        self.write(self.focus, "# Focus\n")
+        os.symlink(self.personal, self.waiting)
+        self.write(self.personal, "## 2026-11-10\n- [ ] call the plumber\n")
+        code, lines, err = self.fold()
+        self.assertEqual((code, lines), (2, []))
+        self.assertTrue(err.startswith("tablet: ") and err.count("\n") == 1, err)
+        self.assertEqual(self.text(self.focus), "# Focus\n")
+        os.remove(self.waiting)
+        self.write(self.waiting, "## 2026-11-10\n- [ ] draft the memo\n")
+        os.makedirs(os.path.join(self.state, "aipaper"))
+        with open(os.path.join(self.state, "aipaper", "lock"), "w") as held:
+            fcntl.flock(held, fcntl.LOCK_EX)
+            code, lines, err = self.fold()
+        self.assertEqual((code, lines), (3, []))
+        self.assertEqual(self.text(self.focus), "# Focus\n")
+
+    def test_fold_refuses_bad_usage(self):
+        for argv in (["fold", "--focus-file", self.focus], ["fold", "--work-state-dir", self.work],
+                     ["fold", "--work-state-dir", self.work, "--focus-file", self.focus, "--today", "x"]):
+            code, out, err = self.run_main(*argv)
+            self.assertEqual((code, out), (2, ""), argv)
+
 
 class ReleaseTest(Base):
     def test_release_lapses_every_lease(self):

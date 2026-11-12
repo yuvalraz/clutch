@@ -284,7 +284,7 @@ names, which can sit outside both `.clutch/` and `~/.clutch`.
 When a key they
 need is unset, morning, eod, ops and review ask for it, and most of the time
 offer to save a missing key into `~/.clutch/rituals.md`, on a yes.
-When the tablet inbox has new pages or typed tasks, `/clutch:ops` files them: work lines into today's focus file (or, with no focus file set, `~/.clutch/personal.md`), work ideas into `~/.clutch/captures.md`, the rest into `~/.clutch/personal.md`, which it creates; it keeps a ledger of what it filed under `~/.clutch` and deletes each capture once filed.
+When the tablet inbox has new pages or typed tasks, `/clutch:ops` files them: work lines into today's focus file (or, with no focus file set, `~/.clutch/personal.md`), work ideas into `~/.clutch/captures.md`, the rest into `~/.clutch/personal.md`, which it creates; it keeps a ledger of what it filed under `~/.clutch` and deletes each capture once filed; before today's focus file exists, work lines wait in `<state dir>/tablet.md` and move into that file once it does.
 
 Some commands reach out, and only when you invoke them. `/clutch:fomo` fetches
 a banked link, and a spark, daydream, dream-spark, or ideate pass may run a web
