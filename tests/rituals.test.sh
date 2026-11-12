@@ -89,6 +89,8 @@ fpin "$R" "ops: blocked step shape"    'waits on: <who>'
 fpin "$R" "ops: brief from the path"   'The first ops sweep of a day opens with a brief built from it.'
 fpin "$E" "eod: carry critical path"   'Carry the `## Critical path` section into tomorrow'"'"'s focus file as it is; it is yours, never rewritten here.'
 fpin "$M" "morning: copy critical path" 'When you create the focus file, copy the `## Critical path` section from the most recent earlier focus file into it as it is, when one has it.'
+fpin "$M" "morning: fold tablet lines"  'When you create the focus file and `<state dir>/tablet.md` has lines, move its item lines under `## From the tablet` at the end of the new file, then empty `tablet.md` only after the focus file write succeeded; never delete it.'
+fpin "$M" "morning: past lines dated"   'A moved line from a block dated before today that carries no date tag gains `(from Ddd MM-DD)` with its block'"'"'s date.'
 
 # --- morning + eod: handoff and shared error contracts
 for f in "$M" "$E"; do

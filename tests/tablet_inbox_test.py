@@ -164,6 +164,9 @@ class PureTest(unittest.TestCase):
         self.assertEqual(line({"text": "a", "kind": "idea", "bucket": "unsure"}, TODAY, "personal"), "- idea: a (unsure)")
         self.assertEqual(line({"text": "a", "kind": "task", "bucket": "personal", "date": "2026-11-12"},
                               TODAY, "personal"), "- [ ] a (for Thu 11-12)")
+        self.assertEqual(line({"text": "a", "kind": "task", "bucket": "work", "date": "2026-11-09"},
+                              TODAY, "focus"), "- [ ] a (from Mon 11-09)")
+        self.assertEqual(line({"text": "a", "kind": "note", "bucket": "work", "date": TODAY}, TODAY, "focus"), "- a")
 
     def test_insert_in_section(self):
         ins = tablet_inbox.insert_in_section
@@ -366,7 +369,8 @@ class RouteTest(Base):
         self.assertEqual(lines, [{"folder": folder, "status": "routed",
                                   "work": ["draft the quarterly memo", "budget is due friday", "ping the vendor"],
                                   "personal": ["call the plumber", "paint the shed"],
-                                  "unsure": ["read that book"], "ideas": ["a dashboard for queues"]}])
+                                  "unsure": ["read that book"], "ideas": ["a dashboard for queues"],
+                                  "waiting": []}])
         self.assertEqual(self.text(self.focus), "# Focus\n\n## Critical path\n- ship it\n\n## From the tablet\n"
                          "- [ ] draft the quarterly memo\n- budget is due friday\n- [ ] ping the vendor\n")
         self.assertEqual(self.text(self.personal), "## 2026-11-10\n- [ ] call the plumber\n"
@@ -469,7 +473,7 @@ class RouteTest(Base):
         self.assertEqual([t["todo_id"] for t in self.claim()[0]["todos"]], ["t1"])
 
     def test_route_holds_folder_when_focus_file_missing(self):
-        os.remove(self.focus)
+        shutil.rmtree(self.work)  # no work state dir: no waiting file either
         a = self.claimed()["folder"]
         b = self.claimed(name="Other--bbbbbbbb")["folder"]
         items = [self.item(a, "draft the quarterly memo"), self.item(a, "call the plumber", bucket="personal"),
@@ -478,18 +482,19 @@ class RouteTest(Base):
         self.assertEqual(code, 0)
         self.assertEqual(lines[0], {"folder": a, "status": "held", "reason": "focus file missing"})
         self.assertEqual(lines[1]["status"], "routed")
-        self.assertFalse(os.path.exists(self.focus))
+        self.assertFalse(os.path.exists(self.work))
         self.assertNotIn("plumber", self.text(self.personal))
         self.assertNotIn("draft the quarterly memo", json.dumps(self.ledger()))
         self.assertEqual(os.stat(a).st_mtime, 0)
 
     def test_route_resets_the_claim_count_when_held_for_its_own_reasons(self):
-        os.remove(self.focus)
+        shutil.rmtree(self.work)
         a = self.claimed()["folder"]
         code, lines, _ = self.route([a], [self.item(a, "draft the quarterly memo")])
         self.assertEqual(lines[0]["reason"], "focus file missing")
         self.assertFalse(os.path.exists(os.path.join(a, ".claims")))
         self.assertEqual(os.stat(a).st_mtime, 0)
+        os.mkdir(self.work)
         self.write(self.focus, "# Focus\n")
         self.lapse(a)
         self.assertEqual(len(self.claim()), 1)
@@ -576,13 +581,15 @@ class RouteTest(Base):
         after = self.snapshot()
         b = self.claimed()["folder"]
         code, lines, _ = self.route([b], items(b))
-        self.assertEqual(lines[0], {"folder": b, "status": "routed", "work": [], "personal": [], "unsure": [], "ideas": []})
+        self.assertEqual(lines[0], {"folder": b, "status": "routed", "work": [], "personal": [], "unsure": [], "ideas": [],
+                                    "waiting": []})
         self.assertEqual(self.snapshot(), after)
 
     def test_route_retires_a_folder_with_no_items(self):
         a = self.claimed()["folder"]
         code, lines, _ = self.route([a], [])
-        self.assertEqual(lines, [{"folder": a, "status": "routed", "work": [], "personal": [], "unsure": [], "ideas": []}])
+        self.assertEqual(lines, [{"folder": a, "status": "routed", "work": [], "personal": [], "unsure": [], "ideas": [],
+                                  "waiting": []}])
         self.assertFalse(os.path.exists(a))
 
     def test_route_rejects_bad_input_and_writes_nothing(self):
@@ -746,6 +753,104 @@ class RouteTest(Base):
         self.assertEqual(lines[1]["status"], "routed")
         self.assertEqual(self.read(self.focus), before[0])
         self.assertEqual(self.text(self.personal), "## 2026-11-10\n- [ ] paint the shed\n")
+
+
+class WaitingTest(Base):
+    """Today's focus file is set but missing and the work state dir exists: work waits in tablet.md."""
+
+    def setUp(self):
+        super().setUp()
+        self.waiting = os.path.join(self.work, "tablet.md")
+
+    def test_route_files_work_in_the_waiting_file_when_focus_file_missing(self):
+        folder = self.claimed()["folder"]
+        items = [self.item(folder, "draft the quarterly memo"),
+                 self.item(folder, "budget is due friday", kind="note"),
+                 self.item(folder, "ping the vendor", kind="action"),
+                 self.item(folder, "a dashboard for queues", kind="idea"),
+                 self.item(folder, "call the plumber", bucket="personal"),
+                 self.item(folder, "read that book", bucket="unsure")]
+        code, lines, err = self.route([folder], items)
+        self.assertEqual((code, err), (0, ""))
+        self.assertEqual(lines, [{"folder": folder, "status": "routed", "work": [],
+                                  "personal": ["call the plumber"], "unsure": ["read that book"],
+                                  "ideas": ["a dashboard for queues"],
+                                  "waiting": ["draft the quarterly memo", "budget is due friday", "ping the vendor"]}])
+        self.assertEqual(self.text(self.waiting), "## 2026-11-10\n- [ ] draft the quarterly memo\n"
+                         "- budget is due friday\n- [ ] ping the vendor\n")
+        self.assertEqual(stat.S_IMODE(os.stat(self.waiting).st_mode), 0o600)
+        self.assertFalse(os.path.exists(self.focus))
+        self.assertEqual(self.text(self.personal), "## 2026-11-10\n- [ ] call the plumber\n- [ ] read that book (unsure)\n")
+        self.assertRegex(self.text(self.pool), r"^\d+ fomo: \[work\] a dashboard for queues \(tablet: Paper Ideas\)\n$")
+        self.assertFalse(os.path.exists(folder))
+
+    def test_personal_and_unsure_never_reach_the_waiting_file(self):
+        folder = self.claimed()["folder"]
+        items = [self.item(folder, "call the plumber", bucket="personal"),
+                 self.item(folder, "read that book", kind="note", bucket="unsure"),
+                 self.item(folder, "learn the cello", kind="idea", bucket="unsure")]
+        code, lines, _ = self.route([folder], items)
+        self.assertEqual((code, lines[0]["status"], lines[0]["waiting"]), (0, "routed", []))
+        self.assertFalse(os.path.exists(self.waiting))
+        self.assertFalse(os.path.exists(self.focus))
+        b = self.claimed(name="Other--bbbbbbbb")["folder"]
+        self.assertEqual(self.route([b], [])[0], 0)  # a folder with no items changes no file
+        self.assertFalse(os.path.exists(self.waiting))
+
+    def test_waiting_file_takes_a_block_per_day_and_keeps_its_lines(self):
+        self.write(self.waiting, "## 2026-11-09\n- [ ] older\n")
+        a = self.claimed()["folder"]
+        self.route([a], [self.item(a, "draft the memo")])
+        b = self.claimed(name="Other--bbbbbbbb")["folder"]
+        self.route([b], [self.item(b, "ping the vendor", kind="action")])
+        self.assertEqual(self.text(self.waiting), "## 2026-11-09\n- [ ] older\n\n"
+                         "## 2026-11-10\n- [ ] draft the memo\n- [ ] ping the vendor\n")
+
+    def test_date_tags_read_from_for_past_and_for_for_future(self):
+        a = self.claimed()["folder"]
+        self.route([a], [self.item(a, "file the expenses", date="2026-11-09"),
+                         self.item(a, "draft the memo", date="2026-11-12"),
+                         self.item(a, "ping the vendor", date=TODAY),
+                         self.item(a, "call the plumber", bucket="personal", date="2026-11-09")])
+        self.assertEqual(self.text(self.waiting), "## 2026-11-10\n- [ ] file the expenses (from Mon 11-09)\n"
+                         "- [ ] draft the memo (for Thu 11-12)\n- [ ] ping the vendor\n")
+        self.assertIn("- [ ] call the plumber (from Mon 11-09)\n", self.text(self.personal))
+
+    def test_route_refuses_a_waiting_file_linked_into_the_state_dir(self):
+        a = self.claimed()["folder"]
+        for target in (os.path.join(self.state, "leak.md"), self.personal):
+            os.symlink(target, self.waiting)
+            before = self.snapshot()
+            code, lines, err = self.route([a], [self.item(a, "draft the memo")])
+            self.assertEqual((code, lines), (2, []))
+            self.assertTrue(err.startswith("tablet: ") and err.count("\n") == 1, err)
+            self.assertEqual(self.snapshot(), before)
+            self.assertFalse(os.path.exists(target))
+            self.assertTrue(os.path.isdir(a))
+            os.remove(self.waiting)
+
+    def test_route_writes_through_a_symlinked_waiting_file(self):
+        target = os.path.join(self.tmp, "elsewhere.md")
+        os.symlink(target, self.waiting)
+        a = self.claimed()["folder"]
+        code, lines, err = self.route([a], [self.item(a, "draft the memo")])
+        self.assertEqual((code, err, lines[0]["waiting"]), (0, "", ["draft the memo"]))
+        self.assertTrue(os.path.islink(self.waiting))
+        self.assertEqual(self.text(target), "## 2026-11-10\n- [ ] draft the memo\n")
+
+    def test_waiting_file_write_failure_restores_every_sink(self):
+        self.write(self.waiting, "## 2026-11-09\n- [ ] older\n")
+        a = self.claimed()["folder"]
+        items = [self.item(a, "draft the memo"), self.item(a, "call the plumber", bucket="personal")]
+        for fail_on in (1, 3):  # the waiting file itself, then the ledger after it
+            with self.failing_writer(fail_on):
+                code, lines, err = self.route([a], items)
+            self.assertEqual((code, lines), (0, [{"folder": a, "status": "held", "reason": "write failed"}]))
+            self.assertEqual(self.text(self.waiting), "## 2026-11-09\n- [ ] older\n")
+            self.assertFalse(os.path.exists(self.personal) or os.path.exists(self.ledger_path))
+            self.assertFalse(os.path.exists(self.focus))
+            self.assertTrue(os.path.isdir(a))
+            self.assertEqual(self.claims_count(a), "1")
 
 
 class ReleaseTest(Base):

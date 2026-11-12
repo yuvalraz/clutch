@@ -48,6 +48,8 @@ and offer to persist the answer into the config. If the file is missing or empty
 set today's focuses with the user now and write the file — the day does not
 start focusless.
 When you create the focus file, copy the `## Critical path` section from the most recent earlier focus file into it as it is, when one has it.
+When you create the focus file and `<state dir>/tablet.md` has lines, move its item lines under `## From the tablet` at the end of the new file, then empty `tablet.md` only after the focus file write succeeded; never delete it.
+A moved line from a block dated before today that carries no date tag gains `(from Ddd MM-DD)` with its block's date.
 
 ### 4. Deep ping
 

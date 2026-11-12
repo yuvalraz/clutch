@@ -95,14 +95,15 @@ def valid_date(text):
 
 
 def item_line(item, today, filed_in):
-    """The line an item takes in the focus file or the personal file."""
+    """The line an item takes in the focus file, the waiting file or the personal file."""
     prefix = {"task": "- [ ] ", "action": "- [ ] ", "note": "- ", "idea": "- idea: "}[item["kind"]]
     line = prefix + one_line(item["text"])
     if filed_in == "personal" and item["bucket"] in ("unsure", "work"):
         line += " (%s)" % item["bucket"]
     date = item.get("date")
     if date and date != today:
-        line += " (for %s)" % datetime.date.fromisoformat(date).strftime("%a %m-%d")
+        line += " (%s %s)" % ("from" if date < today else "for",
+                              datetime.date.fromisoformat(date).strftime("%a %m-%d"))
     return line
 
 
@@ -357,9 +358,12 @@ def route(state, args):
     # Resolved once: checks, reads, writes and restores all act on the link target, never the link.
     paths = {"focus": focus, "personal": real(os.path.join(state, "personal.md")),
              "pool": real(os.path.join(state, "captures.md")),
-             "ledger": real(os.path.join(state, "aipaper", "ledger.json"))}
+             "ledger": real(os.path.join(state, "aipaper", "ledger.json")),
+             "work": work, "waiting": real(os.path.join(work, "tablet.md")) if work else None}
     if work and any(overlaps(work, paths[name]) for name in ("personal", "pool", "ledger")):
         raise Refused("a tablet state file links into the work state dir")
+    if work and overlaps(state_real, paths["waiting"]):
+        raise Refused("the waiting file links into the tablet state dir")
     reading = os.path.realpath(os.path.join(state, "aipaper", "reading"))
     for folder in args.folders:
         if os.path.dirname(os.path.realpath(folder)) != reading:
@@ -424,11 +428,14 @@ def route_folder(folder, meta, items, pages_read, batch_todos, ledger, paths, to
             seen.add(mark)
             kept.append(dict(item, text=text))
     focus_items = [i for i in kept if i["bucket"] == "work" and i["kind"] != "idea"] if paths["focus"] else []
+    waiting_items = []
     if focus_items and not os.path.isfile(paths["focus"]):
-        hold(folder, "focus file missing")
-        return ledger
+        if not os.path.isdir(paths["work"]):  # the waiting file needs the work state dir, never made here
+            hold(folder, "focus file missing")
+            return ledger
+        focus_items, waiting_items = [], focus_items  # morning moves them into the focus file it creates
     pool_items = [i for i in kept if i["bucket"] == "work" and i["kind"] == "idea"]
-    personal_items = [i for i in kept if i not in focus_items and i not in pool_items]
+    personal_items = [i for i in kept if i not in focus_items + waiting_items + pool_items]
     new_ledger = json.loads(json.dumps(ledger))
     for item in kept:
         if "todo_id" in item:
@@ -441,6 +448,9 @@ def route_folder(folder, meta, items, pages_read, batch_todos, ledger, paths, to
         if focus_items:
             changes.append(("focus", lambda old: insert_in_section(
                 old, TABLET_HEADING, [item_line(i, today, "focus") for i in focus_items])))
+        if waiting_items:
+            changes.append(("waiting", lambda old: insert_in_section(
+                old, "## " + today, [item_line(i, today, "focus") for i in waiting_items])))
         if personal_items:
             changes.append(("personal", lambda old: insert_in_section(
                 old, "## " + today, [item_line(i, today, "personal") for i in personal_items])))
@@ -486,10 +496,12 @@ def route_folder(folder, meta, items, pages_read, batch_todos, ledger, paths, to
     except OSError as exc:  # every item is ledgered: the next route files nothing and deletes it
         warn("could not delete %s (%s); the next sweep retires it" % (os.path.basename(folder), exc))
     emit({"folder": folder, "status": "routed",
-          "work": [i["text"] for i in kept if i["bucket"] == "work" and i["kind"] != "idea"],
+          "work": [i["text"] for i in kept if i["bucket"] == "work" and i["kind"] != "idea"
+                   and i not in waiting_items],
           "personal": [i["text"] for i in kept if i["bucket"] == "personal"],
           "unsure": [i["text"] for i in kept if i["bucket"] == "unsure"],
-          "ideas": [i["text"] for i in pool_items]})
+          "ideas": [i["text"] for i in pool_items],
+          "waiting": [i["text"] for i in waiting_items]})
     return new_ledger
 
 
