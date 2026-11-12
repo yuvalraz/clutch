@@ -269,7 +269,22 @@ fpin "$O" "tablet: buckets not a key"   'An optional `### Buckets` list under `#
 fpin "$O" "tablet: empty is silent"     'Empty output: nothing arrived; say nothing about the tablet.'
 fpin "$O" "tablet: other error"         'Any other error: one line, and the sweep goes on.'
 fpin "$O" "tablet: stderr on rc 0"      'A claim or route that exits 0 but prints a `tablet:` line on stderr: name it once, in one line.'
-fpin "$O" "tablet: before morning"      'When `~/.clutch/rituals.md` sets a focus file and today'"'"'s does not exist yet, skip the tablet inbox this sweep, unmentioned: morning creates it.'
+fpin "$O" "tablet: before morning"      'The sweep reads it once, after the tick pass, whether or not today'"'"'s focus file exists yet:'
+fpin "$O" "tablet: focus path always"   'Pass `--focus-file` whenever `~/.clutch/rituals.md` sets a focus file, even before today'"'"'s exists.'
+fpin "$O" "tablet: waiting file"        'When today'"'"'s focus file does not exist yet, work tasks, notes and actions wait in `<state dir>/tablet.md` under today'"'"'s date instead, and the next sweep or morning moves them into today'"'"'s focus file once it exists.'
+fpin "$O" "tablet: fold first"          'At the start of the tablet step, when `~/.clutch/rituals.md` sets a state dir and a focus file, move what waits in `<state dir>/tablet.md` into today'"'"'s focus file:'
+fpin "$O" "tablet: fold command"        'sh "${CLAUDE_PLUGIN_ROOT}/scripts/tablet-inbox.sh" fold --work-state-dir '"'"'<state dir>'"'"' --focus-file '"'"'<today'
+fpin "$O" "tablet: fold paths"          'Fill both paths as for the route below.'
+fpin "$O" "tablet: fold named once"     'A `folded` line names the moved items once, in one line, never counting them.'
+fpin "$O" "tablet: fold errors"         'A fold that exits 3 is unmentioned; any other fold error gets one line naming `<state dir>/tablet.md`, and the sweep goes on.'
+fpin "$O" "tablet: set-but-missing dir" 'with no state dir set in `~/.clutch/rituals.md` drop `--work-state-dir` too; a state dir that is set but missing keeps `--work-state-dir`.'
+case $OJ in *'morning moves them into the focus file it creates'*)
+  echo "FAIL: ops -- waiting lines still wait only for morning"; fail=1 ;; esac
+fpin "$O" "tablet: waiting line"        'Work items in `waiting` get their own line, named the same way: they wait for today'"'"'s focus file.'
+fpin "$O" "tablet: no focus question"   'Never ask the user about a missing focus file: morning creates it.'
+fpin "$O" "tablet: no count at all"     'A tablet line never counts captures, pages, items or questions, in digits or in words: not "all three captures".'
+case $OJ in *'skip the tablet inbox'*|*'does not exist yet, skip'*)
+  echo "FAIL: ops -- the tablet inbox still skips a sweep for a missing focus file"; fail=1 ;; esac
 fpin "$O" "tablet: own reading first"   'Sort each item by its own reading first: one that reads clearly as work or as personal takes that bucket.'
 fpin "$O" "tablet: hints when unclear"  'Only an item that reads unclear takes a hint, in order:'
 fpin "$O" "tablet: hint never forces"   'A hint alone never makes work of an item that reads personal.'
@@ -278,14 +293,14 @@ fpin "$O" "tablet: no day, no date"     'Leave `date` out when the item has no d
 fpin "$O" "tablet: rc 2 retry once"     'Exit status 2 names on stderr what it refused: fix the items once and run the route again; if that fails too, say so in one line.'
 fpin "$O" "tablet: never release after" 'Never release after a route call, whatever its exit status'
 fpin "$O" "tablet: release before route" 'If the sweep stops after the claim and before any route call, release them'
-fpin "$O" "tablet: pool correction"     'move its line between today'"'"'s focus file, `~/.clutch/captures.md` and `~/.clutch/personal.md` in that turn.'
+fpin "$O" "tablet: pool correction"     'move its line between today'"'"'s focus file, `<state dir>/tablet.md`, `~/.clutch/captures.md` and `~/.clutch/personal.md` in that turn.'
 fpin "$O" "tablet: never guess work"    'Never guess work: an unsure item files with the personal ones, marked unsure.'
 fpin "$O" "tablet: pass every folder"   'Pass every claimed folder but a `held` one, and under it in `pages_read` list only the `page_id`s you actually read'
 fpin "$O" "tablet: unread page holds"   'A folder with a page you did not read is held, not retired, and the next sweep reads it again.'
 fpin "$O" "tablet: personal sink"       'every personal and unsure item, ideas included, in `~/.clutch/personal.md`'
 fpin "$O" "tablet: route non-zero"      'A route that exits non-zero filed nothing.'
 fpin "$O" "tablet: never counted"       'one line per bucket that got items, naming them shortened, never counting them'
-fpin "$O" "tablet: focus file missing"  'A capture held for a missing focus file gets one line: the tablet pages wait for today'"'"'s focus file.'
+fpin "$O" "tablet: focus file missing"  'A capture held for a missing focus file, which happens only when the state dir is missing too, gets one line: the tablet pages wait for today'"'"'s focus file.'
 fpin "$O" "tablet: other hold"          'A capture held for another reason gets one line naming the reason.'
 fpin "$O" "tablet: personal stays"      'A personal or unsure item never goes to the state dir, the fomo pool or any integration.'
 fpin "$O" "tablet: tick never reads"    'A tick never reads the tablet inbox.'
@@ -304,6 +319,7 @@ case $OJ in *'and run release'*|*'run release, and the sweep'*|*'Run release onl
   echo "FAIL: ops -- a replaced release or date rule is back"; fail=1 ;; esac
 fpin "$R" "README: tablet inbox"        'When the tablet inbox has new pages or typed tasks, the sweep files each line once: work under `## From the tablet` in today'"'"'s focus file and work ideas in the fomo pool, personal and unsure ones in `~/.clutch/personal.md`, and it names what arrived without counting it.'
 fpin "$R" "README safe: ops reads"      'Ops also reads the tablet inbox under `~/.clutch/inbox/`, and `~/.clutch/people.md` when it exists, to sort what arrived.'
+fpin "$R" "README safe: waiting file"   'before today'"'"'s focus file exists, work lines wait in `<state dir>/tablet.md` and move into that file once it does'
 fpin "$R" "README safe: ops writes"     '`/clutch:ops` files them: work lines into today'"'"'s focus file (or, with no focus file set, `~/.clutch/personal.md`)'
 fpin "$R" "README safe: helper imports" 'its test suite parses its imports and fails on any network module'
 
@@ -587,7 +603,7 @@ armhome te; mkdir -p "$HOME/.clutch/inbox/aipaper"; rm -f "$T/py-ran"
 [ -e "$T/py-ran" ] || { echo "FAIL: O-tablet (e) -- an inbox did not reach the helper, so (a)(b) cannot bite"; exit 1; }
 
 if ! command -v python3 >/dev/null 2>&1; then
-  echo "SKIP: O-tablet (c)(f)(g)(h)(i)(j) (no python3)"
+  echo "SKIP: O-tablet (c)(f)(g)(h)(i)(j)(k) (no python3)"
 else
   # tcap <case> [section] [note name] [todos JSON]: a fresh HOME holding one
   # invented capture, a focus file '# day', and the claim run; TF is the folder it printed.
@@ -638,6 +654,13 @@ else
   [ "$TR" = 0 ] && [ "$(cat "$T/th-work/focus.md")" = "$(printf '# day\n\n## From the tablet\n- [ ] buy stamps')" ] \
     && [ ! -e "$HOME/.clutch/personal.md" ] && [ ! -e "$TF" ] \
     || { echo "FAIL: O-tablet (h) -- rc $TR: $TO / $(cat "$T/th-work/focus.md")"; exit 1; }
+  # (k) today's focus file set but not there yet: the work item waits in <state dir>/tablet.md
+  # under today's date, the focus file is never created, and the folder is retired.
+  tcap tk; rm "$T/tk-work/focus.md"; troute tk work
+  [ "$TR" = 0 ] && [ "$(cat "$T/tk-work/tablet.md" 2>/dev/null)" = "$(printf '## %s\n- [ ] buy stamps' "$(date +%Y-%m-%d)")" ] \
+    && [ ! -e "$T/tk-work/focus.md" ] && [ ! -e "$HOME/.clutch/personal.md" ] && [ ! -e "$TF" ] \
+    && printf '%s\n' "$TO" | grep -qF '"waiting": ["buy stamps"]' \
+    || { echo "FAIL: O-tablet (k) -- rc $TR: $TO"; exit 1; }
   # (i) a Daily capture's typed task goes through the template with its todo_id.
   tcap ti APP_DAILY day_2026_11_10 '[{"id": "t1", "content": "buy stamps", "isDelete": false, "day": 10, "month": 11, "year": 2026}]'
   troute ti personal '' '' t1

@@ -86,6 +86,28 @@ ran wrapper_honors_state_dir_equals "-B scripts/tablet_inbox.py --state-dir=$T/d
 wrap stubpy --state-dir "$T/missing" claim
 ran wrapper_lets_the_helper_refuse_a_missing_state_dir "--state-dir $T/missing claim"
 
+# fold: python3 starts only when the work state dir's tablet.md holds something,
+# whether or not a tablet inbox exists.
+HOME=$T/home4
+mkdir -p "$HOME/.clutch" "$T/w"
+wrap stubpy fold --work-state-dir "$T/w" --focus-file "$T/w/focus.md"
+quiet wrapper_fold_without_waiting_file_runs_no_python
+: > "$T/w/tablet.md"
+wrap stubpy fold --work-state-dir "$T/w" --focus-file "$T/w/focus.md"
+quiet wrapper_fold_with_empty_waiting_file_runs_no_python
+echo '- [ ] x' > "$T/w/tablet.md"
+wrap stubpy fold --work-state-dir "$T/w" --focus-file "$T/w/focus.md"
+ran wrapper_fold_with_waiting_lines_runs_the_helper "-B scripts/tablet_inbox.py fold --work-state-dir $T/w"
+wrap stubpy fold --work-state-dir="$T/w" --focus-file "$T/w/focus.md"
+ran wrapper_fold_equals_form "fold --work-state-dir=$T/w"
+wrap stubpy --state-dir "$T/d" fold --work-state-dir "$T/w2" --focus-file "$T/w/focus.md"
+quiet wrapper_fold_with_state_dir_still_gated
+wrap nopy fold --work-state-dir "$T/w" --focus-file "$T/w/focus.md"
+[ "$rc" -eq 5 ] || { echo "FAIL: wrapper_fold_without_python_fails_loud (rc $rc)"; fail=1; }
+# A route still needs a tablet inbox, even with a non-empty tablet.md.
+wrap stubpy route --work-state-dir "$T/w" --focus-file "$T/w/focus.md"
+quiet wrapper_route_still_gated_on_the_inbox
+
 mkdir "$T/net"
 printf 'curl x\n' > "$T/net/f"
 [ -n "$(grep -rE 'curl|wget|/dev/tcp|nc ' "$T/net/")" ] || { echo "FAIL: readme_network_grep positive control"; fail=1; }

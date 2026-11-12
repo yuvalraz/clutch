@@ -48,6 +48,15 @@ and offer to persist the answer into the config. If the file is missing or empty
 set today's focuses with the user now and write the file — the day does not
 start focusless.
 When you create the focus file, copy the `## Critical path` section from the most recent earlier focus file into it as it is, when one has it.
+Whenever today's focus file exists, created now or earlier, and a state dir is set, move what waits in `<state dir>/tablet.md` into it:
+
+```sh
+sh "${CLAUDE_PLUGIN_ROOT}/scripts/tablet-inbox.sh" fold --work-state-dir '<state dir>' --focus-file '<today's focus file>'
+```
+
+Fill both paths with absolute paths, never a `~` form; inside the single quotes, escape ' as '\''.
+A non-zero exit gets one line naming `<state dir>/tablet.md`; never edit `tablet.md` by hand.
+Empty output says nothing; a `folded` line names the moved items once, in one line, never counting them.
 
 ### 4. Deep ping
 

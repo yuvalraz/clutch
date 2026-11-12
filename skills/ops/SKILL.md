@@ -307,8 +307,19 @@ An approved window draft that awaits a reply or a state change is held as a wait
 
 The tablet inbox holds pages and typed tasks pulled from a paper tablet,
 where work and personal lines mix.
-When `~/.clutch/rituals.md` sets a focus file and today's does not exist yet, skip the tablet inbox this sweep, unmentioned: morning creates it.
-Otherwise the sweep reads it once, after the tick pass:
+The sweep reads it once, after the tick pass, whether or not today's focus file exists yet:
+
+At the start of the tablet step, when `~/.clutch/rituals.md` sets a state dir and a focus file, move what waits in `<state dir>/tablet.md` into today's focus file:
+
+```sh
+sh "${CLAUDE_PLUGIN_ROOT}/scripts/tablet-inbox.sh" fold --work-state-dir '<state dir>' --focus-file '<today's focus file>'
+```
+
+Fill both paths as for the route below.
+Empty output: nothing moved, or today's focus file does not exist yet; say nothing.
+A `folded` line names the moved items once, in one line, never counting them.
+A fold that exits 3 is unmentioned; any other fold error gets one line naming `<state dir>/tablet.md`, and the sweep goes on.
+Then claim:
 
 ```sh
 sh -c '. "${CLAUDE_PLUGIN_ROOT}/scripts/prelude.sh" && sh "${CLAUDE_PLUGIN_ROOT}/scripts/tablet-inbox.sh" claim'
@@ -323,7 +334,7 @@ A claim or route that exits 0 but prints a `tablet:` line on stderr: name it onc
 Read every page image and split it into items, one per written line or bullet: a task, a note, an action or an idea.
 Skip a line already in its page's `known_lines`, even spelled a little differently. Each typed task is one task item.
 Sort each item by its own reading first: one that reads clearly as work or as personal takes that bucket.
-Only an item that reads unclear takes a hint, in order: the `### Buckets` list under `## Ops` in `~/.clutch/rituals.md` (`- work: <terms>`, `- personal: <terms>`); today's focuses and critical path, which mark work; names in `~/.clutch/people.md` when it exists, which mark work; the section, where Meeting is work.
+Only an item that reads unclear takes a hint, in order: the `### Buckets` list under `## Ops` in `~/.clutch/rituals.md` (`- work: <terms>`, `- personal: <terms>`); today's focuses and critical path when today's focus file exists, which mark work; names in `~/.clutch/people.md` when it exists, which mark work; the section, where Meeting is work.
 A hint alone never makes work of an item that reads personal. With no hint and no clear reading, the item is unsure.
 Never guess work: an unsure item files with the personal ones, marked unsure.
 Tablet items are filed, never classified against the delegation policy: no L2 or Auto line acts on one.
@@ -337,19 +348,24 @@ TABLET_ITEMS
 ```
 
 Fill `<state dir>` and `<today's focus file>` with absolute paths, never a `~` form; inside the single quotes, escape ' as '\''.
-With no focus file set in `~/.clutch/rituals.md`, drop `--focus-file`, and with no state dir drop `--work-state-dir` too: work items then file in `~/.clutch/personal.md` marked work, and the work line says so.
+Pass `--focus-file` whenever `~/.clutch/rituals.md` sets a focus file, even before today's exists.
+With no focus file set in `~/.clutch/rituals.md`, drop `--focus-file` (work items then file in `~/.clutch/personal.md` marked work, and the work line says so), and with no state dir set in `~/.clutch/rituals.md` drop `--work-state-dir` too; a state dir that is set but missing keeps `--work-state-dir`.
 Pass every claimed folder but a `held` one, and under it in `pages_read` list only the `page_id`s you actually read, even when it has no new items: a folder whose pages were all read is retired.
 A folder with a page you did not read is held, not retired, and the next sweep reads it again.
 A typed task carries `todo_id` instead of `page_id`. `date` is the item's day as YYYY-MM-DD: a typed task's own `date`, or a Daily page's note name read as a date (`day_2026_1_5` is 2026-01-05).
 Leave `date` out when the item has no day of its own: a typed task whose `date` is empty, a page outside Daily.
 The heredoc is quoted, so the items need JSON escaping only.
 Work tasks, notes and actions land under `## From the tablet` in today's focus file and work ideas in the fomo pool; every personal and unsure item, ideas included, in `~/.clutch/personal.md` under today's date. Nothing here goes to any integration.
+When today's focus file does not exist yet, work tasks, notes and actions wait in `<state dir>/tablet.md` under today's date instead, and the next sweep or morning moves them into today's focus file once it exists.
 A route that exits non-zero filed nothing.
 Exit status 2 names on stderr what it refused: fix the items once and run the route again; if that fails too, say so in one line.
 Exit status 3 means the tablet inbox is busy, unmentioned; any other error gets one line.
 Each output line is one capture: `routed` with what it filed per bucket, `held` with a reason, or `gone`.
 Speak one line per bucket that got items, naming them shortened, never counting them: work, personal, unsure (named as unsure), and ideas named as banked.
-A capture held for a missing focus file gets one line: the tablet pages wait for today's focus file.
+Work items in `waiting` get their own line, named the same way: they wait for today's focus file.
+Never ask the user about a missing focus file: morning creates it.
+A tablet line never counts captures, pages, items or questions, in digits or in words: not "all three captures".
+A capture held for a missing focus file, which happens only when the state dir is missing too, gets one line: the tablet pages wait for today's focus file.
 A capture held for another reason gets one line naming the reason.
 
 If the sweep stops after the claim and before any route call, release them so the next sweep reads them again:
@@ -359,7 +375,7 @@ sh -c '. "${CLAUDE_PLUGIN_ROOT}/scripts/prelude.sh" && sh "${CLAUDE_PLUGIN_ROOT}
 ```
 
 Never release after a route call, whatever its exit status: the leases lapse on their own, and the claim count moves a capture that keeps failing to held.
-When the user says an unsure item is work, or a filed item sits in the wrong bucket, move its line between today's focus file, `~/.clutch/captures.md` and `~/.clutch/personal.md` in that turn.
+When the user says an unsure item is work, or a filed item sits in the wrong bucket, move its line between today's focus file, `<state dir>/tablet.md`, `~/.clutch/captures.md` and `~/.clutch/personal.md` in that turn.
 A personal or unsure item never goes to the state dir, the fomo pool or any integration.
 A tick never reads the tablet inbox.
 
