@@ -137,7 +137,7 @@ A production change, a direct send, a merge or a delete always waits for a yes.
 An `- Auto:` line names an intake channel, such as a review-request queue: ops posts there without a yes and logs it, and an @-mention the line does not name still waits for your yes.
 Non-critical drafts wait for an approval window, 11:00 and 16:30 by default, which opens on your next sweep.
 A `## Critical path` in your focus file makes the first sweep of the day open with a brief.
-When the tablet inbox has new pages or typed tasks, the sweep files each line once: work under `## From the tablet` in today's focus file and work ideas in the fomo pool, personal and unsure ones in `~/.clutch/personal.md`, and it names what arrived without counting it.
+When the tablet inbox has new pages or typed tasks, the sweep files each line once: work under `## From the tablet` in today's focus file (or in `<state dir>/tablet.md` until that file exists) and work ideas in the fomo pool, personal and unsure ones in `~/.clutch/personal.md`, and it names what arrived without counting it.
 
 **Review.** `/clutch:review` closes one PR at a time with your written
 conventions applied. When your call on a finding implies a rule, one line
@@ -278,7 +278,8 @@ Every other write comes from a command you fire. `/clutch:fomo --brain` banks
 straight to the brain. `/clutch:rituals` writes `~/.clutch/rituals.md`.
 `/clutch:review` appends a convention to your conventions file on a yes.
 `/clutch:dream` and `/clutch:interview` write the auto-memory directory.
-`/clutch:morning` writes today's focus file when it is missing, and
+`/clutch:morning` writes today's focus file when it is missing and moves tablet
+lines waiting in `<state dir>/tablet.md` into it, and
 `/clutch:eod` writes tomorrow's, in the state dir your `~/.clutch/rituals.md`
 names, which can sit outside both `.clutch/` and `~/.clutch`.
 When a key they
