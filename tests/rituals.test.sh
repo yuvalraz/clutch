@@ -93,6 +93,7 @@ fpin "$M" "morning: fold when focus exists" 'Whenever today'"'"'s focus file exi
 fpin "$M" "morning: fold command"       'sh "${CLAUDE_PLUGIN_ROOT}/scripts/tablet-inbox.sh" fold --work-state-dir '"'"'<state dir>'"'"' --focus-file '"'"'<today'
 fpin "$M" "morning: fold paths"         'Fill both paths with absolute paths, never a `~` form; inside the single quotes, escape '"'"' as '"'"'\'"'"''"'"'.'
 fpin "$M" "morning: fold error line"    'A non-zero exit gets one line naming `<state dir>/tablet.md`; never edit `tablet.md` by hand.'
+fpin "$M" "morning: fold names items"   'Empty output says nothing; a `folded` line names the moved items once, in one line, never counting them.'
 MJ=$(tr -s '[:space:]' ' ' < "$M")
 case $MJ in *'then empty `tablet.md`'*|*'When you create the focus file and `<state dir>/tablet.md`'*)
   echo "FAIL: morning -- the model still empties tablet.md by hand"; fail=1 ;; esac

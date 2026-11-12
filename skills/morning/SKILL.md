@@ -56,6 +56,7 @@ sh "${CLAUDE_PLUGIN_ROOT}/scripts/tablet-inbox.sh" fold --work-state-dir '<state
 
 Fill both paths with absolute paths, never a `~` form; inside the single quotes, escape ' as '\''.
 A non-zero exit gets one line naming `<state dir>/tablet.md`; never edit `tablet.md` by hand.
+Empty output says nothing; a `folded` line names the moved items once, in one line, never counting them.
 
 ### 4. Deep ping
 

@@ -954,6 +954,14 @@ class FoldTest(Base):
             self.assertTrue(err.startswith("tablet: ") and err.count("\n") == 1, err)
             self.assertEqual((self.text(self.focus), self.text(self.waiting)), (focus, waiting))
 
+    def test_fold_killed_between_writes_keeps_every_line(self):
+        self.write(self.focus, "# Focus\n")
+        self.write(self.waiting, "## 2026-11-10\n- [ ] draft the memo\n- call the plumber\n")
+        with self.failing_writer(2, error=KeyboardInterrupt), self.assertRaises(KeyboardInterrupt):
+            self.fold()  # a kill skips the restore, so only the write order keeps the lines
+        for line in ("- [ ] draft the memo", "- call the plumber"):
+            self.assertTrue(line in self.text(self.focus) or line in self.text(self.waiting), line)
+
     def test_fold_refuses_overlapping_sinks_and_waits_for_the_lock(self):
         self.write(self.focus, "# Focus\n")
         os.symlink(self.personal, self.waiting)
