@@ -4,7 +4,7 @@
 # Sets: CLUTCH_GIT (1 inside a git work tree, else 0), ROOT, CLUTCH_DIR,
 # EXCLUDE_FILE, CLUTCH_WORKLOG. Defines clutch_ensure_dir,
 # clutch_last_authored, clutch_worklog_window, clutch_open_loops,
-# clutch_ops_due.
+# clutch_session_tag, clutch_owned_loops, clutch_ops_due.
 
 CLUTCH_GIT=0
 ROOT=""
@@ -128,6 +128,26 @@ clutch_worklog_scan() {
 
 # The open wait loops, raw (epoch kept), oldest first; read by the ops tick.
 clutch_open_loops() { clutch_worklog_scan loops; }
+
+# The session tag from hook input JSON ($1): "@" plus the first 8 chars of
+# the FIRST "session_id" value, which must be [0-9A-Za-z-]. Prints nothing
+# and returns 1 otherwise. Cut at the first key: a greedy sed takes the last.
+clutch_session_tag() {
+  case $1 in *'"session_id"'*) ;; *) return 1 ;; esac
+  CST_R=${1#*\"session_id\"}
+  CST_ID=$(printf '%s\n' "$CST_R" | sed -n '1s/^ *: *"\([0-9A-Za-z-]\{1,\}\)".*/\1/p')
+  [ -n "$CST_ID" ] || return 1
+  printf '@%.8s\n' "$CST_ID"
+}
+
+# The open wait lines owned by tag $1 (field 6 equals it), raw, oldest
+# first. Returns 2 on a malformed tag, else clutch_open_loops' rc 1 or 2.
+clutch_owned_loops() {
+  case $1 in @|@*[!0-9A-Za-z-]*|[!@]*|'') return 2 ;; esac
+  COL_OUT=$(clutch_open_loops) || return $?
+  [ -n "$COL_OUT" ] || return 0
+  printf '%s\n' "$COL_OUT" | LC_ALL=C awk -v t="$1" '$6 == t'
+}
 
 # The window for the session-start block and the ops sweep: up to 8 lines,
 # open waits first, epoch dropped, each cut to 160 bytes.

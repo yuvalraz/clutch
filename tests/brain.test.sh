@@ -317,15 +317,15 @@ printf '%s\n' "$HITS" | sed -n 2p | grep -q 'brain probe entry' \
 # P6 suite-under-scratch-HOME: the whole sibling suite passes with no brain
 # (byte-identity with 1.9.0) and with a seeded brain (presence breaks
 # nothing). Self-exclusion by filename is the recursion guard.
-# Env hygiene: every sibling invocation clears the thirteen-name override-var
-# scrub list (Durable Decision 8) via ONE subshell unset line below -- the ten
-# vars this file takes plus the siblings' own SPRINT_SKILL INTENT_SKILL
-# ANCHOR_SH. FOMO_SKILL is shared with fomo-snippet.test.sh. Any new override var added to this file or a sibling suite MUST
+# Env hygiene: every sibling invocation clears the override-var scrub list
+# (Durable Decision 8) via ONE subshell unset line below -- the ten vars this
+# file takes plus the siblings' own SPRINT_SKILL INTENT_SKILL ANCHOR_SH, and
+# CLUTCH_WATCH, the one env input (not an override var) in that line. FOMO_SKILL is shared with fomo-snippet.test.sh. Any new override var added to this file or a sibling suite MUST
 # be added to that unset line in the same edit. Without the scrub, a BASE
 # replay's poisoned var (e.g. README_FILE) inherits into the children and
 # lights sibling suites red.
 run_scrubbed() {
-  ( unset FOMO_SKILL SPARK_SKILL IDEATE_SKILL DAYDREAM_SKILL DREAMSPARK_SKILL RETRACE_SKILL README_FILE GLOSSARY_FILE CONSTITUTION_FILE HEARTBEAT_SH SPRINT_SKILL INTENT_SKILL ANCHOR_SH STOP_SH PRELUDE_SH CONST_FILE
+  ( unset FOMO_SKILL SPARK_SKILL IDEATE_SKILL DAYDREAM_SKILL DREAMSPARK_SKILL RETRACE_SKILL README_FILE GLOSSARY_FILE CONSTITUTION_FILE HEARTBEAT_SH SPRINT_SKILL INTENT_SKILL ANCHOR_SH STOP_SH PRELUDE_SH CONST_FILE CLUTCH_WATCH
     HOME="$1" sh "$2" >/dev/null )
 }
 mkdir "$T/h6"
