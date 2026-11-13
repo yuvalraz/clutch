@@ -5,23 +5,33 @@
 # clutch_owned_loops (the open wait lines whose field 6 equals the tag; rc 1
 # with no worklog, rc 2 on an unreadable worklog, a worklog path that cannot
 # be stat'ed, an empty HOME or a malformed tag; a wait re-held after a moved:
-# line on the same ref is open again).
-# prelude.sh is staged into a scratch tree and sourced from a non-git dir
-# under a scratch HOME. PRELUDE_SH overrides the target for replay against a
-# historical version. Silent on pass apart from PASS.
+# line on the same ref is open again). A1-A5 cover the anchor's
+# "Session tag: @<tag8>" line (dropped without a session_id or under
+# CLUTCH_WATCH=off); K1-K2 pin the constitution's wait: verb and the watch
+# tick carve-out.
+# prelude.sh, anchor.sh and the constitution are staged into a scratch tree
+# and run from a scratch repo or a non-git dir under a scratch HOME.
+# PRELUDE_SH, ANCHOR_SH and CONST_FILE override the targets for replay
+# against a historical version. Silent on pass apart from PASS.
 set -u
 unset CLUTCH_WATCH CLAUDE_PLUGIN_ROOT
 
 HERE=$(cd "$(dirname "$0")" && pwd)
 P=${PRELUDE_SH:-$HERE/../scripts/prelude.sh}
-[ -f "$P" ] || { echo "FAIL: missing $P"; exit 1; }
+A=${ANCHOR_SH:-$HERE/../scripts/anchor.sh}
+K=${CONST_FILE:-$HERE/../rules/constitution.md}
+for f in "$P" "$A" "$K"; do
+  [ -f "$f" ] || { echo "FAIL: missing $f"; exit 1; }
+done
 
 T=$(mktemp -d) || exit 1
 trap 'chmod -R u+rwx "$T" 2>/dev/null; rm -rf "$T"' EXIT
 HOME=$T/home
 export HOME
-mkdir -p "$HOME" "$T/scripts" "$T/plain"
+mkdir -p "$HOME" "$T/scripts" "$T/plain" "$T/rules"
 cp "$P" "$T/scripts/prelude.sh"
+cp "$A" "$T/scripts/anchor.sh"
+cp "$K" "$T/rules/constitution.md"
 W="$HOME/.clutch/worklog.md"
 NOW=$(date +%s)
 fail=0
@@ -126,6 +136,90 @@ add 200 'proj moved: gh:o/r#1 approved'
 add 100 'proj wait: gh:o/r#1 b2 @0123abcd pr one re-held'
 owned '@0123abcd'
 is O5 0 "$((NOW - 100)) proj wait: gh:o/r#1 b2 @0123abcd pr one re-held"
+
+# --- Anchor tag line. anc <dir> <json>: the staged anchor run from dir on
+# json, with CLUTCH_WATCH set to $WATCH; sets OUT and RC. fix: a fresh repo
+# .clutch (breadcrumb only) and a one-line worklog, so each run starts alike.
+R=$T/repo
+mkdir -p "$R"
+git -C "$R" init -q
+WATCH=''
+anc() {
+  OUT=$(cd "$1" && printf '%s' "$2" | CLUTCH_WATCH=$WATCH GIT_CEILING_DIRECTORIES=$T sh "$T/scripts/anchor.sh" 2>/dev/null); RC=$?
+}
+fix() {
+  rm -rf "$R/.clutch" && mkdir -p "$R/.clutch"
+  printf 'b; most recent: notes.md\n' > "$R/.clutch/breadcrumb"
+  seed
+  add 100 'proj moved: gh:o/r#9 merged'
+}
+# tagged <label>: rc 0 and exactly one Session tag line, @0123abcd.
+tagged() {
+  [ "$RC" = 0 ] && [ "$(printf '%s\n' "$OUT" | grep -c '^Session tag:')" = 1 ] \
+    && printf '%s\n' "$OUT" | grep -qx 'Session tag: @0123abcd' \
+    || { echo "FAIL: $1 -- rc $RC, want one 'Session tag: @0123abcd' line in [$OUT]"; fail=1; }
+}
+# untagged <label>: rc 0 and no Session tag line.
+untagged() {
+  [ "$RC" = 0 ] && ! printf '%s\n' "$OUT" | grep -q 'Session tag:' \
+    || { echo "FAIL: $1 -- rc $RC, want no Session tag line in [$OUT]"; fail=1; }
+}
+ASKLINE='Intent for this session: build, ideate, ops, or review? /clutch:intent sets the frame.'
+
+# A1: startup in a repo: one tag line, the intent ask still last.
+fix
+anc "$R" "{\"session_id\":\"$ID\",\"source\":\"startup\"}"
+tagged A1
+[ "$(printf '%s\n' "$OUT" | tail -n 1)" = "$ASKLINE" ] \
+  || { echo "FAIL: A1 -- intent ask is not the last line in [$OUT]"; fail=1; }
+
+# A2: every other source carries the tag too.
+for src in resume compact clear fork; do
+  fix
+  anc "$R" "{\"session_id\":\"$ID\",\"source\":\"$src\"}"
+  tagged "A2 $src"
+done
+
+# A3: outside git, without and with a worklog; after the Worklog block.
+rm -rf "$HOME/.clutch"
+anc "$T/plain" "{\"session_id\":\"$ID\",\"source\":\"startup\"}"
+tagged "A3 no worklog"
+fix
+anc "$T/plain" "{\"session_id\":\"$ID\",\"source\":\"startup\"}"
+tagged "A3 worklog"
+printf '%s\n' "$OUT" | awk '/^Worklog:$/ { w = NR } /^Session tag: / { s = NR } END { exit !(w && s > w) }' \
+  || { echo "FAIL: A3 -- tag line not after the Worklog block in [$OUT]"; fail=1; }
+
+# A4: no session_id, or bad JSON: no tag line, rc 0.
+for j in '{"source":"startup"}' '{"session_id":' 'not json' '{"session_id":"ab/cd","source":"startup"}'; do
+  fix
+  anc "$R" "$j"
+  untagged "A4 [$j]"
+done
+
+# A5: CLUTCH_WATCH=off with a session_id prints what the same anchor prints
+# for the input without one, in a repo and outside git.
+for d in "$R" "$T/plain"; do
+  fix
+  anc "$d" '{"source":"startup"}'
+  BASE_OUT=$OUT
+  fix
+  WATCH=off
+  anc "$d" "{\"session_id\":\"$ID\",\"source\":\"startup\"}"
+  WATCH=''
+  untagged "A5 off [$d]"
+  [ "$OUT" = "$BASE_OUT" ] \
+    || { echo "FAIL: A5 [$d] -- off output differs from no-session_id output: [$OUT] vs [$BASE_OUT]"; fail=1; }
+done
+
+# --- K1-K2: constitution pins, whitespace joined so wrapped prose matches.
+J=$(tr -s '[:space:]' ' ' < "$T/rules/constitution.md")
+kpin() {
+  case "$J" in *"$2"*) ;; *) echo "FAIL: $1 -- constitution lacks: $2"; fail=1 ;; esac
+}
+kpin "K1 wait verb" "wait: when an outward action leaves you waiting on someone else's move"
+kpin "K1 wait text" '<kind>:<ref> <baseline> <session tag> <what you wait for>'
+kpin "K2 watch tick invited" "A tick from the session's armed watch is invited output too."
 
 [ "$fail" -eq 0 ] || exit 1
 echo PASS
