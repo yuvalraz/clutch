@@ -101,6 +101,8 @@ clutch_worklog_scan() {
   [ -f "$CLUTCH_WORKLOG" ] && [ -r "$CLUTCH_WORKLOG" ] || return 2
   WNOW=$(date +%s 2>/dev/null) || return 2
   # LC_ALL=C: a UTF-8 awk aborts the whole scan on one invalid byte.
+  # shortcut: a tail that fails after the -f/-r guard (EIO, a race) yields
+  # rc 0 with empty output; upgrade if a reader must tell that from no loops.
   tail -n 2000 "$CLUTCH_WORKLOG" 2>/dev/null | LC_ALL=C awk -v now="$WNOW" -v mode="$1" '
     $1 ~ /^[0-9]+$/ && NF >= 4 {
       age = now - $1
@@ -142,9 +144,24 @@ clutch_session_tag() {
 
 # The open wait lines owned by tag $1 (field 6 equals it), raw, oldest
 # first. Returns 2 on a malformed tag, else clutch_open_loops' rc 1 or 2.
+# rc 1 (no worklog) only when the absence is proven: an empty HOME, a
+# dangling symlink, or a ~/.clutch or HOME that is not a searchable directory
+# is rc 2, so a caller never reads "can't stat" as "no loops".
 clutch_owned_loops() {
-  case $1 in @|@*[!0-9A-Za-z-]*|[!@]*|'') return 2 ;; esac
-  COL_OUT=$(clutch_open_loops) || return $?
+  # Spelled-out class: a range like A-Z matches é under a UTF-8 /bin/sh.
+  case $1 in @|@*[!0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz-]*|[!@]*|'') return 2 ;; esac
+  COL_OUT=$(clutch_open_loops)
+  COL_RC=$?
+  if [ "$COL_RC" = 1 ]; then
+    [ -n "$HOME" ] && [ ! -L "$CLUTCH_WORKLOG" ] || return 2
+    if [ -e "$HOME/.clutch" ] || [ -L "$HOME/.clutch" ]; then
+      [ -d "$HOME/.clutch" ] && [ -x "$HOME/.clutch" ] || return 2
+    else
+      [ -d "$HOME" ] && [ -x "$HOME" ] || return 2
+    fi
+    return 1
+  fi
+  [ "$COL_RC" = 0 ] || return "$COL_RC"
   [ -n "$COL_OUT" ] || return 0
   printf '%s\n' "$COL_OUT" | LC_ALL=C awk -v t="$1" '$6 == t'
 }
