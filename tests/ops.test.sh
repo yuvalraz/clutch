@@ -289,7 +289,8 @@ fpin "$WS" "W5d linear movement"        '- linear: an `updatedAt` newer than the
 fpin "$WS" "W5e tagged moved text"      'verb `moved:` and text `<kind>:<ref> @<tag> <what moved>`.'
 fpin "$WS" "W6 own standing rules"      "Then act on it by the session's own standing rules, such as a fix loop on changes requested or the bookkeeping after a merge."
 fpin "$WS" "W7 outward waits for yes"   'An outward action still waits for its usual yes.'
-fpin "$WS" "W8 silent when unmoved"     'When nothing moved, print nothing.'
+fpin "$WS" "W8 fixed line when unmoved" 'When nothing moved, reply with exactly `No change.` and nothing more: an empty reply gets prompted for one.'
+fpin "$WS" "W8b no non-movement talk" "Never mention activity that does not count as movement, such as a bot's review or comment."
 fpin "$WS" "W9 no gear change"          'It sets no gear, no focus and no mode: the session keeps the rules it had.'
 fpin "$WS" "W10 no counts"              'Never count waits, never say how long anything has waited, and never name a wait that did not move.'
 nws_l=$(grep -c '' "$WS")

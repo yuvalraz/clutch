@@ -1,6 +1,6 @@
 ---
 name: watch
-description: Run one tick of a session's armed watch. Read only the wait loops its tag owns, stay silent when none moved, act on what moved, and remove the watch once none is left.
+description: Run one tick of a session's armed watch. Read only the wait loops its tag owns, reply `No change.` when none moved, act on what moved, and remove the watch once none is left.
 when_to_use: Use ONLY when the prompt is `/clutch:watch @<tag>`, the line a session's armed watch sends. Any other mention of watching or waiting, "watch <thing>" in ops included, is not a trigger.
 argument-hint: "@<tag>"
 ---
@@ -44,6 +44,7 @@ Only a gh PR is held again this way; a wait of any other kind is not.
 Then act on it by the session's own standing rules, such as a fix loop on changes requested or the bookkeeping after a merge.
 An outward action still waits for its usual yes.
 
-When nothing moved, print nothing.
+When nothing moved, reply with exactly `No change.` and nothing more: an empty reply gets prompted for one.
+Never mention activity that does not count as movement, such as a bot's review or comment.
 A tool that is not reachable keeps its wait open: name it once, then stay silent about it.
 Never count waits, never say how long anything has waited, and never name a wait that did not move.

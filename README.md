@@ -85,7 +85,7 @@ only at one of those moments.
 - Any session that hands off an outward step, such as a PR or an ask, logs a
   `wait:` line that starts with its session tag. At turn end, a session that
   holds such waits and no watch is told to arm a watch once per new wait: `/clutch:watch @<tag>`
-  every 15 minutes from 08:00 to 21:45, silent unless one of its waits moved,
+  every 15 minutes from 08:00 to 21:45, one `No change.` line unless one of its waits moved,
   gone once none is left. `CLUTCH_WATCH=off` turns off the ask and the session tag.
 - The next session start shows them in its `Worklog:` block.
   Claims age out after 4 h and moves after 24 h.
@@ -200,7 +200,7 @@ as ignition. The rest set the session's focus, run the day, and check on clutch.
 | `/clutch:intent` | Declares the session's focus and engages the gear | The session-start question, or a change of plan |
 | `/clutch:ideate` | Divergent mode for the whole session | An ideate session |
 | `/clutch:ops` | Operations mode: one sweep, one loop at a time | A day of meetings, people, and threads |
-| `/clutch:watch` | One tick of a session's armed watch: reads only that session's waits, silent unless one moved | Sent by the watch a session arms; you rarely type it |
+| `/clutch:watch` | One tick of a session's armed watch: reads only that session's waits, `No change.` unless one moved | Sent by the watch a session arms; you rarely type it |
 | `/clutch:review` | Review mode: one PR at a time, your conventions applied | A review session |
 | `/clutch:tempo` | Sets or reports the gear: espresso, craft, ballmer, freefall, ferment | You want the gearbox itself |
 | `/clutch:morning` | Opens the day: focus check, deep ping, one divergent beat, one quick win, the first move | The start of your day |
