@@ -8,11 +8,13 @@
 # line on the same ref is open again). A1-A5 cover the anchor's
 # "Session tag: @<tag8>" line (dropped without a session_id or under
 # CLUTCH_WATCH=off); K1-K4 pin the constitution's wait: verb, the watch
-# tick carve-out, the untagged wait and the one-token baseline.
-# prelude.sh, anchor.sh and the constitution are staged into a scratch tree
-# and run from a scratch repo or a non-git dir under a scratch HOME.
-# PRELUDE_SH, ANCHOR_SH and CONST_FILE override the targets for replay
-# against a historical version. Silent on pass apart from PASS.
+# tick carve-out, the untagged wait and the one-token baseline. S1-S14 and
+# S2b cover the stop.sh watch gate (one block line while the session holds
+# owned open waits and no armed /clutch:watch, once per wait set).
+# prelude.sh, anchor.sh, stop.sh and the constitution are staged into a
+# scratch tree and run from a scratch repo or a non-git dir under a scratch
+# HOME. PRELUDE_SH, ANCHOR_SH, STOP_SH and CONST_FILE override the targets
+# for replay against a historical version. Silent on pass apart from PASS.
 set -u
 unset CLUTCH_WATCH CLAUDE_PLUGIN_ROOT
 
@@ -20,7 +22,8 @@ HERE=$(cd "$(dirname "$0")" && pwd)
 P=${PRELUDE_SH:-$HERE/../scripts/prelude.sh}
 A=${ANCHOR_SH:-$HERE/../scripts/anchor.sh}
 K=${CONST_FILE:-$HERE/../rules/constitution.md}
-for f in "$P" "$A" "$K"; do
+S=${STOP_SH:-$HERE/../scripts/stop.sh}
+for f in "$P" "$A" "$K" "$S"; do
   [ -f "$f" ] || { echo "FAIL: missing $f"; exit 1; }
 done
 
@@ -31,6 +34,7 @@ export HOME
 mkdir -p "$HOME" "$T/scripts" "$T/plain" "$T/rules"
 cp "$P" "$T/scripts/prelude.sh"
 cp "$A" "$T/scripts/anchor.sh"
+cp "$S" "$T/scripts/stop.sh"
 cp "$K" "$T/rules/constitution.md"
 W="$HOME/.clutch/worklog.md"
 NOW=$(date +%s)
@@ -224,6 +228,157 @@ kpin "K1 wait text" '<kind>:<ref> <baseline> <session tag> <what you wait for>'
 kpin "K2 watch tick invited" "A tick from the session's armed watch is invited output too."
 kpin "K3 untagged wait" "No Session tag line: omit the tag, never a peer's."
 kpin "K4 one-token baseline" "The baseline is one token: hyphens, no spaces."
+
+# --- S1-S14, S2b: the stop.sh watch gate. stp <dir> <json>: the staged
+# stop.sh run from dir on json, with CLUTCH_WATCH set to $WATCH; sets OUT and
+# RC. fresh <fixture>: a fresh copy at $T/run, because stop.sh writes the
+# breadcrumb and state. Scratch repos carry a repo-local identity only.
+unset XDG_CONFIG_HOME
+GIT_CONFIG_NOSYSTEM=1
+export GIT_CONFIG_NOSYSTEM
+stp() {
+  OUT=$(cd "$1" && printf '%s' "$2" | CLUTCH_WATCH=$WATCH GIT_CEILING_DIRECTORIES=$T sh "$T/scripts/stop.sh" 2>/dev/null); RC=$?
+}
+fresh() { rm -rf "$T/run" && cp -R "$1" "$T/run"; }
+mkrepo() {
+  mkdir -p "$1" && git -C "$1" init -q &&
+    git -C "$1" config user.email s@s && git -C "$1" config user.name s &&
+    git -C "$1" commit -q --allow-empty -m "seed"
+}
+SF=$T/sfix
+mkrepo "$SF" || exit 1
+# Bell-ready: first stop 2000 s ago, base one authored commit behind HEAD.
+BF=$T/bfix
+mkrepo "$BF" || exit 1
+mkdir -p "$BF/.clutch"
+printf 'stop %s\nbase %s\n' "$((NOW - 2000))" "$(git -C "$BF" rev-parse HEAD)" > "$BF/.clutch/session-state"
+git -C "$BF" commit -q --allow-empty -m "feat bell"
+
+BLOCK='{"decision":"block","reason":"This session holds open wait loops and no watch. Arm one now with CronCreate, schedule `*/15 8-21 * * *`, recurring, prompt `/clutch:watch @0123abcd`, then end the turn. If the user said not to watch them, just end the turn."}'
+IN="{\"session_id\":\"$ID\",\"stop_hook_active\":false,\"session_crons\":[]}"
+FP="$HOME/.clutch/watch/0123abcd"
+# blocked <label>: rc 0 and stdout exactly the block line.
+blocked() {
+  [ "$RC" = 0 ] && [ "$OUT" = "$BLOCK" ] \
+    || { echo "FAIL: $1 -- rc $RC stdout [$OUT], want rc 0 and the block line"; fail=1; }
+}
+# quiet <label>: rc 0 and no stdout.
+quiet() { is "$1" 0 ''; }
+# owned1: a fresh worklog holding one owned open wait.
+owned1() { seed; add 100 'proj wait: gh:o/r#1 b1 @0123abcd pr one'; }
+crons() {
+  printf '{"session_id":"%s","stop_hook_active":false,"session_crons":[{"id":"c1","cron":"*/15 8-21 * * *","prompt":"%s","recurring":true}]}' "$ID" "$1"
+}
+
+# S1: owned open wait, no watch: one valid JSON block line; fingerprint written.
+owned1
+fresh "$SF"
+stp "$T/run" "$IN"
+blocked S1
+if [ -x /usr/bin/python3 ]; then
+  printf '%s' "$OUT" | /usr/bin/python3 -I -c 'import json,sys; d=json.load(sys.stdin); assert d["decision"] == "block"; assert "*/15 8-21 * * *" in d["reason"]; assert "/clutch:watch @0123abcd" in d["reason"]' 2>/dev/null \
+    || { echo "FAIL: S1 -- block line is not the JSON block object"; fail=1; }
+fi
+[ -s "$FP" ] || { echo "FAIL: S1 -- no fingerprint at $FP"; fail=1; }
+
+# S5: a second stop on the same owned set stays quiet.
+stp "$T/run" "$IN"
+quiet S5
+# S6: a new owned wait blocks again.
+add 50 'proj wait: gh:o/r#2 b1 @0123abcd pr two'
+stp "$T/run" "$IN"
+blocked S6
+
+# S2: an armed watch: no block, breadcrumb still written.
+owned1
+fresh "$SF"
+stp "$T/run" "$(crons '/clutch:watch @0123abcd')"
+quiet S2
+[ -s "$T/run/.clutch/breadcrumb" ] || { echo "FAIL: S2 -- no breadcrumb"; fail=1; }
+
+# S2b: a longer tag or another session's watch is not this session's.
+for pr in '/clutch:watch @0123abcd9' '/clutch:watch @ffffffff'; do
+  owned1
+  fresh "$SF"
+  stp "$T/run" "$(crons "$pr")"
+  blocked "S2b [$pr]"
+done
+
+# S3: stop_hook_active true, either spacing.
+for a in '"stop_hook_active":true' '"stop_hook_active": true'; do
+  owned1
+  fresh "$SF"
+  stp "$T/run" "{\"session_id\":\"$ID\",$a,\"session_crons\":[]}"
+  quiet "S3 [$a]"
+done
+
+# S4: only untagged and peer-tagged waits never block.
+seed
+add 100 'proj wait: gh:o/r#1 b1 untagged wait'
+add 90 'proj wait: gh:o/r#2 b1 @ffffffff peer wait'
+fresh "$SF"
+stp "$T/run" "$IN"
+quiet S4
+
+# S7: CLUTCH_WATCH=off with a session_id gives the same stdout and rc as the
+# same stop.sh fed the input without session_id, bell-ready fixture.
+owned1
+fresh "$BF"
+stp "$T/run" '{"stop_hook_active":false,"session_crons":[]}'
+BASE_OUT=$OUT BASE_RC=$RC
+[ -n "$BASE_OUT" ] || { echo "FAIL: S7 -- bell fixture printed nothing (vacuous)"; fail=1; }
+owned1
+fresh "$BF"
+WATCH=off
+stp "$T/run" "$IN"
+WATCH=''
+[ "$OUT" = "$BASE_OUT" ] && [ "$RC" = "$BASE_RC" ] \
+  || { echo "FAIL: S7 -- off rc $RC [$OUT] vs no-session_id rc $BASE_RC [$BASE_OUT]"; fail=1; }
+# S12 (S7 control): watch on, same input: only the block line, no bell.
+owned1
+fresh "$BF"
+stp "$T/run" "$IN"
+blocked S12
+grep -q '^emit' "$T/run/.clutch/session-state" && { echo "FAIL: S12 -- bell recorded an emit"; fail=1; }
+
+# S8: empty, non-JSON and truncated stdin: no block, rc 0.
+for j in '' 'not json' "{\"session_id\":\"0123abcd-45" "{\"session_id\":\"$ID\",\"session_cr"; do
+  owned1
+  fresh "$SF"
+  stp "$T/run" "$j"
+  quiet "S8 [$j]"
+done
+
+# S9: outside git the gate still blocks.
+owned1
+stp "$T/plain" "$IN"
+blocked S9
+
+# S10: no session_crons key (registry unreachable): no block.
+owned1
+fresh "$SF"
+stp "$T/run" "{\"session_id\":\"$ID\",\"stop_hook_active\":false}"
+quiet S10
+
+# S11: the fingerprint cannot be written: no block, rc 0.
+owned1
+: > "$HOME/.clutch/watch"
+fresh "$SF"
+stp "$T/run" "$IN"
+quiet S11
+
+# S13: no session_id: no block.
+owned1
+fresh "$SF"
+stp "$T/run" '{"stop_hook_active":false,"session_crons":[]}'
+quiet S13
+
+# S14: an owned wait closed by moved: on its ref: no block.
+owned1
+add 50 'proj moved: gh:o/r#1 merged'
+fresh "$SF"
+stp "$T/run" "$IN"
+quiet S14
 
 [ "$fail" -eq 0 ] || exit 1
 echo PASS

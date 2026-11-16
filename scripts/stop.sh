@@ -3,11 +3,47 @@
 # thread breadcrumb writer, the worklog writer (~/.clutch/worklog.md) and the
 # recognition bell live in one process, run sequentially, and never race each
 # other on .clutch/ state.
-# Silent by default; any error degrades to nothing. Exit 0 always.
+# Silent by default; any error degrades to nothing. Exit 0 always. The one
+# stdout exception is the watch gate's block line below.
 
+INPUT=$(cat 2>/dev/null) || INPUT=""
 PRELUDE=$(dirname "$0")/prelude.sh
 [ -f "$PRELUDE" ] || exit 0
 . "$PRELUDE" || exit 0
+
+# --- watch gate: a session holding its own open wait loops (field 6 = its
+# @tag) and no armed /clutch:watch is blocked once per wait set with the
+# arming step. Runs outside git too. Every failure falls through to the rest
+# of the script; the fingerprint lands before the block prints, so a lost
+# block is possible and a repeated one is not. CLUTCH_WATCH=off skips it.
+if [ "${CLUTCH_WATCH:-}" != off ]; then
+  case $INPUT in
+    *'"stop_hook_active":true'* | *'"stop_hook_active": true'*) ;;
+    *'"session_crons"'*)
+      if WATCH_TAG=$(clutch_session_tag "$INPUT"); then
+        # shortcut: a prompt holding ] in an earlier entry cuts the slice; one
+        # extra block per wait set at most.
+        WATCH_CR=${INPUT#*\"session_crons\"}
+        WATCH_CR=${WATCH_CR%%]*}
+        case $WATCH_CR in
+          *"clutch:watch $WATCH_TAG"[!0-9A-Za-z-]*) ;;
+          *)
+            WATCH_OWN=$(clutch_owned_loops "$WATCH_TAG" 2>/dev/null) &&
+              [ -n "$WATCH_OWN" ] &&
+              WATCH_FP=$(printf '%s\n' "$WATCH_OWN" | cksum) &&
+              WATCH_FILE="$HOME/.clutch/watch/${WATCH_TAG#@}" &&
+              [ "$(head -n 1 "$WATCH_FILE" 2>/dev/null)" != "$WATCH_FP" ] &&
+              mkdir -p "$HOME/.clutch/watch" 2>/dev/null &&
+              printf '%s\n' "$WATCH_FP" 2>/dev/null > "$WATCH_FILE" &&
+              printf '{"decision":"block","reason":"This session holds open wait loops and no watch. Arm one now with CronCreate, schedule `*/15 8-21 * * *`, recurring, prompt `/clutch:watch %s`, then end the turn. If the user said not to watch them, just end the turn."}\n' "$WATCH_TAG" &&
+              exit 0
+            ;;
+        esac
+      fi
+      ;;
+  esac
+fi
+
 [ "$CLUTCH_GIT" = 1 ] || exit 0
 clutch_ensure_dir || exit 0
 
