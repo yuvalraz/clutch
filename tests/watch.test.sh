@@ -8,9 +8,11 @@
 # line on the same ref is open again). A1-A5 cover the anchor's
 # "Session tag: @<tag8>" line (dropped without a session_id or under
 # CLUTCH_WATCH=off); K1-K4 pin the constitution's wait: verb, the watch
-# tick carve-out, the untagged wait and the one-token baseline. S1-S14 and
-# S2b cover the stop.sh watch gate (one block line while the session holds
-# owned open waits and no armed /clutch:watch, once per wait set).
+# tick carve-out, the untagged wait and the one-token baseline. S1-S19,
+# S2b, S2c and S10b cover the stop.sh watch gate (one block line while the
+# session holds an owned open wait not yet recorded in ~/.clutch/watch/<tag8>
+# and no "prompt" whose whole value is /clutch:watch @<tag8>; S19 bounds the
+# time on a ~160 KB message).
 # prelude.sh, anchor.sh, stop.sh and the constitution are staged into a
 # scratch tree and run from a scratch repo or a non-git dir under a scratch
 # HOME. PRELUDE_SH, ANCHOR_SH, STOP_SH and CONST_FILE override the targets
@@ -270,7 +272,8 @@ crons() {
   printf '{"session_id":"%s","stop_hook_active":false,"session_crons":[{"id":"c1","cron":"*/15 8-21 * * *","prompt":"%s","recurring":true}]}' "$ID" "$1"
 }
 
-# S1: owned open wait, no watch: one valid JSON block line; fingerprint written.
+# S1: owned open wait, no watch: one valid JSON block line; the owned line
+# recorded.
 owned1
 fresh "$SF"
 stp "$T/run" "$IN"
@@ -279,7 +282,8 @@ if [ -x /usr/bin/python3 ]; then
   printf '%s' "$OUT" | /usr/bin/python3 -I -c 'import json,sys; d=json.load(sys.stdin); assert d["decision"] == "block"; assert "*/15 8-21 * * *" in d["reason"]; assert "/clutch:watch @0123abcd" in d["reason"]' 2>/dev/null \
     || { echo "FAIL: S1 -- block line is not the JSON block object"; fail=1; }
 fi
-[ -s "$FP" ] || { echo "FAIL: S1 -- no fingerprint at $FP"; fail=1; }
+grep -qx "$((NOW - 100)) proj wait: gh:o/r#1 b1 @0123abcd pr one" "$FP" 2>/dev/null \
+  || { echo "FAIL: S1 -- owned line not recorded at $FP"; fail=1; }
 
 # S5: a second stop on the same owned set stays quiet.
 stp "$T/run" "$IN"
@@ -360,7 +364,7 @@ fresh "$SF"
 stp "$T/run" "{\"session_id\":\"$ID\",\"stop_hook_active\":false}"
 quiet S10
 
-# S11: the fingerprint cannot be written: no block, rc 0.
+# S11: the record cannot be written: no block, rc 0.
 owned1
 : > "$HOME/.clutch/watch"
 fresh "$SF"
@@ -379,6 +383,73 @@ add 50 'proj moved: gh:o/r#1 merged'
 fresh "$SF"
 stp "$T/run" "$IN"
 quiet S14
+
+# docin <message> <session_crons array>: a Stop input in the docs key order,
+# last_assistant_message and background_tasks before session_crons.
+docin() {
+  printf '{"session_id":"%s","transcript_path":"/t/x.jsonl","cwd":"/c","hook_event_name":"Stop","stop_hook_active":false,"last_assistant_message":"%s","background_tasks":[],"session_crons":%s}' "$ID" "$1" "$2"
+}
+WCRON='{"id":"c9","schedule":"*/15 8-21 * * *","recurring":true,"prompt":"/clutch:watch @0123abcd"}'
+
+# S2c: a message that mentions the watch prompt is not an armed watch.
+owned1
+fresh "$SF"
+stp "$T/run" "$(docin 'Armed: prompt `/clutch:watch @0123abcd` now' '[]')"
+blocked S2c
+
+# S15: a cron prompt over 1000 chars carries "... [+N chars]" with a ];
+# the armed watch after it still counts.
+LONGP="$(head -c 1000 /dev/zero | tr '\0' 'p')… [+250 chars]"
+owned1
+fresh "$SF"
+# Built outside $(...): bash 3.2 brace-expands a {a,b} there despite the quotes.
+LCRON='{"id":"c1","schedule":"0 9 * * *","recurring":true,"prompt":"'$LONGP'"}'
+stp "$T/run" "$(docin 'done' "[$LCRON,$WCRON]")"
+quiet S15
+
+# S16: a /loop prompt that only mentions the watch is not the watch.
+owned1
+fresh "$SF"
+stp "$T/run" "$(docin 'done' '[{"id":"c1","schedule":"*/5 * * * *","recurring":true,"prompt":"/loop 5m /clutch:watch @0123abcd"}]')"
+blocked S16
+
+# S10b: no session_crons key, but a message ending in an escaped mention of
+# it: the registry is still unreachable, no block.
+owned1
+fresh "$SF"
+stp "$T/run" "{\"session_id\":\"$ID\",\"stop_hook_active\":false,\"last_assistant_message\":\"see \\\"session_crons\"}"
+quiet S10b
+
+# S17: the user declined (blocked once), then one owned wait closes: the
+# smaller set never blocks again.
+seed
+add 100 'proj wait: gh:o/r#1 b1 @0123abcd pr one'
+add 90 'proj wait: gh:o/r#2 b1 @0123abcd pr two'
+fresh "$SF"
+stp "$T/run" "$IN"
+blocked "S17 first"
+add 50 'proj moved: gh:o/r#1 merged'
+stp "$T/run" "$IN"
+quiet S17
+# S18: declined, then a new owned wait: blocked once, then quiet.
+add 40 'proj wait: gh:o/r#3 b1 @0123abcd pr three'
+stp "$T/run" "$IN"
+blocked "S18 new wait"
+stp "$T/run" "$IN"
+quiet "S18 again"
+
+# S19: a ~160 KB last_assistant_message full of escaped mentions finishes
+# well inside the hook timeout (whole seconds: a diff of 1 or less is < 2 s).
+FILL=$(i=0; while [ $i -lt 2200 ]; do printf 'lorem \\"session_crons\\":[ \\"prompt\\":\\"/clutch:watch @0123abcd\\" ] ipsum '; i=$((i + 1)); done)
+for c in '[]' "[$WCRON]"; do
+  owned1
+  fresh "$SF"
+  S19_T0=$(date +%s)
+  stp "$T/run" "$(docin "$FILL" "$c")"
+  S19_DT=$(($(date +%s) - S19_T0))
+  [ "$S19_DT" -le 1 ] || { echo "FAIL: S19 [$c] -- ${S19_DT}s for a ${#FILL}-byte message"; fail=1; }
+  if [ "$c" = '[]' ]; then blocked "S19 unarmed"; else quiet "S19 armed"; fi
+done
 
 [ "$fail" -eq 0 ] || exit 1
 echo PASS
