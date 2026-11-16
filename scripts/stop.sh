@@ -3,11 +3,54 @@
 # thread breadcrumb writer, the worklog writer (~/.clutch/worklog.md) and the
 # recognition bell live in one process, run sequentially, and never race each
 # other on .clutch/ state.
-# Silent by default; any error degrades to nothing. Exit 0 always.
+# Silent by default; any error degrades to nothing. Exit 0 always. The one
+# stdout exception is the watch gate's block line below.
 
+INPUT=$(cat 2>/dev/null) || INPUT=""
 PRELUDE=$(dirname "$0")/prelude.sh
 [ -f "$PRELUDE" ] || exit 0
 . "$PRELUDE" || exit 0
+
+# --- watch gate: a session holding its own open wait loops (field 6 = its
+# @tag) and no armed /clutch:watch is blocked with the arming step, only when
+# an owned wait is not yet recorded in ~/.clutch/watch/<tag8>; a smaller or
+# equal set never blocks again. The new lines land there before the block
+# prints, so a lost block is possible and a repeated one is not. Runs outside
+# git too. Every failure falls through to the rest of the script.
+# CLUTCH_WATCH=off skips it. Matches stay linear over the whole input (bash
+# 3.2 slicing is quadratic on a long last_assistant_message). Armed means a
+# "prompt" whose whole JSON value is the watch prompt: inside a JSON string
+# every " is escaped, so a mention in a message cannot match. A key is the
+# only string followed by ':', so "session_crons": is the key itself; no key
+# means the registry was unreachable, so no block.
+if [ "${CLUTCH_WATCH:-}" != off ]; then
+  case $INPUT in
+    *'"stop_hook_active":true'* | *'"stop_hook_active": true'*) ;;
+    *'"session_crons":'*)
+      if WATCH_TAG=$(clutch_session_tag "$INPUT") &&
+        WATCH_OWN=$(clutch_owned_loops "$WATCH_TAG" 2>/dev/null) &&
+        [ -n "$WATCH_OWN" ]; then
+        case $INPUT in
+          *"\"prompt\":\"/clutch:watch $WATCH_TAG\""* | *"\"prompt\": \"/clutch:watch $WATCH_TAG\""*) ;;
+          *)
+            WATCH_FILE="$HOME/.clutch/watch/${WATCH_TAG#@}"
+            if [ -e "$WATCH_FILE" ]; then
+              WATCH_NEW=$(printf '%s\n' "$WATCH_OWN" | grep -vxF -f "$WATCH_FILE" 2>/dev/null)
+            else
+              WATCH_NEW=$WATCH_OWN
+            fi &&
+              [ -n "$WATCH_NEW" ] &&
+              mkdir -p "$HOME/.clutch/watch" 2>/dev/null &&
+              printf '%s\n' "$WATCH_NEW" 2>/dev/null >> "$WATCH_FILE" &&
+              printf '{"decision":"block","reason":"This session holds open wait loops and no watch. Arm one now with CronCreate, schedule `*/15 8-21 * * *`, recurring, prompt `/clutch:watch %s`, then end the turn. If the user said not to watch them, just end the turn."}\n' "$WATCH_TAG" &&
+              exit 0
+            ;;
+        esac
+      fi
+      ;;
+  esac
+fi
+
 [ "$CLUTCH_GIT" = 1 ] || exit 0
 clutch_ensure_dir || exit 0
 

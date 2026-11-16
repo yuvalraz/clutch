@@ -19,6 +19,8 @@ PRELUDE=$(dirname "$0")/prelude.sh
 # Read before the git gate so sessions outside a repo see the worklog too.
 WLINES=$(clutch_worklog_window 2>/dev/null) || WLINES=""
 [ -n "$WLINES" ] && printf '\nWorklog:\n%s\n' "$WLINES"
+# Before the git gate so sessions outside a repo get the tag too; CLUTCH_WATCH=off drops it.
+[ "${CLUTCH_WATCH:-}" = off ] || { STAG=$(clutch_session_tag "$INPUT") && printf 'Session tag: %s\n' "$STAG"; }
 [ "$CLUTCH_GIT" = 1 ] || exit 0
 
 # Reset the session clock only on a positively identified fresh session

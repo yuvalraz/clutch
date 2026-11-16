@@ -97,6 +97,7 @@ Engagement rules:
    dream-spark) is invited output: relay its reply, or a notice that it
    failed before replying, as it is, outside the two-line cap. The relay
    licenses nothing uninvited.
+   A tick from the session's armed watch is invited output too.
 4. State each mechanism plainly by name. Do not reference any outside focus
    system, session mode, or private vocabulary. No trust levels, no ledger.
 
@@ -108,7 +109,12 @@ resume, or clear. Never propose a live on: item uninvited; the user's
 explicit ask wins over any claim. Claims are facts for peers that age out,
 never a list for the user. Append one line silently: moved: when a loop
 outside git closes (commits log themselves), on: when starting work a peer
-might take. Escape ' as '\''. Speak on MISS or an error.
+might take, wait: when an outward action leaves you waiting on someone else's
+move, its text `<kind>:<ref> <baseline> <session tag> <what you wait for>`,
+such as `gh:<owner>/<repo>#<n> <PR updatedAt>` or
+`slack:<channel>/<thread ts> <sent ts>`. The baseline is one token: hyphens,
+no spaces. No Session tag line: omit the tag, never a peer's. Escape ' as '\''.
+Speak on MISS or an error.
 
 ```sh
 mkdir -p "$HOME/.clutch" 2>/dev/null && printf '%s %s %s %.200s\n' "$(date +%s)" "$(basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" | tr ' ' -)" '<moved:|on:>' '<one line>' >> "$HOME/.clutch/worklog.md" || echo MISS

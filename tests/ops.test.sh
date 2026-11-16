@@ -9,6 +9,8 @@
 # locally because de-private.test.sh applies them only to the divergent set.
 # Wait loops and the tick: fixed-string pins on the arm, tick and fold prose,
 # then the skill's own wait snippet and tick read line run as a round trip.
+# The watch skill: fixed-string pins on its tick prose, and its tagged read
+# line run as a round trip against the same wait snippet.
 set -u
 
 HERE=$(cd "$(dirname "$0")" && pwd)
@@ -20,9 +22,10 @@ R=${README_FILE:-$HERE/../README.md}
 HB=${HB_FILE:-$HERE/../scripts/heartbeat.sh}
 A=${ANCHOR_SH:-$HERE/../scripts/anchor.sh}
 C=${CONST_FILE:-$HERE/../rules/constitution.md}
+WS=${WATCH_SKILL:-$HERE/../skills/watch/SKILL.md}
 
 fail=0
-for f in "$O" "$I" "$TP" "$G" "$R" "$HB" "$A" "$C"; do
+for f in "$O" "$I" "$TP" "$G" "$R" "$HB" "$A" "$C" "$WS"; do
   [ -f "$f" ] || { echo "FAIL: missing $f"; fail=1; }
 done
 [ "$fail" -eq 0 ] || exit 1
@@ -258,7 +261,41 @@ fpin "$R" "README: wait bullet"        'In ops, an action you approve that await
 fpin "$R" "README: watch code span"    '`watch <thing>`'
 fpin "$R" "README: closing ref"        'A later `moved:` line that starts with the same ref closes it.'
 fpin "$R" "README: three verbs"      '`on:` claim or `wait:` loop'
+# The stop hook blocks the model, not the user: the README says the session
+# is told to arm a watch, once per new wait, never that the user is asked.
+fpin "$R" "README: told once per wait"  'is told to arm a watch once per new wait'
+if grep -qE 'asked once to arm|one ask to arm' "$R"; then
+  echo "FAIL: README says the user is asked to arm a watch"; fail=1
+fi
 fpin "$R" "README: tick sentence"      '`/clutch:ops tick` checks only those waits, on request, and speaks only when one moved.'
+
+# --- ops: tagged waits, and the pointer to the watch's own tick
+fpin "$O" "ops: wait text tag"          'When the session start gave a `Session tag:`, `<text>` starts with that tag, such as `@0123abcd Or'"'"'s review`.'
+fpin "$O" "ops: watch pointer"          'A session'"'"'s armed watch does not send a tick: it sends `/clutch:watch @<tag>`, which reads only the waits that tag owns.'
+
+# --- watch skill: the armed watch's tick
+fpin "$WS" "W1 trigger"                 'Use ONLY when the prompt is `/clutch:watch @<tag>`'
+# A fire only runs skills the model may invoke, so model invocation stays on.
+if grep -qiE '^disable-model-invocation:[[:space:]]*["'"'"']?true' "$WS"; then
+  echo "FAIL: W2 watch skill disables model invocation -- its fires never run"
+  fail=1
+fi
+fpin "$WS" "W3 delete on empty read"    'Exit status 0 with empty output, or exit status 1 with no error text, means no wait is left: delete the recurring task whose prompt is `/clutch:watch @<tag>` and say so in one line.'
+fpin "$WS" "W4 keep on bad read"        'Any other outcome, error text included, keeps the watch: say once that the waits cannot be read, and stay silent about it on later ticks.'
+fpin "$WS" "W5 not the user, not a bot" 'A review, comment, reply or message from the user or a bot does not count, except a review that requests changes, which counts from anyone but the user.'
+fpin "$WS" "W5b gh read updatedAt"      '`gh pr view <number> --repo <owner>/<repo> --json state,reviews,comments,updatedAt`'
+fpin "$WS" "W5c gh re-held baseline"    "the re-held baseline is that PR's \`updatedAt\` from the same read."
+fpin "$WS" "W5d linear movement"        '- linear: an `updatedAt` newer than the baseline with a different state, or a comment newer than the baseline.'
+fpin "$WS" "W5e tagged moved text"      'verb `moved:` and text `<kind>:<ref> @<tag> <what moved>`.'
+fpin "$WS" "W6 own standing rules"      "Then act on it by the session's own standing rules, such as a fix loop on changes requested or the bookkeeping after a merge."
+fpin "$WS" "W7 outward waits for yes"   'An outward action still waits for its usual yes.'
+fpin "$WS" "W8 silent when unmoved"     'When nothing moved, print nothing.'
+fpin "$WS" "W9 no gear change"          'It sets no gear, no focus and no mode: the session keeps the rules it had.'
+fpin "$WS" "W10 no counts"              'Never count waits, never say how long anything has waited, and never name a wait that did not move.'
+nws_l=$(grep -c '' "$WS")
+[ "$nws_l" -lt 60 ] || { echo "FAIL: W11 watch skill is $nws_l lines, want under 60"; fail=1; }
+fpin "$WS" "W12 re-hold open thing"     'If the thing is still open after the move, such as approved, commented or changes requested, append a fresh `wait:` line right after that `moved:` line, with the same snippet and text `<kind>:<ref> <new baseline> @<tag> <text>`: the same ref, the new baseline and the same `@<tag>`, so a later merge stays watched.'
+fpin "$WS" "W13 merged not held"        'A thing that merged or closed is not held again.'
 
 # --- the tablet inbox: the sweep claims, reads, sorts and routes it once
 pin  "$O" "tablet: section"             '^### Tablet inbox$'
@@ -317,7 +354,7 @@ case $OJ in *'Leave out a folder'*|*'Pass a folder only when'*)
 # Release after a failed route un-counts the claim, so a refusal would loop forever.
 case $OJ in *'and run release'*|*'run release, and the sweep'*|*'Run release only when'*|*'note name).'*)
   echo "FAIL: ops -- a replaced release or date rule is back"; fail=1 ;; esac
-fpin "$R" "README: tablet inbox"        'When the tablet inbox has new pages or typed tasks, the sweep files each line once: work under `## From the tablet` in today'"'"'s focus file and work ideas in the fomo pool, personal and unsure ones in `~/.clutch/personal.md`, and it names what arrived without counting it.'
+fpin "$R" "README: tablet inbox"        'When the tablet inbox has new pages or typed tasks, the sweep files each line once: work under `## From the tablet` in today'"'"'s focus file (or in `<state dir>/tablet.md` until that file exists) and work ideas in the fomo pool, personal and unsure ones in `~/.clutch/personal.md`, and it names what arrived without counting it.'
 fpin "$R" "README safe: ops reads"      'Ops also reads the tablet inbox under `~/.clutch/inbox/`, and `~/.clutch/people.md` when it exists, to sort what arrived.'
 fpin "$R" "README safe: waiting file"   'before today'"'"'s focus file exists, work lines wait in `<state dir>/tablet.md` and move into that file once it does'
 fpin "$R" "README safe: ops writes"     '`/clutch:ops` files them: work lines into today'"'"'s focus file (or, with no focus file set, `~/.clutch/personal.md`)'
@@ -351,6 +388,11 @@ check_empty "C intent (ops)"        -nE  "$PAT_C" "$O"
 check_empty "E fuel (ops)"          -niE "$PAT_E" "$O"
 check_empty "F daemon (ops)"        -niE "$PAT_F" "$O"
 check_empty "G template (ops)"      -nF  "$PAT_T" "$O"
+check_empty "A private-vocab (watch)" -niE "$PAT_A" "$WS"
+check_empty "C intent (watch)"        -nE  "$PAT_C" "$WS"
+check_empty "E fuel (watch)"          -niE "$PAT_E" "$WS"
+check_empty "F daemon (watch)"        -niE "$PAT_F" "$WS"
+check_empty "G template (watch)"      -nF  "$PAT_T" "$WS"
 
 T=$(mktemp -d) || exit 1
 HOME=$T/home; export HOME
@@ -524,6 +566,97 @@ TOUT=$(cd "$T/armdir" && LC_ALL=en_US.UTF-8 sh -c "$TCMD" 2>&1); TRC=$?
 [ "$TRC" = 0 ] && printf '%s\n' "$TOUT" | grep -qF ' gh:o/r#1 ' \
   && printf '%s\n' "$TOUT" | grep -qF ' gh:o/r#2 ' \
   || { echo "FAIL: O-arm (g) -- want both loops under UTF-8; rc $TRC: $TOUT"; exit 1; }
+
+# --- O-tag: the watch skill's tagged read line against the ops wait snippet.
+# rl1 <string> <from> <to>: the first <from> replaced by <to>, literally.
+rl1() {
+  printf '%s\n' "$1" | RA=$2 RB=$3 awk '{ i = index($0, ENVIRON["RA"])
+    if (i) $0 = substr($0, 1, i - 1) ENVIRON["RB"] substr($0, i + length(ENVIRON["RA"]))
+    print }'
+}
+GLINE=$(grep -F 'sh -c' "$WS" | grep -F 'clutch_owned_loops')
+[ "$(printf '%s\n' "$GLINE" | grep -c .)" = 1 ] \
+  || { echo "FAIL: O-tag wants exactly one sh -c line reading clutch_owned_loops, got: $GLINE"; exit 1; }
+GBAD=$(subroot "$GLINE")
+case "$GBAD" in
+  *CLAUDE_PLUGIN_ROOT*) echo "FAIL: O-tag -- plugin root left unsubstituted: $GBAD"; exit 1 ;;
+esac
+GCMD=$(rl1 "$GBAD" '@<tag>' '@0123abcd')
+[ "$GCMD" != "$GBAD" ] || { echo "FAIL: O-tag -- no @<tag> to fill in: $GLINE"; exit 1; }
+# wfill <ref> <text> <out>: the ops wait snippet filled with <ref> and <text>.
+wfill() {
+  WK=$1 WB='2026-11-13T10:00:00Z' WX=$2 awk '
+    function rl(s, a, b,   i) { i = index(s, a); return i ? substr(s, 1, i - 1) b substr(s, i + length(a)) : s }
+    { $0 = rl($0, "<kind>:<ref>", ENVIRON["WK"]); $0 = rl($0, "<baseline>", ENVIRON["WB"])
+      print rl($0, "<text>", ENVIRON["WX"]) }' "$T/wsnip.raw" > "$3"
+}
+# owned <cmd>: run a tagged read line from the arm dir; sets GOUT, GRC, $T/gerr.
+owned() { GOUT=$(cd "$T/armdir" && sh -c "$1" 2>"$T/gerr"); GRC=$?; }
+
+# (a) an owned wait: the tagged read prints exactly that line
+armhome ga
+wfill 'gh:o/r#7' "@0123abcd Or'\\''s review" "$T/gsnip-own.sh"
+(cd "$T/armdir" && sh "$T/gsnip-own.sh" >/dev/null 2>&1)
+OWN=$(cat "$W" 2>/dev/null)
+printf '%s\n' "$OWN" | grep -qE "^[0-9]+ armdir wait: gh:o/r#7 2026-11-13T10:00:00Z @0123abcd Or's review\$" \
+  || { echo "FAIL: O-tag (a) -- want one owned wait: line, got: $OWN"; exit 1; }
+owned "$GCMD"
+[ "$GRC" = 0 ] && [ "$GOUT" = "$OWN" ] \
+  || { echo "FAIL: O-tag (a) -- rc $GRC, got: $GOUT"; exit 1; }
+
+# (b) another session's wait and an untagged one stay out of the read
+wfill 'gh:o/r#8' '@ffffffff Eve review' "$T/gsnip-other.sh"
+wfill 'gh:o/r#9' 'Dan review' "$T/gsnip-plain.sh"
+(cd "$T/armdir" && sh "$T/gsnip-other.sh" && sh "$T/gsnip-plain.sh") >/dev/null 2>&1
+[ "$(grep -c . "$W")" = 3 ] || { echo "FAIL: O-tag (b) -- want 3 wait lines, got: $(cat "$W")"; exit 1; }
+owned "$GCMD"
+[ "$GRC" = 0 ] && [ "$GOUT" = "$OWN" ] \
+  || { echo "FAIL: O-tag (b) -- rc $GRC, got: $GOUT"; exit 1; }
+
+# (c) a peer waits on the same ref; the watch writes its tagged moved: line,
+# then the re-held wait (both forms pinned in W5e and W12) with the
+# constitution's snippet: the owned read is that one re-held line, and the
+# peer still reads its own wait.
+wfill 'gh:o/r#7' '@ffffffff Eve on mine too' "$T/gsnip-peer7.sh"
+(cd "$T/armdir" && sh "$T/gsnip-peer7.sh") >/dev/null 2>&1
+PEER=$(grep -F ' @ffffffff Eve on mine too' "$W")
+# csnip <verb> <text> <out>: the constitution's snippet filled.
+csnip() {
+  awk '/```sh/{n++; f=1; next} /```/{f=0} f && n == 1' "$C" | CV=$1 CX=$2 awk '
+    function rl(s, a, b,   i) { i = index(s, a); return i ? substr(s, 1, i - 1) b substr(s, i + length(a)) : s }
+    { $0 = rl($0, "<moved:|on:>", ENVIRON["CV"]); print rl($0, "<one line>", ENVIRON["CX"]) }' > "$3"
+}
+csnip 'moved:' 'gh:o/r#7 @0123abcd approved' "$T/gsnip-moved.sh"
+csnip 'wait:' "gh:o/r#7 2026-11-13T11:00:00Z @0123abcd Or'\\''s review" "$T/gsnip-rehold.sh"
+(cd "$T/armdir" && sh "$T/gsnip-moved.sh" && sh "$T/gsnip-rehold.sh") >/dev/null 2>&1
+REHELD=$(tail -n 1 "$W")
+printf '%s\n' "$REHELD" | grep -qE "^[0-9]+ armdir wait: gh:o/r#7 2026-11-13T11:00:00Z @0123abcd Or's review\$" \
+  || { echo "FAIL: O-tag (c) -- want the re-held wait: line last, got: $REHELD"; exit 1; }
+owned "$GCMD"
+[ "$GRC" = 0 ] && [ "$GOUT" = "$REHELD" ] \
+  || { echo "FAIL: O-tag (c) -- want rc 0 and only the re-held line; rc $GRC, got: $GOUT"; exit 1; }
+owned "$(rl1 "$GBAD" '@<tag>' '@ffffffff')"
+[ "$GRC" = 0 ] && [ -n "$PEER" ] && [ "$GOUT" = "$(printf '%s\n%s' "$(grep -F ' @ffffffff Eve review' "$W")" "$PEER")" ] \
+  || { echo "FAIL: O-tag (c) -- the peer lost its wait on the same ref; rc $GRC, got: $GOUT"; exit 1; }
+
+# (bad) the placeholder left in: nothing printed, rc 2, the watch is kept
+owned "$GBAD"
+[ "$GRC" = 2 ] && [ -z "$GOUT" ] \
+  || { echo "FAIL: O-tag (bad) -- want rc 2, empty; rc $GRC: $GOUT"; exit 1; }
+
+# (none) no worklog: rc 1, no stdout, no stderr -- the delete case
+armhome gn
+owned "$GCMD"
+[ "$GRC" = 1 ] && [ -z "$GOUT" ] && [ ! -s "$T/gerr" ] \
+  || { echo "FAIL: O-tag (none) -- want rc 1, silent; rc $GRC: $GOUT / $(cat "$T/gerr")"; exit 1; }
+
+# (gone) no scripts/prelude.sh under the plugin root: rc nonzero with error
+# text -- the keep case, never read as an empty read
+mkdir -p "$T/noroot"
+GGONE=$(rl1 "$(rl1 "$GLINE" '${CLAUDE_PLUGIN_ROOT}' "$T/noroot")" '@<tag>' '@0123abcd')
+owned "$GGONE"
+[ "$GRC" != 0 ] && [ -s "$T/gerr" ] \
+  || { echo "FAIL: O-tag (gone) -- want rc nonzero with stderr; rc $GRC: $(cat "$T/gerr")"; exit 1; }
 
 # --- O-window: the skill's one window line, root substituted like O-run. A
 # `### Windows` time of 00:00 has always passed, so the first run is due at any

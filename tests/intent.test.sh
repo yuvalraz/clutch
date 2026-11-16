@@ -78,6 +78,7 @@ for f in "$C" "$H"; do
   pin "$f" "carve-out not counted ($f)" 'never counted against the budget'
   pin "$f" "carve-out ignore legal ($f)" 'ignoring it is a legal answer'
   pin "$f" "carve-out four focuses ($f)" 'build, ideate, ops, or review'
+  pin "$f" "watch tick invited ($f)" "the session's armed watch is invited output too"
 done
 
 # --- README eleventh moment + GLOSSARY entry

@@ -4,7 +4,7 @@
 # Sets: CLUTCH_GIT (1 inside a git work tree, else 0), ROOT, CLUTCH_DIR,
 # EXCLUDE_FILE, CLUTCH_WORKLOG. Defines clutch_ensure_dir,
 # clutch_last_authored, clutch_worklog_window, clutch_open_loops,
-# clutch_ops_due.
+# clutch_session_tag, clutch_owned_loops, clutch_ops_due.
 
 CLUTCH_GIT=0
 ROOT=""
@@ -89,32 +89,42 @@ clutch_last_authored() {
 # One scan of the worklog for both readers ($1: window or loops). A wait loop
 # is "<epoch> <repo> wait: <kind>:<ref> <baseline> <text>"; a later moved:
 # line whose fourth field is the same <kind>:<ref> closes it, and an open wait
-# ages out after 5 days. Malformed, future-dated and unknown-verb lines are
+# ages out after 5 days. A wait whose text starts with an @tag is keyed by ref
+# and tag, so peer sessions on one ref stay apart: a moved: line whose fifth
+# field is an @tag closes only that tag's wait, an untagged moved: line closes
+# every wait on the ref. Malformed, future-dated and unknown-verb lines are
 # skipped. A ref's trailing ,;:. or CR is ignored on both sides, and a
 # "moved: L2:" line never closes a wait. Returns 1 when the file does not
 # exist (no worklog), 2 when it exists but is not a readable regular file or
-# `date` fails; never creates anything.
+# `date` or `tail` fails; never creates anything.
 # shortcut: scans the last 2000 lines and cuts bytes, not characters; upgrade
 # if 5 days log more than 2000 lines or a cut splits a glyph.
 clutch_worklog_scan() {
   [ -e "$CLUTCH_WORKLOG" ] || return 1
   [ -f "$CLUTCH_WORKLOG" ] && [ -r "$CLUTCH_WORKLOG" ] || return 2
   WNOW=$(date +%s 2>/dev/null) || return 2
+  WTAIL=$(tail -n 2000 "$CLUTCH_WORKLOG" 2>/dev/null) || return 2
   # LC_ALL=C: a UTF-8 awk aborts the whole scan on one invalid byte.
-  tail -n 2000 "$CLUTCH_WORKLOG" 2>/dev/null | LC_ALL=C awk -v now="$WNOW" -v mode="$1" '
+  printf '%s\n' "$WTAIL" | LC_ALL=C awk -v now="$WNOW" -v mode="$1" '
     $1 ~ /^[0-9]+$/ && NF >= 4 {
       age = now - $1
       if (age < 0) next
       n++; ln[n] = $0; vb[n] = $3; ag[n] = age
       r = $4; sub(/[,;:.\r]+$/, "", r)
-      if ($3 == "wait:" && NF >= 6 && r ~ /^[^:]+:./) open[r] = n
-      else if ($3 == "moved:" && (r in open)) delete open[r]
+      # A session tag is @ plus 8 lowercase hex (the head of a session id); any other @word is plain text.
+      if ($3 == "wait:" && NF >= 6 && r ~ /^[^:]+:./) {
+        k = ($6 ~ /^@[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]$/) ? r SUBSEP $6 : r
+        open[k] = n; ref[k] = r
+      } else if ($3 == "moved:") {
+        if ($5 ~ /^@[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]$/) delete open[r SUBSEP $5]
+        else for (k in open) if (ref[k] == r) delete open[k]
+      }
     }
     # Live claims are kept first, then open waits, then moves, so neither a
     # burst of moves nor a pile of waits can push a claim out of view; waits
     # still print first.
     END {
-      for (r in open) if (ag[open[r]] < 432000) w[open[r]] = 1
+      for (k in open) if (ag[open[k]] < 432000) w[open[k]] = 1
       if (mode == "loops") { for (i = 1; i <= n; i++) if (w[i]) print ln[i]; exit }
       k = 0
       for (i = n; i > 0 && k < 8; i--) if (vb[i] == "on:" && ag[i] < 14400) { keep[i] = 1; k++ }
@@ -128,6 +138,41 @@ clutch_worklog_scan() {
 
 # The open wait loops, raw (epoch kept), oldest first; read by the ops tick.
 clutch_open_loops() { clutch_worklog_scan loops; }
+
+# The session tag from hook input JSON ($1): "@" plus the first 8 chars of
+# the FIRST "session_id" value, which must be [0-9A-Za-z-]. Prints nothing
+# and returns 1 otherwise. Cut at the first key: a greedy sed takes the last.
+clutch_session_tag() {
+  case $1 in *'"session_id"'*) ;; *) return 1 ;; esac
+  CST_R=${1#*\"session_id\"}
+  CST_ID=$(printf '%s\n' "$CST_R" | sed -n '1s/^ *: *"\([0-9A-Za-z-]\{1,\}\)".*/\1/p')
+  [ -n "$CST_ID" ] || return 1
+  printf '@%.8s\n' "$CST_ID"
+}
+
+# The open wait lines owned by tag $1 (field 6 equals it), raw, oldest
+# first. Returns 2 on a malformed tag, else clutch_open_loops' rc 1 or 2.
+# rc 1 (no worklog) only when the absence is proven: an empty HOME, a
+# dangling symlink, or a ~/.clutch or HOME that is not a searchable directory
+# is rc 2, so a caller never reads "can't stat" as "no loops".
+clutch_owned_loops() {
+  # Spelled-out class: a range like A-Z matches é under a UTF-8 /bin/sh.
+  case $1 in @|@*[!0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz-]*|[!@]*|'') return 2 ;; esac
+  COL_OUT=$(clutch_open_loops)
+  COL_RC=$?
+  if [ "$COL_RC" = 1 ]; then
+    [ -n "$HOME" ] && [ ! -L "$CLUTCH_WORKLOG" ] || return 2
+    if [ -e "$HOME/.clutch" ] || [ -L "$HOME/.clutch" ]; then
+      [ -d "$HOME/.clutch" ] && [ -x "$HOME/.clutch" ] || return 2
+    else
+      [ -d "$HOME" ] && [ -x "$HOME" ] || return 2
+    fi
+    return 1
+  fi
+  [ "$COL_RC" = 0 ] || return "$COL_RC"
+  [ -n "$COL_OUT" ] || return 0
+  printf '%s\n' "$COL_OUT" | LC_ALL=C awk -v t="$1" '$6 == t'
+}
 
 # The window for the session-start block and the ops sweep: up to 8 lines,
 # open waits first, epoch dropped, each cut to 160 bytes.

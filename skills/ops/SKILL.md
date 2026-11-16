@@ -186,6 +186,7 @@ behavior:
   - gmail: ref `gmail:<thread id>`; baseline, the thread's last message id.
   - ld: ref `ld:<flag key>`; baseline, the flag version.
   - dd: ref `dd:<monitor id>`; baseline, the monitor state.
+  When the session start gave a `Session tag:`, `<text>` starts with that tag, such as `@0123abcd Or's review`.
 - **Interruptions are the gait.** A new ping mid-loop gets one line, bank it
   or close it now, then back to the open loop.
 - **A tangent banks.** An idea that pulls sideways goes to `/clutch:fomo` in
@@ -243,6 +244,7 @@ When nothing moved, a tick prints nothing.
 A tool that is not reachable gets one line naming it, and that loop stays open.
 A tick never re-arms a loop, never names one that did not move, and never says how long anything has waited.
 In the sweep's tick pass, moved loops fold into the situation instead of their own lines.
+A session's armed watch does not send a tick: it sends `/clutch:watch @<tag>`, which reads only the waits that tag owns.
 
 ### Delegation
 
