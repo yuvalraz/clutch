@@ -35,8 +35,8 @@ and it is the anti-nag law made visible. A wrong nudge costs more than a missed
 one.
 
 The catch may reach first. The spark only answers.
-Apart from fomo's silent bank, divergence, the focuses and the upkeep commands
-wait until you fire them.
+Apart from fomo's silent bank and a session's armed watch, divergence, the
+focuses and the upkeep commands wait until you fire them.
 
 ```
  session start --> anchor.sh -------> .clutch/   session clock
@@ -59,11 +59,11 @@ second identical failure can be told from a first) live in
 
 | When | What fires | What you might see | What it writes |
 |------|------------|--------------------|----------------|
-| Session start (startup, resume, clear, compact, fork) | `anchor.sh` | This goes to the model, which greets you with it: your thread, last landed commit, captures held, and the smallest move to resume. On a fresh session with no gear set, one question. The model also gets the constitution and the `Worklog:` block. | `.clutch/session-state` on a fresh session |
+| Session start (startup, resume, clear, compact, fork) | `anchor.sh` | This goes to the model, which greets you with it: your thread, last landed commit, captures held, and the smallest move to resume. On a fresh session with no gear set, one question. The model also gets the constitution and the `Worklog:` block, and this session's tag. | `.clutch/session-state` on a fresh session |
 | Every prompt | `heartbeat.sh` | Nothing. It reminds the model which command fits which stall, how many uninvited lines are left, and the sprint clock. | nothing |
 | Before a shell command | `hot-pause.sh` | One ask before a force-push, `reset --hard`, `branch -D`, `checkout -- .` or `clean -fd`. Your yes wins in one keypress. | nothing |
 | After a shell command | `red-moment.sh` | Usually nothing. When the same runner command fails again with the tree unchanged, the model may say one line. | `.clutch/session-state` |
-| Turn end | `stop.sh` | The bell: `Landed: '<subject>'. Smallest next move: one commit.`, only after 25 minutes and real movement. A live sprint shows `Sprint: N min left on '<goal>'` instead. After a long run with unbanked work, one offer to bank it. | `.clutch/breadcrumb`, and one `moved:` line in `~/.clutch/worklog.md` naming your latest commit, when the turn landed one |
+| Turn end | `stop.sh` | The bell: `Landed: '<subject>'. Smallest next move: one commit.`, only after 25 minutes and real movement. A live sprint shows `Sprint: N min left on '<goal>'` instead. After a long run with unbanked work, one offer to bank it. When this session holds its own open waits and no watch, one ask to arm a watch comes first instead. | `.clutch/breadcrumb`, and one `moved:` line in `~/.clutch/worklog.md` naming your latest commit, when the turn landed one, and `~/.clutch/watch/<tag>` when it asks |
 | On a command | the skill you named | What that command does (see Commands at a glance) | Depends on the command: the pool, the brain, `~/.clutch/rituals.md`, your review conventions file, or the auto-memory directory |
 
 ### Sessions see each other
@@ -82,6 +82,11 @@ only at one of those moments.
   when its ask ends with "(I'll hold this as an open loop)", and so does
   `watch <thing>`. A later `moved:` line that starts with the same ref closes it.
   Open waits show first in the `Worklog:` block and age out after 5 days.
+- Any session that hands off an outward step, such as a PR or an ask, logs a
+  `wait:` line that starts with its session tag. At turn end, a session that
+  holds such waits and no watch is asked once to arm one: `/clutch:watch @<tag>`
+  every 15 minutes from 08:00 to 21:45, silent unless one of its waits moved,
+  gone once none is left. `CLUTCH_WATCH=off` turns off the ask and the session tag.
 - The next session start shows them in its `Worklog:` block.
   Claims age out after 4 h and moves after 24 h.
   At most eight lines show, and a burst of moves never pushes a claim out.
@@ -174,7 +179,7 @@ Slow is legal. You are allowed to think.
 
 ## Commands at a glance
 
-Twenty commands, same heartbeat, opposite directions. The catch side meets you
+Twenty-one commands, same heartbeat, opposite directions. The catch side meets you
 when work stops moving. The spark side banks what pulls you and hands it back
 as ignition. The rest set the session's focus, run the day, and check on clutch.
 
@@ -195,6 +200,7 @@ as ignition. The rest set the session's focus, run the day, and check on clutch.
 | `/clutch:intent` | Declares the session's focus and engages the gear | The session-start question, or a change of plan |
 | `/clutch:ideate` | Divergent mode for the whole session | An ideate session |
 | `/clutch:ops` | Operations mode: one sweep, one loop at a time | A day of meetings, people, and threads |
+| `/clutch:watch` | One tick of a session's armed watch: reads only that session's waits, silent unless one moved | Sent by the watch a session arms; you rarely type it |
 | `/clutch:review` | Review mode: one PR at a time, your conventions applied | A review session |
 | `/clutch:tempo` | Sets or reports the gear: espresso, craft, ballmer, freefall, ferment | You want the gearbox itself |
 | `/clutch:morning` | Opens the day: focus check, deep ping, one divergent beat, one quick win, the first move | The start of your day |
@@ -251,13 +257,16 @@ work repo.
 
 It carries nothing personal. It reads your git state, its own `.clutch/` folder,
 your `~/.clutch` brain if you keep one, and the conversation in front of it.
-Some commands read more, and only when you fire them: `/clutch:dream` and
+Some commands read more, and only when you fire them or a session's armed
+watch fires one: `/clutch:dream` and
 `/clutch:interview` read the assistant's auto-memory directory, and
 `/clutch:review` reads your conventions file and the PR in front of it.
 `/clutch:morning`, `/clutch:eod`, `/clutch:ops` and `/clutch:review` read
 `~/.clutch/rituals.md` for your day's facts, integrations and conventions path.
 Morning and eod also read the state dir it names and your focus files.
 Ops also reads the tablet inbox under `~/.clutch/inbox/`, and `~/.clutch/people.md` when it exists, to sort what arrived.
+`/clutch:watch` reads the waits its session tag owns in `~/.clutch/worklog.md`,
+and the PRs, threads and other items they name.
 
 One thing to know before you mix contexts: a brain entry banked at home surfaces in
 whatever repo you run these skills in, a work repo included. Whether that is
@@ -266,8 +275,9 @@ fine is your call.
 It writes the local `.clutch/` folder, plus your brain on an absorb verdict, and
 adds the local folder to git's ignore list. Sessions also append one-line notes
 of what moved to `~/.clutch/worklog.md`, so parallel sessions can see each
-other. That log is not pool stock: it is the one thing sessions write to
-`~/.clutch` without a command or a verdict. The log is global: its lines,
+other. That log is not pool stock: it and the watch marker
+`~/.clutch/watch/<tag>` are the only things sessions write to `~/.clutch`
+without a command or a verdict. The log is global: its lines,
 commit subjects and repo names included, reach sessions in every repo, a work
 repo included. If you keep no `~/.clutch` yet, the first note creates it, and
 that folder is the brain: from then on an absorb verdict in `/clutch:fomo`
@@ -287,13 +297,16 @@ need is unset, morning, eod, ops and review ask for it, and most of the time
 offer to save a missing key into `~/.clutch/rituals.md`, on a yes.
 When the tablet inbox has new pages or typed tasks, `/clutch:ops` files them: work lines into today's focus file (or, with no focus file set, `~/.clutch/personal.md`), work ideas into `~/.clutch/captures.md`, the rest into `~/.clutch/personal.md`, which it creates; it keeps a ledger of what it filed under `~/.clutch` and deletes each capture once filed; before today's focus file exists, work lines wait in `<state dir>/tablet.md` and move into that file once it does.
 
-Some commands reach out, and only when you invoke them. `/clutch:fomo` fetches
+Some commands reach out, and only when you invoke them or a session's armed
+watch fires one. `/clutch:fomo` fetches
 a banked link, and a spark, daydream, dream-spark, or ideate pass may run a web
 search. `/clutch:ops` and `/clutch:morning` check the integrations you named.
 `/clutch:morning` and `/clutch:eod` run the prep command you set, and the
 extra and close-out steps you wrote can use your integrations.
-`/clutch:review` reads PRs and posts to one only on a yes. Nothing here
-touches the network on its own, and you can verify it:
+`/clutch:review` reads PRs and posts to one only on a yes.
+`/clutch:watch` checks the integrations its session's waits name, every 15
+minutes until none is left. No hook script here touches the network, and you
+can verify it:
 
 ```
 grep -rE 'curl|wget|/dev/tcp|nc ' scripts/
