@@ -7,8 +7,8 @@
 # be stat'ed, an empty HOME or a malformed tag; a wait re-held after a moved:
 # line on the same ref is open again). A1-A5 cover the anchor's
 # "Session tag: @<tag8>" line (dropped without a session_id or under
-# CLUTCH_WATCH=off); K1-K2 pin the constitution's wait: verb and the watch
-# tick carve-out.
+# CLUTCH_WATCH=off); K1-K4 pin the constitution's wait: verb, the watch
+# tick carve-out, the untagged wait and the one-token baseline.
 # prelude.sh, anchor.sh and the constitution are staged into a scratch tree
 # and run from a scratch repo or a non-git dir under a scratch HOME.
 # PRELUDE_SH, ANCHOR_SH and CONST_FILE override the targets for replay
@@ -195,6 +195,8 @@ for j in '{"source":"startup"}' '{"session_id":' 'not json' '{"session_id":"ab/c
   fix
   anc "$R" "$j"
   untagged "A4 [$j]"
+  [ "$j" != '{"source":"startup"}' ] || [ "$(printf '%s\n' "$OUT" | tail -n 1)" = "$ASKLINE" ] \
+    || { echo "FAIL: A4 [$j] -- intent ask is not the last line in [$OUT]"; fail=1; }
 done
 
 # A5: CLUTCH_WATCH=off with a session_id prints what the same anchor prints
@@ -212,7 +214,7 @@ for d in "$R" "$T/plain"; do
     || { echo "FAIL: A5 [$d] -- off output differs from no-session_id output: [$OUT] vs [$BASE_OUT]"; fail=1; }
 done
 
-# --- K1-K2: constitution pins, whitespace joined so wrapped prose matches.
+# --- K1-K4: constitution pins, whitespace joined so wrapped prose matches.
 J=$(tr -s '[:space:]' ' ' < "$T/rules/constitution.md")
 kpin() {
   case "$J" in *"$2"*) ;; *) echo "FAIL: $1 -- constitution lacks: $2"; fail=1 ;; esac
@@ -220,6 +222,8 @@ kpin() {
 kpin "K1 wait verb" "wait: when an outward action leaves you waiting on someone else's move"
 kpin "K1 wait text" '<kind>:<ref> <baseline> <session tag> <what you wait for>'
 kpin "K2 watch tick invited" "A tick from the session's armed watch is invited output too."
+kpin "K3 untagged wait" "No Session tag line: omit the tag, never a peer's."
+kpin "K4 one-token baseline" "The baseline is one token: hyphens, no spaces."
 
 [ "$fail" -eq 0 ] || exit 1
 echo PASS

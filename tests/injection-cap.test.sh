@@ -4,12 +4,12 @@
 # heartbeat, must stay under BUDGET (500 chars of headroom) at their worst
 # case. (i) anchor on startup with every optional line present, including a
 # full worklog block (10 fresh 300-char lines under a scratch HOME) and the
-# session tag line; (ii) heartbeat
-# with a gear, a live sprint and spent budget; (iii) negative control: the
-# anchor with a constitution padded to 10,000 chars must trip the same check,
-# so the size assert cannot pass vacuously. The real anchor.sh runs beside the
-# real prelude.sh. PLUGIN_ROOT_UNDER_TEST overrides the CLAUDE_PLUGIN_ROOT used
-# for (i), so a padded rules/ tree can be replayed through it.
+# session tag line; (ii) heartbeat with a gear, a live sprint and spent
+# budget; (iii) negative control: the anchor with a constitution padded to
+# 10,000 chars must trip the same check, so the size assert cannot pass
+# vacuously. The real anchor.sh runs beside the real prelude.sh.
+# PLUGIN_ROOT_UNDER_TEST overrides the CLAUDE_PLUGIN_ROOT used for (i), so a
+# padded rules/ tree can be replayed through it.
 set -u
 # An ambient CLUTCH_WATCH=off would drop the tag line and under-measure.
 unset CLUTCH_WATCH

@@ -112,7 +112,9 @@ outside git closes (commits log themselves), on: when starting work a peer
 might take, wait: when an outward action leaves you waiting on someone else's
 move, its text `<kind>:<ref> <baseline> <session tag> <what you wait for>`,
 such as `gh:<owner>/<repo>#<n> <PR updatedAt>` or
-`slack:<channel>/<thread ts> <sent ts>`. Escape ' as '\''. Speak on MISS or an error.
+`slack:<channel>/<thread ts> <sent ts>`. The baseline is one token: hyphens,
+no spaces. No Session tag line: omit the tag, never a peer's. Escape ' as '\''.
+Speak on MISS or an error.
 
 ```sh
 mkdir -p "$HOME/.clutch" 2>/dev/null && printf '%s %s %s %.200s\n' "$(date +%s)" "$(basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" | tr ' ' -)" '<moved:|on:>' '<one line>' >> "$HOME/.clutch/worklog.md" || echo MISS
