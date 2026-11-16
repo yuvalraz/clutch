@@ -7,7 +7,7 @@
 # be stat'ed, an empty HOME or a malformed tag; a wait re-held after a moved:
 # line on the same ref is open again). O6-O8 cover two sessions waiting on
 # one ref (a tagged moved: closes only its tag, an untagged one closes both);
-# O9 a failing tail is rc 2, never an empty read. A1-A5 cover the anchor's
+# O9 a failing tail is rc 2, never an empty read; O10 an @handle in untagged text stays plain text. A1-A5 cover the anchor's
 # "Session tag: @<tag8>" line (dropped without a session_id or under
 # CLUTCH_WATCH=off); K1-K4 pin the constitution's wait: verb, the watch
 # tick carve-out, the untagged wait and the one-token baseline. S1-S19,
@@ -183,6 +183,25 @@ PATH=$OPATH
 is "O9 owned" 2 ''
 OUT=$(cd "$T/plain" && PATH=$T/shim:$PATH && . "$T/scripts/prelude.sh" && clutch_open_loops 2>/dev/null); RC=$?
 is "O9 open loops" 2 ''
+
+# O10: an @handle in untagged text is plain text, as before tags existed. Only
+# @ plus 8 lowercase hex is a session tag.
+loops() { OUT=$(cd "$T/plain" && . "$T/scripts/prelude.sh" && clutch_open_loops 2>/dev/null); RC=$?; }
+seed
+add 200 "proj wait: gh:o/r#1 base Or's review"
+add 100 'proj moved: gh:o/r#1 @or approved'
+loops
+is "O10 handle moved closes" 0 ''
+seed
+add 200 'proj wait: slack:C1/1.2 1.2 @dan please answer'
+add 100 'proj moved: slack:C1/1.2 @eve replied'
+loops
+is "O10 handle wait closes" 0 ''
+seed
+add 200 'proj wait: slack:C1/1.2 1.2 @danielle first ask'
+add 100 'proj wait: slack:C1/1.2 1.3 second ask'
+loops
+is "O10 later wait replaces" 0 "$((NOW - 100)) proj wait: slack:C1/1.2 1.3 second ask"
 
 # --- Anchor tag line. anc <dir> <json>: the staged anchor run from dir on
 # json, with CLUTCH_WATCH set to $WATCH; sets OUT and RC. fix: a fresh repo

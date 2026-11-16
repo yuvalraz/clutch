@@ -111,11 +111,12 @@ clutch_worklog_scan() {
       if (age < 0) next
       n++; ln[n] = $0; vb[n] = $3; ag[n] = age
       r = $4; sub(/[,;:.\r]+$/, "", r)
+      # A session tag is @ plus 8 lowercase hex (the head of a session id); any other @word is plain text.
       if ($3 == "wait:" && NF >= 6 && r ~ /^[^:]+:./) {
-        k = ($6 ~ /^@/) ? r SUBSEP $6 : r
+        k = ($6 ~ /^@[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]$/) ? r SUBSEP $6 : r
         open[k] = n; ref[k] = r
       } else if ($3 == "moved:") {
-        if ($5 ~ /^@/) delete open[r SUBSEP $5]
+        if ($5 ~ /^@[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]$/) delete open[r SUBSEP $5]
         else for (k in open) if (ref[k] == r) delete open[k]
       }
     }
