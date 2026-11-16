@@ -5,7 +5,9 @@
 # clutch_owned_loops (the open wait lines whose field 6 equals the tag; rc 1
 # with no worklog, rc 2 on an unreadable worklog, a worklog path that cannot
 # be stat'ed, an empty HOME or a malformed tag; a wait re-held after a moved:
-# line on the same ref is open again). A1-A5 cover the anchor's
+# line on the same ref is open again). O6-O8 cover two sessions waiting on
+# one ref (a tagged moved: closes only its tag, an untagged one closes both);
+# O9 a failing tail is rc 2, never an empty read. A1-A5 cover the anchor's
 # "Session tag: @<tag8>" line (dropped without a session_id or under
 # CLUTCH_WATCH=off); K1-K4 pin the constitution's wait: verb, the watch
 # tick carve-out, the untagged wait and the one-token baseline. S1-S19,
@@ -142,6 +144,45 @@ add 200 'proj moved: gh:o/r#1 approved'
 add 100 'proj wait: gh:o/r#1 b2 @0123abcd pr one re-held'
 owned '@0123abcd'
 is O5 0 "$((NOW - 100)) proj wait: gh:o/r#1 b2 @0123abcd pr one re-held"
+
+# O6-O8: two sessions wait on the same ref. Each tag reads its own line; a
+# moved: line tagged @A closes only @A's wait; an untagged moved: closes both.
+two() {
+  seed
+  add 300 'proj wait: gh:o/r#1 b1 @0123abcd mine'
+  add 200 'proj wait: gh:o/r#1 b1 @ffffffff peer'
+}
+two
+owned '@0123abcd'
+is "O6 mine" 0 "$((NOW - 300)) proj wait: gh:o/r#1 b1 @0123abcd mine"
+owned '@ffffffff'
+is "O6 peer" 0 "$((NOW - 200)) proj wait: gh:o/r#1 b1 @ffffffff peer"
+add 100 'proj moved: gh:o/r#1 @ffffffff approved'
+owned '@0123abcd'
+is "O7 mine kept" 0 "$((NOW - 300)) proj wait: gh:o/r#1 b1 @0123abcd mine"
+owned '@ffffffff'
+is "O7 peer closed" 0 ''
+two
+add 100 'proj moved: gh:o/r#1 merged'
+owned '@0123abcd'
+is "O8 mine closed" 0 ''
+owned '@ffffffff'
+is "O8 peer closed" 0 ''
+
+# O9: tail failing after the -f/-r guard is rc 2 (unreadable), never an empty
+# read the watch would take for "no wait left".
+seed
+add 100 'proj wait: gh:o/r#1 b1 @0123abcd mine'
+mkdir -p "$T/shim"
+printf '#!/bin/sh\nexit 1\n' > "$T/shim/tail"
+chmod +x "$T/shim/tail"
+OPATH=$PATH
+PATH=$T/shim:$PATH
+owned '@0123abcd'
+PATH=$OPATH
+is "O9 owned" 2 ''
+OUT=$(cd "$T/plain" && PATH=$T/shim:$PATH && . "$T/scripts/prelude.sh" && clutch_open_loops 2>/dev/null); RC=$?
+is "O9 open loops" 2 ''
 
 # --- Anchor tag line. anc <dir> <json>: the staged anchor run from dir on
 # json, with CLUTCH_WATCH set to $WATCH; sets OUT and RC. fix: a fresh repo

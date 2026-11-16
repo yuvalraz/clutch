@@ -24,20 +24,21 @@ Any other outcome, error text included, keeps the watch: say once that the waits
 
 Read each wait once, by its kind, against its baseline. Only this counts as movement:
 
-- gh: `gh pr view <number> --repo <owner>/<repo> --json state,reviews,comments`;
-  the PR merged or closed, or a review or comment newer than the baseline.
+- gh: `gh pr view <number> --repo <owner>/<repo> --json state,reviews,comments,updatedAt`;
+  the PR merged or closed, or a review or comment newer than the baseline;
+  the re-held baseline is that PR's `updatedAt` from the same read.
 - slack: a reply in the thread newer than the baseline ts.
-- linear: a changed state, or a comment newer than the baseline.
+- linear: an `updatedAt` newer than the baseline with a different state, or a comment newer than the baseline.
 - gmail: a message in the thread newer than the baseline id.
 - ld: a flag version other than the baseline.
 - dd: a monitor state other than the baseline.
 
-A review, comment, reply or message counts only when it comes from someone other than the user and not from a bot.
+A review, comment, reply or message from the user or a bot does not count, except a review that requests changes, which counts from anyone but the user.
 
 A wait that moved: append its `moved:` line first, with the constitution's
-worklog snippet, verb `moved:` and text `<kind>:<ref> <what moved>`. Copy the
-ref exactly from its `wait:` line, as its own token followed by a space.
-If the thing is still open after the move, such as approved, commented or changes requested, append a fresh `wait:` line right after that `moved:` line, with the same snippet: the same ref, the same `@<tag>` and the new baseline, so a later merge stays watched.
+worklog snippet, verb `moved:` and text `<kind>:<ref> @<tag> <what moved>`.
+Copy the ref exactly from its `wait:` line, as its own token followed by a space.
+If the thing is still open after the move, such as approved, commented or changes requested, append a fresh `wait:` line right after that `moved:` line, with the same snippet and text `<kind>:<ref> <new baseline> @<tag> <text>`: the same ref, the new baseline and the same `@<tag>`, so a later merge stays watched.
 A thing that merged or closed is not held again.
 Only a gh PR is held again this way; a wait of any other kind is not.
 Then act on it by the session's own standing rules, such as a fix loop on changes requested or the bookkeeping after a merge.

@@ -63,7 +63,7 @@ second identical failure can be told from a first) live in
 | Every prompt | `heartbeat.sh` | Nothing. It reminds the model which command fits which stall, how many uninvited lines are left, and the sprint clock. | nothing |
 | Before a shell command | `hot-pause.sh` | One ask before a force-push, `reset --hard`, `branch -D`, `checkout -- .` or `clean -fd`. Your yes wins in one keypress. | nothing |
 | After a shell command | `red-moment.sh` | Usually nothing. When the same runner command fails again with the tree unchanged, the model may say one line. | `.clutch/session-state` |
-| Turn end | `stop.sh` | The bell: `Landed: '<subject>'. Smallest next move: one commit.`, only after 25 minutes and real movement. A live sprint shows `Sprint: N min left on '<goal>'` instead. After a long run with unbanked work, one offer to bank it. When this session holds its own open waits and no watch, one ask to arm a watch comes first instead. | `.clutch/breadcrumb`, and one `moved:` line in `~/.clutch/worklog.md` naming your latest commit, when the turn landed one, and `~/.clutch/watch/<tag>` when it asks |
+| Turn end | `stop.sh` | The bell: `Landed: '<subject>'. Smallest next move: one commit.`, only after 25 minutes and real movement. A live sprint shows `Sprint: N min left on '<goal>'` instead. After a long run with unbanked work, one offer to bank it. When this session holds its own open waits and no watch, the session is told to arm a watch once per new wait, first instead. | `.clutch/breadcrumb`, and one `moved:` line in `~/.clutch/worklog.md` naming your latest commit, when the turn landed one, and `~/.clutch/watch/<tag>` when it asks |
 | On a command | the skill you named | What that command does (see Commands at a glance) | Depends on the command: the pool, the brain, `~/.clutch/rituals.md`, your review conventions file, or the auto-memory directory |
 
 ### Sessions see each other
@@ -84,7 +84,7 @@ only at one of those moments.
   Open waits show first in the `Worklog:` block and age out after 5 days.
 - Any session that hands off an outward step, such as a PR or an ask, logs a
   `wait:` line that starts with its session tag. At turn end, a session that
-  holds such waits and no watch is asked once to arm one: `/clutch:watch @<tag>`
+  holds such waits and no watch is told to arm a watch once per new wait: `/clutch:watch @<tag>`
   every 15 minutes from 08:00 to 21:45, silent unless one of its waits moved,
   gone once none is left. `CLUTCH_WATCH=off` turns off the ask and the session tag.
 - The next session start shows them in its `Worklog:` block.

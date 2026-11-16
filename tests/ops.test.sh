@@ -261,6 +261,12 @@ fpin "$R" "README: wait bullet"        'In ops, an action you approve that await
 fpin "$R" "README: watch code span"    '`watch <thing>`'
 fpin "$R" "README: closing ref"        'A later `moved:` line that starts with the same ref closes it.'
 fpin "$R" "README: three verbs"      '`on:` claim or `wait:` loop'
+# The stop hook blocks the model, not the user: the README says the session
+# is told to arm a watch, once per new wait, never that the user is asked.
+fpin "$R" "README: told once per wait"  'is told to arm a watch once per new wait'
+if grep -qE 'asked once to arm|one ask to arm' "$R"; then
+  echo "FAIL: README says the user is asked to arm a watch"; fail=1
+fi
 fpin "$R" "README: tick sentence"      '`/clutch:ops tick` checks only those waits, on request, and speaks only when one moved.'
 
 # --- ops: tagged waits, and the pointer to the watch's own tick
@@ -270,13 +276,17 @@ fpin "$O" "ops: watch pointer"          'A session'"'"'s armed watch does not se
 # --- watch skill: the armed watch's tick
 fpin "$WS" "W1 trigger"                 'Use ONLY when the prompt is `/clutch:watch @<tag>`'
 # A fire only runs skills the model may invoke, so model invocation stays on.
-if grep -q 'disable-model-invocation: true' "$WS"; then
+if grep -qiE '^disable-model-invocation:[[:space:]]*["'"'"']?true' "$WS"; then
   echo "FAIL: W2 watch skill disables model invocation -- its fires never run"
   fail=1
 fi
 fpin "$WS" "W3 delete on empty read"    'Exit status 0 with empty output, or exit status 1 with no error text, means no wait is left: delete the recurring task whose prompt is `/clutch:watch @<tag>` and say so in one line.'
 fpin "$WS" "W4 keep on bad read"        'Any other outcome, error text included, keeps the watch: say once that the waits cannot be read, and stay silent about it on later ticks.'
-fpin "$WS" "W5 not the user, not a bot" 'A review, comment, reply or message counts only when it comes from someone other than the user and not from a bot.'
+fpin "$WS" "W5 not the user, not a bot" 'A review, comment, reply or message from the user or a bot does not count, except a review that requests changes, which counts from anyone but the user.'
+fpin "$WS" "W5b gh read updatedAt"      '`gh pr view <number> --repo <owner>/<repo> --json state,reviews,comments,updatedAt`'
+fpin "$WS" "W5c gh re-held baseline"    "the re-held baseline is that PR's \`updatedAt\` from the same read."
+fpin "$WS" "W5d linear movement"        '- linear: an `updatedAt` newer than the baseline with a different state, or a comment newer than the baseline.'
+fpin "$WS" "W5e tagged moved text"      'verb `moved:` and text `<kind>:<ref> @<tag> <what moved>`.'
 fpin "$WS" "W6 own standing rules"      "Then act on it by the session's own standing rules, such as a fix loop on changes requested or the bookkeeping after a merge."
 fpin "$WS" "W7 outward waits for yes"   'An outward action still waits for its usual yes.'
 fpin "$WS" "W8 silent when unmoved"     'When nothing moved, print nothing.'
@@ -284,7 +294,7 @@ fpin "$WS" "W9 no gear change"          'It sets no gear, no focus and no mode: 
 fpin "$WS" "W10 no counts"              'Never count waits, never say how long anything has waited, and never name a wait that did not move.'
 nws_l=$(grep -c '' "$WS")
 [ "$nws_l" -lt 60 ] || { echo "FAIL: W11 watch skill is $nws_l lines, want under 60"; fail=1; }
-fpin "$WS" "W12 re-hold open thing"     'If the thing is still open after the move, such as approved, commented or changes requested, append a fresh `wait:` line right after that `moved:` line, with the same snippet: the same ref, the same `@<tag>` and the new baseline, so a later merge stays watched.'
+fpin "$WS" "W12 re-hold open thing"     'If the thing is still open after the move, such as approved, commented or changes requested, append a fresh `wait:` line right after that `moved:` line, with the same snippet and text `<kind>:<ref> <new baseline> @<tag> <text>`: the same ref, the new baseline and the same `@<tag>`, so a later merge stays watched.'
 fpin "$WS" "W13 merged not held"        'A thing that merged or closed is not held again.'
 
 # --- the tablet inbox: the sweep claims, reads, sorts and routes it once
@@ -602,6 +612,32 @@ wfill 'gh:o/r#9' 'Dan review' "$T/gsnip-plain.sh"
 owned "$GCMD"
 [ "$GRC" = 0 ] && [ "$GOUT" = "$OWN" ] \
   || { echo "FAIL: O-tag (b) -- rc $GRC, got: $GOUT"; exit 1; }
+
+# (c) a peer waits on the same ref; the watch writes its tagged moved: line,
+# then the re-held wait (both forms pinned in W5e and W12) with the
+# constitution's snippet: the owned read is that one re-held line, and the
+# peer still reads its own wait.
+wfill 'gh:o/r#7' '@ffffffff Eve on mine too' "$T/gsnip-peer7.sh"
+(cd "$T/armdir" && sh "$T/gsnip-peer7.sh") >/dev/null 2>&1
+PEER=$(grep -F ' @ffffffff Eve on mine too' "$W")
+# csnip <verb> <text> <out>: the constitution's snippet filled.
+csnip() {
+  awk '/```sh/{n++; f=1; next} /```/{f=0} f && n == 1' "$C" | CV=$1 CX=$2 awk '
+    function rl(s, a, b,   i) { i = index(s, a); return i ? substr(s, 1, i - 1) b substr(s, i + length(a)) : s }
+    { $0 = rl($0, "<moved:|on:>", ENVIRON["CV"]); print rl($0, "<one line>", ENVIRON["CX"]) }' > "$3"
+}
+csnip 'moved:' 'gh:o/r#7 @0123abcd approved' "$T/gsnip-moved.sh"
+csnip 'wait:' "gh:o/r#7 2026-11-13T11:00:00Z @0123abcd Or'\\''s review" "$T/gsnip-rehold.sh"
+(cd "$T/armdir" && sh "$T/gsnip-moved.sh" && sh "$T/gsnip-rehold.sh") >/dev/null 2>&1
+REHELD=$(tail -n 1 "$W")
+printf '%s\n' "$REHELD" | grep -qE "^[0-9]+ armdir wait: gh:o/r#7 2026-11-13T11:00:00Z @0123abcd Or's review\$" \
+  || { echo "FAIL: O-tag (c) -- want the re-held wait: line last, got: $REHELD"; exit 1; }
+owned "$GCMD"
+[ "$GRC" = 0 ] && [ "$GOUT" = "$REHELD" ] \
+  || { echo "FAIL: O-tag (c) -- want rc 0 and only the re-held line; rc $GRC, got: $GOUT"; exit 1; }
+owned "$(rl1 "$GBAD" '@<tag>' '@ffffffff')"
+[ "$GRC" = 0 ] && [ -n "$PEER" ] && [ "$GOUT" = "$(printf '%s\n%s' "$(grep -F ' @ffffffff Eve review' "$W")" "$PEER")" ] \
+  || { echo "FAIL: O-tag (c) -- the peer lost its wait on the same ref; rc $GRC, got: $GOUT"; exit 1; }
 
 # (bad) the placeholder left in: nothing printed, rc 2, the watch is kept
 owned "$GBAD"

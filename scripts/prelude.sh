@@ -89,34 +89,41 @@ clutch_last_authored() {
 # One scan of the worklog for both readers ($1: window or loops). A wait loop
 # is "<epoch> <repo> wait: <kind>:<ref> <baseline> <text>"; a later moved:
 # line whose fourth field is the same <kind>:<ref> closes it, and an open wait
-# ages out after 5 days. Malformed, future-dated and unknown-verb lines are
+# ages out after 5 days. A wait whose text starts with an @tag is keyed by ref
+# and tag, so peer sessions on one ref stay apart: a moved: line whose fifth
+# field is an @tag closes only that tag's wait, an untagged moved: line closes
+# every wait on the ref. Malformed, future-dated and unknown-verb lines are
 # skipped. A ref's trailing ,;:. or CR is ignored on both sides, and a
 # "moved: L2:" line never closes a wait. Returns 1 when the file does not
 # exist (no worklog), 2 when it exists but is not a readable regular file or
-# `date` fails; never creates anything.
+# `date` or `tail` fails; never creates anything.
 # shortcut: scans the last 2000 lines and cuts bytes, not characters; upgrade
 # if 5 days log more than 2000 lines or a cut splits a glyph.
 clutch_worklog_scan() {
   [ -e "$CLUTCH_WORKLOG" ] || return 1
   [ -f "$CLUTCH_WORKLOG" ] && [ -r "$CLUTCH_WORKLOG" ] || return 2
   WNOW=$(date +%s 2>/dev/null) || return 2
+  WTAIL=$(tail -n 2000 "$CLUTCH_WORKLOG" 2>/dev/null) || return 2
   # LC_ALL=C: a UTF-8 awk aborts the whole scan on one invalid byte.
-  # shortcut: a tail that fails after the -f/-r guard (EIO, a race) yields
-  # rc 0 with empty output; upgrade if a reader must tell that from no loops.
-  tail -n 2000 "$CLUTCH_WORKLOG" 2>/dev/null | LC_ALL=C awk -v now="$WNOW" -v mode="$1" '
+  printf '%s\n' "$WTAIL" | LC_ALL=C awk -v now="$WNOW" -v mode="$1" '
     $1 ~ /^[0-9]+$/ && NF >= 4 {
       age = now - $1
       if (age < 0) next
       n++; ln[n] = $0; vb[n] = $3; ag[n] = age
       r = $4; sub(/[,;:.\r]+$/, "", r)
-      if ($3 == "wait:" && NF >= 6 && r ~ /^[^:]+:./) open[r] = n
-      else if ($3 == "moved:" && (r in open)) delete open[r]
+      if ($3 == "wait:" && NF >= 6 && r ~ /^[^:]+:./) {
+        k = ($6 ~ /^@/) ? r SUBSEP $6 : r
+        open[k] = n; ref[k] = r
+      } else if ($3 == "moved:") {
+        if ($5 ~ /^@/) delete open[r SUBSEP $5]
+        else for (k in open) if (ref[k] == r) delete open[k]
+      }
     }
     # Live claims are kept first, then open waits, then moves, so neither a
     # burst of moves nor a pile of waits can push a claim out of view; waits
     # still print first.
     END {
-      for (r in open) if (ag[open[r]] < 432000) w[open[r]] = 1
+      for (k in open) if (ag[open[k]] < 432000) w[open[k]] = 1
       if (mode == "loops") { for (i = 1; i <= n; i++) if (w[i]) print ln[i]; exit }
       k = 0
       for (i = n; i > 0 && k < 8; i--) if (vb[i] == "on:" && ag[i] < 14400) { keep[i] = 1; k++ }
