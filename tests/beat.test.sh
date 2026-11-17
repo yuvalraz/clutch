@@ -5,19 +5,29 @@
 # "asked <YYYY-MM-DD>" lands in the record before the block prints. The watch
 # gate keeps priority (B5). Every failure falls through: no block (B6-B10).
 # CLUTCH_BEAT=off skips it (B11). B-scrub pins the brain scrub line.
+# H1-H10 cover clutch_beat_window (the untagged open waits, then the newest
+# 20 moved: lines after the record's last epoch whose field 5 is not the tag;
+# "last <now>" appended to an existing record before printing). R1 runs the
+# beat skill's read line, R2 the ops Step 0 record snippet under sh and
+# zsh -f, R3 the beat skill's moved: text through the constitution snippet.
 # prelude.sh and stop.sh are staged into a scratch tree and run from a scratch
-# repo or a non-git dir under a scratch HOME. PRELUDE_SH and STOP_SH override
-# the targets for replay against a historical version. Silent on pass apart
-# from PASS.
+# repo or a non-git dir under a scratch HOME. PRELUDE_SH, STOP_SH,
+# BEAT_SKILL, OPS_SKILL and CONST_FILE override the targets for replay
+# against a historical version. Silent on pass apart from PASS.
 set -u
 unset CLUTCH_BEAT CLUTCH_WATCH CLUTCH_INVESTIGATE CLUTCH_PLAIN CLUTCH_GUESS CLAUDE_PLUGIN_ROOT
 
 HERE=$(cd "$(dirname "$0")" && pwd)
 P=${PRELUDE_SH:-$HERE/../scripts/prelude.sh}
 S=${STOP_SH:-$HERE/../scripts/stop.sh}
-for f in "$P" "$S"; do
+BS=${BEAT_SKILL:-$HERE/../skills/beat/SKILL.md}
+O=${OPS_SKILL:-$HERE/../skills/ops/SKILL.md}
+K=${CONST_FILE:-$HERE/../rules/constitution.md}
+for f in "$P" "$S" "$O" "$K"; do
   [ -f "$f" ] || { echo "FAIL: missing $f"; exit 1; }
 done
+# A missing beat skill fails R1 and R3 below, and the rest still runs.
+[ -f "$BS" ] || echo "FAIL: missing $BS"
 
 T=$(mktemp -d) || exit 1
 trap 'chmod -R u+rwx "$T" 2>/dev/null; rm -rf "$T"' EXIT
@@ -265,9 +275,238 @@ for c in '[]' "[$BCRON]"; do
   if [ "$c" = '[]' ]; then blocked "B13 unarmed"; else quiet "B13 armed"; fi
 done
 
-# B-scrub: brain.test.sh's sibling runs clear CLUTCH_BEAT.
-grep -E '^[[:space:]]*\( unset ' "$HERE/brain.test.sh" | grep -qw CLUTCH_BEAT \
-  || { echo "FAIL: B-scrub -- CLUTCH_BEAT missing from brain.test.sh's run_scrubbed unset line"; fail=1; }
+# B-scrub: brain.test.sh's sibling runs clear CLUTCH_BEAT and BEAT_SKILL.
+for v in CLUTCH_BEAT BEAT_SKILL; do
+  grep -E '^[[:space:]]*\( unset ' "$HERE/brain.test.sh" | grep -qw "$v" \
+    || { echo "FAIL: B-scrub -- $v missing from brain.test.sh's run_scrubbed unset line"; fail=1; }
+done
+
+# --- H1-H10: clutch_beat_window. bw <tag>: the helper sourced from the
+# staged prelude in a plain dir; sets OUT, RC and ERR. mkrec <line>...: a
+# record holding exactly those lines.
+ERR=""
+bw() {
+  OUT=$(cd "$T/plain" && . "$T/scripts/prelude.sh" && clutch_beat_window "$1" 2>"$T/err"); RC=$?
+  ERR=$(cat "$T/err")
+}
+mkrec() { mkdir -p "$HOME/.clutch/watch" && printf '%s\n' "$@" > "$BF"; }
+# wl <age> <rest>: the exact line add writes.
+wl() { printf '%s %s' "$((NOW - $1))" "$2"; }
+lastn() { grep -c '^last [0-9][0-9]*$' "$BF" 2>/dev/null; }
+
+# H1/H1b: only untagged waits (an @handle is text, not a tag).
+seed
+add 500 'proj wait: gh:o/r#1 b1 untagged one'
+add 400 'proj wait: gh:o/r#2 b1 @0123abcd mine'
+add 300 'proj wait: gh:o/r#3 b1 @ffffffff peer'
+add 200 'proj wait: gh:o/r#4 b1 @Dan handle text'
+mkrec "last $((NOW - 1000))"
+bw '@0123abcd'
+is H1 0 "$(wl 500 'proj wait: gh:o/r#1 b1 untagged one')
+$(wl 200 'proj wait: gh:o/r#4 b1 @Dan handle text')"
+
+# H2: moves after last only (not before, not equal, not future), never this
+# tag's field 5, never on: lines; waits first.
+seed
+add 500 'proj wait: gh:o/r#9 b1 plain'
+add 400 'proj moved: before'
+add 300 'proj moved: equal'
+add 200 'proj moved: gh:o/r#1 @0123abcd own'
+add 150 'proj moved: gh:o/r#2 @ffffffff other'
+add 100 'proj on: claim'
+add 90 "proj moved: landed 'x'"
+add -1000 'proj moved: future'
+mkrec "last $((NOW - 300))"
+bw '@0123abcd'
+is H2 0 "$(wl 500 'proj wait: gh:o/r#9 b1 plain')
+$(wl 150 'proj moved: gh:o/r#2 @ffffffff other')
+$(wl 90 "proj moved: landed 'x'")"
+[ "$(lastn)" = 2 ] || { echo "FAIL: H2 -- want 2 last lines: $(cat "$BF")"; fail=1; }
+H2_LAST=$(tail -n 1 "$BF")
+[ "${H2_LAST#last }" -ge "$NOW" ] 2>/dev/null || { echo "FAIL: H2 -- last not advanced to now: $H2_LAST"; fail=1; }
+
+# H3: a second read straight after prints the waits only.
+bw '@0123abcd'
+is H3 0 "$(wl 500 'proj wait: gh:o/r#9 b1 plain')"
+[ "$(lastn)" = 3 ] || { echo "FAIL: H3 -- want 3 last lines: $(cat "$BF")"; fail=1; }
+
+# H4: no record: waits only, nothing created.
+seed
+add 500 'proj wait: gh:o/r#9 b1 plain'
+add 100 'proj moved: peer move'
+bw '@0123abcd'
+is H4 0 "$(wl 500 'proj wait: gh:o/r#9 b1 plain')"
+[ ! -e "$HOME/.clutch/watch" ] || { echo "FAIL: H4 -- ~/.clutch/watch created"; fail=1; }
+
+# H4b: a record with no last line: no moves, last appended.
+mkrec 'asked 2000-01-01'
+bw '@0123abcd'
+is H4b 0 "$(wl 500 'proj wait: gh:o/r#9 b1 plain')"
+[ "$(lastn)" = 1 ] || { echo "FAIL: H4b -- want 1 last line: $(cat "$BF")"; fail=1; }
+
+# H5: no worklog: rc 1, empty, the record untouched, nothing created.
+rm -rf "$HOME/.clutch"
+bw '@0123abcd'
+is "H5 none" 1 ''
+[ ! -e "$HOME/.clutch" ] || { echo "FAIL: H5 -- ~/.clutch created"; fail=1; }
+mkrec "last $((NOW - 1000))"
+bw '@0123abcd'
+is "H5 record" 1 ''
+[ "$(lastn)" = 1 ] || { echo "FAIL: H5 -- record changed: $(cat "$BF")"; fail=1; }
+
+# H6: an unreadable worklog: rc 2, empty, no last appended.
+if [ "$(id -u)" = 0 ]; then
+  echo "SKIP: H6 H8 (root reads and writes through chmod)"
+else
+  seed
+  add 500 'proj wait: gh:o/r#9 b1 plain'
+  mkrec "last $((NOW - 1000))"
+  chmod 000 "$W"
+  bw '@0123abcd'
+  chmod 644 "$W"
+  is H6 2 ''
+  [ "$(lastn)" = 1 ] || { echo "FAIL: H6 -- last appended: $(cat "$BF")"; fail=1; }
+  # H8: the record cannot be written: rc 2, nothing printed.
+  chmod 444 "$BF"
+  bw '@0123abcd'
+  chmod 644 "$BF"
+  is H8 2 ''
+fi
+
+# H7: malformed tags: rc 2, nothing written.
+seed
+add 500 'proj wait: gh:o/r#9 b1 plain'
+mkrec "last $((NOW - 1000))"
+for g in '@' '@0123abc' '@0123abcd9' '0123abcd' '@0123/bcd' ''; do
+  bw "$g"
+  is "H7 [$g]" 2 ''
+done
+[ "$(lastn)" = 1 ] && [ "$(ls "$HOME/.clutch/watch")" = 0123abcd.beat ] \
+  || { echo "FAIL: H7 -- something written: $(ls "$HOME/.clutch/watch") / $(cat "$BF")"; fail=1; }
+
+# H9: a moved line ending in one invalid UTF-8 byte hides no later line.
+seed
+printf '%s proj moved: caf\303\n%s proj moved: after\n' "$((NOW - 100))" "$((NOW - 50))" >> "$W"
+mkrec "last $((NOW - 1000))"
+OUT=$(cd "$T/plain" && . "$T/scripts/prelude.sh" && LC_ALL=en_US.UTF-8 && export LC_ALL && clutch_beat_window '@0123abcd' 2>/dev/null); RC=$?
+[ "$RC" = 0 ] && printf '%s\n' "$OUT" | grep -qF ' proj moved: after' \
+  || { echo "FAIL: H9 -- rc $RC, later line lost under UTF-8: $OUT"; fail=1; }
+
+# H10: 25 moves after last: the newest 20, oldest first.
+seed
+i=1
+H10_WANT=""
+while [ "$i" -le 25 ]; do
+  add $((300 - i * 10)) "proj moved: m$i"
+  if [ "$i" -gt 5 ]; then
+    H10_WANT="$H10_WANT${H10_WANT:+
+}$(wl $((300 - i * 10)) "proj moved: m$i")"
+  fi
+  i=$((i + 1))
+done
+mkrec "last $((NOW - 1000))"
+bw '@0123abcd'
+is H10 0 "$H10_WANT"
+
+# --- R1: the beat skill's one read line, the plugin root replaced by the
+# staged tree and @<tag> filled, prints what the helper prints and passes
+# its rc through.
+# rl1 <string> <from> <to>: the first <from> replaced by <to>, literally.
+rl1() {
+  printf '%s\n' "$1" | RA=$2 RB=$3 awk '{ i = index($0, ENVIRON["RA"])
+    if (i) $0 = substr($0, 1, i - 1) ENVIRON["RB"] substr($0, i + length(ENVIRON["RA"]))
+    print }'
+}
+RLINE=$(grep -F 'sh -c' "$BS" 2>/dev/null | grep -F 'clutch_beat_window')
+if [ "$(printf '%s\n' "$RLINE" | grep -c .)" != 1 ]; then
+  echo "FAIL: R1 wants exactly one sh -c line reading clutch_beat_window, got: $RLINE"; fail=1
+else
+  RBAD=$(rl1 "$RLINE" '${CLAUDE_PLUGIN_ROOT}' "$T")
+  RCMD=$(rl1 "$RBAD" '@<tag>' '@0123abcd')
+  [ "$RCMD" != "$RBAD" ] || { echo "FAIL: R1 -- no @<tag> to fill in: $RLINE"; fail=1; }
+  r1fx() {
+    seed
+    add 500 'proj wait: gh:o/r#9 b1 plain'
+    add 100 'proj moved: peer move'
+    mkrec "last $((NOW - 1000))"
+  }
+  r1fx
+  R1_OUT=$(cd "$T/plain" && sh -c "$RCMD" 2>&1); R1_RC=$?
+  r1fx
+  bw '@0123abcd'
+  [ "$R1_RC" = "$RC" ] && [ "$R1_OUT" = "$OUT" ] && [ -n "$OUT" ] \
+    || { echo "FAIL: R1 -- line rc $R1_RC [$R1_OUT], helper rc $RC [$OUT]"; fail=1; }
+  rm -rf "$HOME/.clutch"
+  R1_OUT=$(cd "$T/plain" && sh -c "$RCMD" 2>&1); R1_RC=$?
+  [ "$R1_RC" = 1 ] && [ -z "$R1_OUT" ] || { echo "FAIL: R1 none -- want rc 1, silent; rc $R1_RC: $R1_OUT"; fail=1; }
+  r1fx
+  R1_OUT=$(cd "$T/plain" && sh -c "$RBAD" 2>/dev/null); R1_RC=$?
+  [ "$R1_RC" = 2 ] && [ -z "$R1_OUT" ] || { echo "FAIL: R1 bad -- want rc 2, empty; rc $R1_RC: $R1_OUT"; fail=1; }
+fi
+
+# --- R2: the ops Step 0 record snippet, @<tag> filled, under sh and zsh -f.
+nrb=$(awk '/^[ \t]*```sh/{n++; f=1; b[n] = ""; next} /^[ \t]*```/{f=0} f{b[n] = b[n] $0 "\n"}
+  END {k = 0; for (i = 1; i <= n; i++) if (index(b[i], ".beat")) {k++; s = b[i]}
+       printf "%s", s > out; print k}' out="$T/rsnip.raw" "$O")
+if [ "$nrb" != 1 ]; then
+  echo "FAIL: R2 wants exactly one ops sh block naming .beat, got $nrb"; fail=1
+else
+  rl1 "$(cat "$T/rsnip.raw")" '@<tag>' '@0123abcd' > "$T/rsnip.sh"
+  cmp -s "$T/rsnip.raw" "$T/rsnip.sh" && { echo "FAIL: R2 -- no @<tag> to fill in"; fail=1; }
+  SHELLS="sh"
+  if command -v zsh >/dev/null 2>&1; then SHELLS="sh zsh"; else echo "SKIP: R2 zsh (no zsh)"; fi
+  for sh in $SHELLS; do
+    [ "$sh" = zsh ] && run="zsh -f" || run=sh
+    # rs [VAR=val]: the snippet from a plain dir; sets OUT (stdout+stderr), RC.
+    rs() { OUT=$(cd "$T/plain" && env "$@" $run "$T/rsnip.sh" 2>&1); RC=$?; }
+    # (a) ~/.clutch exists: one last line in 0123abcd.beat.
+    rm -rf "$HOME/.clutch"; mkdir -p "$HOME/.clutch"
+    rs HOME="$HOME"
+    [ -z "$OUT" ] && [ "$(ls "$HOME/.clutch/watch" 2>/dev/null)" = 0123abcd.beat ] \
+      && [ "$(grep -c . "$BF")" = 1 ] && grep -qx 'last [0-9][0-9]*' "$BF" \
+      || { echo "FAIL: R2 $sh (a) -- out [$OUT], watch [$(ls "$HOME/.clutch/watch" 2>/dev/null)], record [$(cat "$BF" 2>/dev/null)]"; fail=1; }
+    # (b) no ~/.clutch: nothing created.
+    rm -rf "$HOME/.clutch"
+    rs HOME="$HOME"
+    [ -z "$OUT" ] && [ ! -e "$HOME/.clutch" ] || { echo "FAIL: R2 $sh (b) -- out [$OUT] or ~/.clutch created"; fail=1; }
+    # (c) CLUTCH_BEAT=off: nothing created.
+    mkdir -p "$HOME/.clutch"
+    rs HOME="$HOME" CLUTCH_BEAT=off
+    [ -z "$OUT" ] && [ ! -e "$HOME/.clutch/watch" ] || { echo "FAIL: R2 $sh (c) -- out [$OUT] or record written under off"; fail=1; }
+    # (d) an existing record is left unchanged.
+    mkrec 'last 1' "asked $TODAY"
+    R2_B=$(cat "$BF")
+    rs HOME="$HOME"
+    [ -z "$OUT" ] && [ "$(cat "$BF")" = "$R2_B" ] || { echo "FAIL: R2 $sh (d) -- out [$OUT] or record changed: $(cat "$BF")"; fail=1; }
+  done
+fi
+
+# --- R3: the beat skill's moved: text, filled and written with the
+# constitution's snippet, closes the untagged wait on its ref; a tagged form
+# would not (DD7).
+# csnip <verb> <text> <out>: the constitution's snippet filled.
+csnip() {
+  awk '/```sh/{n++; f=1; next} /```/{f=0} f && n == 1' "$K" | CV=$1 CX=$2 awk '
+    function rl(s, a, b,   i) { i = index(s, a); return i ? substr(s, 1, i - 1) b substr(s, i + length(a)) : s }
+    { $0 = rl($0, "<moved:|on:>", ENVIRON["CV"]); print rl($0, "<one line>", ENVIRON["CX"]) }' > "$3"
+}
+# open9: clutch_open_loops lists the gh:o/r#9 wait.
+open9() { (cd "$T/plain" && . "$T/scripts/prelude.sh" && clutch_open_loops) | grep -qF ' gh:o/r#9 '; }
+MT=$(sed -n 's/.*verb `moved:` and text `\([^`]*\)`.*/\1/p' "$BS" 2>/dev/null | head -n 1)
+if [ -z "$MT" ]; then
+  echo "FAIL: R3 -- no moved: text template in the beat skill"; fail=1
+else
+  FILLED=$(rl1 "$(rl1 "$(rl1 "$MT" '<kind>:<ref>' 'gh:o/r#9')" '<what moved>' 'merged')" '@<tag>' '@0123abcd')
+  seed
+  add 500 'proj wait: gh:o/r#9 b1 pr nine'
+  open9 || { echo "FAIL: R3 -- the wait is not open before the move"; fail=1; }
+  csnip 'moved:' 'gh:o/r#9 @0123abcd merged' "$T/r3tag.sh"
+  (cd "$T/plain" && sh "$T/r3tag.sh" >/dev/null 2>&1)
+  open9 || { echo "FAIL: R3 -- a tagged moved: line closed the untagged wait"; fail=1; }
+  csnip 'moved:' "$FILLED" "$T/r3.sh"
+  (cd "$T/plain" && sh "$T/r3.sh" >/dev/null 2>&1)
+  open9 && { echo "FAIL: R3 -- the beat's moved: text [$FILLED] left the untagged wait open"; fail=1; }
+fi
 
 [ "$fail" -eq 0 ] || exit 1
 echo PASS

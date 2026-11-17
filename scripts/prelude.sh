@@ -7,6 +7,7 @@
 # clutch_last_authored, clutch_worklog_window, clutch_open_loops,
 # clutch_session_tag, clutch_owned_loops, clutch_ops_due,
 # clutch_guess_intent.
+# Also defines clutch_beat_window.
 
 CLUTCH_GIT=0
 CLUTCH_STATE=0
@@ -206,6 +207,40 @@ clutch_owned_loops() {
   [ "$COL_RC" = 0 ] || return "$COL_RC"
   [ -n "$COL_OUT" ] || return 0
   printf '%s\n' "$COL_OUT" | LC_ALL=C awk -v t="$1" '$6 == t'
+}
+
+# The ops beat's read for tag $1 (record ~/.clutch/watch/<tag8>.beat): the
+# open waits no session's tag owns, raw, oldest first; then the newest 20
+# moved: lines whose epoch is after the record's last "last <epoch>" line and
+# at or before now, and whose fifth field is not the tag, oldest first. With
+# no record, or none with a last line, there are no moves. "last <now>" is
+# appended to an existing record before anything prints; the record and
+# ~/.clutch/watch are never created. Returns 2 on a malformed tag, a date
+# failure, an unreadable worklog or a failed append (nothing printed), and 1
+# with no worklog (nothing recorded).
+clutch_beat_window() {
+  # Spelled-out class: a range like A-Z matches é under a UTF-8 /bin/sh.
+  case $1 in @????????) ;; *) return 2 ;; esac
+  case $1 in @*[!0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz-]*) return 2 ;; esac
+  CBW_NOW=$(date +%s 2>/dev/null) || return 2
+  case $CBW_NOW in '' | *[!0-9]*) return 2 ;; esac
+  CBW_W=$(clutch_open_loops)
+  CBW_RC=$?
+  [ "$CBW_RC" = 1 ] && return 1
+  [ "$CBW_RC" = 0 ] || return 2
+  CBW_F="$HOME/.clutch/watch/${1#@}.beat"
+  CBW_S=$(LC_ALL=C sed -n 's/^last \([0-9][0-9]*\)$/\1/p' "$CBW_F" 2>/dev/null | tail -n 1)
+  [ -n "$CBW_S" ] || CBW_S=$CBW_NOW
+  # shortcut: newest 20 moves only; upgrade if a beat gap logs more that matter
+  CBW_M=$(tail -n 2000 "$CLUTCH_WORKLOG" 2>/dev/null | LC_ALL=C awk -v s="$CBW_S" -v n="$CBW_NOW" -v t="$1" \
+    '$1 ~ /^[0-9]+$/ && $3 == "moved:" && $1 + 0 > s + 0 && $1 + 0 <= n + 0 && $5 != t' | tail -n 20) || return 2
+  if [ -f "$CBW_F" ]; then
+    { printf 'last %s\n' "$CBW_NOW" >> "$CBW_F"; } 2>/dev/null || return 2
+  fi
+  [ -z "$CBW_W" ] || printf '%s\n' "$CBW_W" |
+    LC_ALL=C awk '$6 !~ /^@[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]$/'
+  [ -z "$CBW_M" ] || printf '%s\n' "$CBW_M"
+  return 0
 }
 
 # The window for the session-start block and the ops sweep: up to 8 lines,
