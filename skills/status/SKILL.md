@@ -12,10 +12,11 @@ them distinguishable: it prints facts and changes nothing.
 
 Procedure:
 
-1. Run the status script that ships with this plugin; the harness substitutes its path when it loads this skill:
+1. Run the status script that ships with this plugin; the harness substitutes its path when it loads this skill.
+   Replace `@<tag>` with the `Session tag:` from the session start; with no `Session tag:` line, leave it as is:
 
    ```sh
-   sh "${CLAUDE_PLUGIN_ROOT}/scripts/status.sh"
+   sh "${CLAUDE_PLUGIN_ROOT}/scripts/status.sh" '@<tag>'
    ```
 
    Never locate it with \$0 or $BASH_SOURCE; under a harness Bash tool those
@@ -33,10 +34,10 @@ Procedure:
    substrate, nothing at all for a healthy quiet state. Quiet is not broken;
    the report now says which one it is. For the state lines:
 
-   - `.clutch present but not readable` or `.clutch not writable`: `chmod u+rwx .clutch` lets the hooks back in.
-   - `state present but not writable`, or `unreadable` when the file's mode blocks reading: `chmod u+rw .clutch/session-state` lets the hooks back in.
+   - `.clutch present but not readable` or `.clutch not writable`: `chmod u+rwx .clutch` lets the hooks back in; on a report run with this session's tag whose `.clutch/s/<tag8>` folder exists, `.clutch not writable` means that folder: `chmod u+rwx .clutch/s/<tag8>`.
+   - `state present but not writable`, or `unreadable` when the file's mode blocks reading: `chmod u+rw .clutch/session-state` lets the hooks back in, or `chmod u+rw .clutch/s/<tag8>/session-state` on a report run with this session's tag whose folder exists.
    - `.clutch present but not a directory`: moving that `.clutch` file or link aside lets the next hook make the directory.
-   - `session-state present but not a file`: moving `.clutch/session-state` aside lets the next hook start a fresh one.
+   - `session-state present but not a file`: moving `.clutch/session-state` aside (or this session's `.clutch/s/<tag8>/session-state`, on a report run with its tag whose folder exists) lets the next hook start a fresh one.
    - `worklog: unwritable`: `chmod u+rwx ~/.clutch` and `chmod u+rw ~/.clutch/worklog.md` let the writers back in.
    - `worklog: missing`: nothing to fix; the first write makes it, and when the line names `~/.clutch` that write creates the folder too, which also starts a brain.
 

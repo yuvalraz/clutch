@@ -52,17 +52,22 @@ focuses and the upkeep commands wait until you fire them.
 `.clutch/` is the pool, one per repo, or per folder outside a repo once you declare a focus there. `~/.clutch` is the brain, if you keep
 one. `~/.clutch/worklog.md` is the worklog, shared by every repo. The session
 clock and the repeat-red record (the hook's record of a repeated red, so a
-second identical failure can be told from a first) live in
-`.clutch/session-state`.
+second identical failure can be told from a first) live in each session's own
+`.clutch/s/<tag>/session-state`, beside its gear (`tempo`) and sprint clock
+(`sprint-start`), so parallel sessions in one folder never share a gear, a
+clock or a budget. A session without a tag uses the folder-wide
+`.clutch/session-state`, `.clutch/tempo` and `.clutch/sprint-start`, as
+before. A new session clears out other sessions' folders untouched for 7
+days. `CLUTCH_PER_SESSION=off` turns per-session state off.
 
 ### When it fires
 
 | When | What fires | What you might see | What it writes |
 |------|------------|--------------------|----------------|
-| Session start (startup, resume, clear, compact, fork) | `anchor.sh` | This goes to the model, which greets you with it: your thread, last landed commit, captures held, and the smallest move to resume. On a fresh session with no gear set, one question. The model also gets the constitution and the `Worklog:` block, and this session's tag. | `.clutch/session-state` on a fresh session, in a repo or a folder where you declared a focus |
+| Session start (startup, resume, clear, compact, fork) | `anchor.sh` | This goes to the model, which greets you with it: your thread, last landed commit, captures held, and the smallest move to resume. On a fresh session with no gear set, one question. The model also gets the constitution and the `Worklog:` block, and this session's tag. | `.clutch/s/<tag>/session-state` on a fresh session, in a repo or a folder where you declared a focus |
 | Every prompt | `heartbeat.sh` | Nothing. It reminds the model which command fits which stall, how many uninvited lines are left, and the sprint clock. | nothing |
 | Before a shell command | `hot-pause.sh` | One ask before a force-push, `reset --hard`, `branch -D`, `checkout -- .` or `clean -fd`. Your yes wins in one keypress. | nothing |
-| After a shell command | `red-moment.sh` | Usually nothing. When the same runner command fails again with the tree unchanged, the model may say one line. | `.clutch/session-state` |
+| After a shell command | `red-moment.sh` | Usually nothing. When the same runner command fails again with the tree unchanged, the model may say one line. | `.clutch/s/<tag>/session-state` |
 | Turn end | `stop.sh` | The bell: `Landed: '<subject>'. Smallest next move: one commit.`, only after 25 minutes and real movement. A live sprint shows `Sprint: N min left on '<goal>'` instead. After a long run with unbanked work, one offer to bank it. When this session holds its own open waits and no watch, the session is told to arm a watch once per new wait, first instead. In an ops session with no beat, the session is told to arm one, once a day. | `.clutch/breadcrumb`, and one `moved:` line in `~/.clutch/worklog.md` naming your latest commit, when the turn landed one, and `~/.clutch/watch/<tag>` when it asks, and `~/.clutch/watch/<tag>.beat` when it asks the beat |
 | On a command | the skill you named | What that command does (see Commands at a glance) | Depends on the command: the pool, the brain, `~/.clutch/rituals.md`, your review conventions file, or the auto-memory directory |
 
@@ -86,7 +91,7 @@ only at one of those moments.
   `wait:` line that starts with its session tag. At turn end, a session that
   holds such waits and no watch is told to arm a watch once per new wait: `/clutch:watch @<tag>`
   every 15 minutes from 08:00 to 21:45, one `No change.` line unless one of its waits moved,
-  gone once none is left. `CLUTCH_WATCH=off` turns off the ask and the session tag.
+  gone once none is left. `CLUTCH_WATCH=off` turns off the ask, the session tag and per-session state.
 - An ops session is told at turn end, once a day, to arm a beat: `/clutch:beat @<tag>`
   every two hours from 08:07 to 20:07 while the session is open. It reads the moves
   other sessions logged since the last beat and the waits no session's tag owns, and
@@ -126,7 +131,7 @@ maintenance too. `/clutch:dream` consolidates it and prunes the index, and
 A fresh session opens with one question, the only one of the day:
 build, ideate, ops, review, or investigate? Ignoring it is also an answer, and it never asks twice.
 When you declared a focus in this folder before, the question names it first (`looks like build again`), and a plain go takes it. Outside a repo the question rides each new session too. `CLUTCH_GUESS=off` turns the guess off. `CLUTCH_INVESTIGATE=off` keeps the question to the first four.
-Declaring a focus outside a repo writes `.clutch/tempo` in that folder, never in your home folder, so the gear and the budget ride every turn there as in a repo; `CLUTCH_PLAIN=off` turns that off.
+Declaring a focus outside a repo writes the session's tempo under `.clutch` in that folder, never in your home folder, so the gear and the budget ride every turn there as in a repo; `CLUTCH_PLAIN=off` turns that off.
 `/clutch:intent` takes the answer and engages the matching gear.
 
 **Build.** A maker session in the craft gear (explore, then commit). The catch
