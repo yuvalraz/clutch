@@ -59,6 +59,58 @@ case "$INPUT" in
     ;;
 esac
 [ "$COLD" = 1 ] && FRESH=1
+
+# Per-session state: at a startup, resume, clear or fork this session gets
+# its own folder .clutch/s/<tag8>/ for tempo, session-state and
+# sprint-start; every hook and skill uses it once it exists. Never on a
+# compaction or an unknown source, never through a symlinked .clutch/s or
+# .clutch/s/<tag8>, never under CLUTCH_PER_SESSION=off or CLUTCH_WATCH=off.
+# Any failure leaves the session on the folder-wide files, as before.
+PS_SRC=""
+case "$INPUT" in
+  *'"source":"startup"'* | *'"source": "startup"'*) PS_SRC=startup ;;
+  *'"source":"resume"'* | *'"source": "resume"'*) PS_SRC=resume ;;
+  *'"source":"clear"'* | *'"source": "clear"'*) PS_SRC=clear ;;
+  *'"source":"fork"'* | *'"source": "fork"'*) PS_SRC=fork ;;
+esac
+# The newest session-state among the folder-wide one and every real peer
+# folder's, by mtime; prints nothing when there is none.
+newest_state() {
+  set --
+  [ -f "$CLUTCH_DIR/session-state" ] && set -- "$CLUTCH_DIR/session-state"
+  for NS_D in "$CLUTCH_DIR"/s/*; do
+    [ "$NS_D" = "$CLUTCH_SDIR" ] || [ -L "$NS_D" ] || [ -L "$NS_D/session-state" ] ||
+      [ ! -f "$NS_D/session-state" ] || set -- "$@" "$NS_D/session-state"
+  done
+  [ "$#" -gt 0 ] && ls -t "$@" 2>/dev/null | head -n 1
+}
+if ! clutch_session_paths "$INPUT" && [ -n "$CLUTCH_TAG8" ] && [ -n "$PS_SRC" ] &&
+  [ ! -L "$CLUTCH_DIR/s" ] && { [ ! -e "$CLUTCH_DIR/s" ] || [ -d "$CLUTCH_DIR/s" ]; } &&
+  [ ! -L "$CLUTCH_DIR/s/$CLUTCH_TAG8" ] && [ ! -e "$CLUTCH_DIR/s/$CLUTCH_TAG8" ] &&
+  clutch_ensure_dir && mkdir -p "$CLUTCH_DIR/s/$CLUTCH_TAG8" 2>/dev/null &&
+  clutch_session_paths "$INPUT"; then
+  # Seed: a fork continues the newest state in this folder (a hot fork all
+  # of it, a cold one its gear); a resume of a session that predates its
+  # folder keeps the folder-wide gear unless another session has run since.
+  PS_NEW=$(newest_state)
+  case $PS_SRC in
+    fork)
+      if [ -n "$PS_NEW" ]; then
+        PS_FROM=$(dirname "$PS_NEW")
+        PS_FILES=tempo
+        [ "$COLD" = 1 ] || PS_FILES="tempo session-state sprint-start"
+        for PS_F in $PS_FILES; do
+          [ ! -f "$PS_FROM/$PS_F" ] || [ -L "$PS_FROM/$PS_F" ] || cp "$PS_FROM/$PS_F" "$CLUTCH_SDIR/$PS_F" 2>/dev/null || :
+        done
+      fi
+      ;;
+    resume)
+      if [ -z "$PS_NEW" ] || [ "$PS_NEW" = "$CLUTCH_DIR/session-state" ]; then
+        [ ! -f "$CLUTCH_DIR/tempo" ] || cp "$CLUTCH_DIR/tempo" "$CLUTCH_SDIR/tempo" 2>/dev/null || :
+      fi
+      ;;
+  esac
+fi
 if [ "$FRESH" = 1 ]; then
   # The gear is session-scoped: a brand-new session (startup or clear)
   # opens in neutral, so the intent ask below always fires at a fresh
@@ -68,17 +120,39 @@ if [ "$FRESH" = 1 ]; then
   case "$INPUT" in
     *'"source":"startup"'* | *'"source": "startup"'* | \
       *'"source":"clear"'* | *'"source": "clear"'*)
-      rm -f "$CLUTCH_DIR/tempo" 2>/dev/null || :
+      rm -f "$CLUTCH_SDIR/tempo" 2>/dev/null || :
       ;;
   esac
   if clutch_ensure_dir; then
     NOW=$(date +%s)
     BASE=$(clutch_last_authored %H) || BASE=""
     [ -n "$BASE" ] || BASE="-"
-    printf 'start %s\nbase %s\n' "$NOW" "$BASE" 2>/dev/null > "$CLUTCH_DIR/session-state"
+    printf 'start %s\nbase %s\n' "$NOW" "$BASE" 2>/dev/null > "$CLUTCH_SDIR/session-state"
     # A sprint never legitimately spans a session boundary.
-    rm -f "$CLUTCH_DIR/sprint-start" 2>/dev/null
+    rm -f "$CLUTCH_SDIR/sprint-start" 2>/dev/null
   fi
+fi
+
+# Prune, at startup only, once this session has its own folder: every other
+# real folder under a real .clutch/s with no entry (itself included) changed
+# within 7 days loses its known files, then rmdir, which keeps a folder that
+# holds anything else. Silent.
+# shortcut: a 7-day bound and one find; a session with no prompt for 7 days loses its folder and runs folder-wide until its next boundary.
+if [ "$PS_SRC" = startup ] && [ "$CLUTCH_SDIR" != "$CLUTCH_DIR" ] && [ ! -L "$CLUTCH_DIR/s" ]; then
+  PS_LIVE=$(find "$CLUTCH_DIR/s" -mindepth 1 -maxdepth 2 -mtime -7 2>/dev/null)
+  for PS_D in "$CLUTCH_DIR"/s/*; do
+    [ "$PS_D" != "$CLUTCH_SDIR" ] && [ ! -L "$PS_D" ] && [ -d "$PS_D" ] || continue
+    case "
+$PS_LIVE
+" in
+      *"
+$PS_D
+"* | *"
+$PS_D/"*) continue ;;
+    esac
+    rm -f "$PS_D/tempo" "$PS_D/session-state" "$PS_D/sprint-start" "$PS_D"/session-state.tmp* 2>/dev/null
+    rmdir "$PS_D" 2>/dev/null || :
+  done
 fi
 
 # Git-derived lines; a plain clutch folder has no commits to name.
@@ -120,7 +194,7 @@ if [ "$FRESH" = 1 ]; then
   if [ ! -e "$CLUTCH_DIR" ]; then
     ASK=1
   elif ls "$CLUTCH_DIR" >/dev/null 2>&1; then
-    GEAR=$(head -c 32 "$CLUTCH_DIR/tempo" 2>/dev/null | tr -d '[:space:]') || GEAR=""
+    GEAR=$(head -c 32 "$CLUTCH_SDIR/tempo" 2>/dev/null | tr -d '[:space:]') || GEAR=""
     case "$GEAR" in
       espresso | craft | ballmer | freefall | ferment) ;;
       *) ASK=1 ;;

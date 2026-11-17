@@ -23,7 +23,12 @@
 # STATUS_SKILL and STATUS_SH override the skill
 # file and the script, so both can be replayed against any historical version
 # (git show BASE:... > tmp).
+# ST1-ST3 (2.15.0): status.sh @<tag8> reads this session's
+# .clutch/s/<tag8>/ when it exists (no symlink at either level, neither
+# CLUTCH_PER_SESSION=off nor CLUTCH_WATCH=off); anything else, and no
+# argument, is fbb2aa8's report byte for byte.
 set -u
+unset CLUTCH_PER_SESSION CLUTCH_WATCH
 
 HERE=$(cd "$(dirname "$0")" && pwd)
 ROOT=$(cd "$HERE/.." && pwd)
@@ -70,7 +75,8 @@ unpin "skill: no hand-resolved path"                  '<base-directory>'
 unpin "skill: stays model-invocable"                  'disable-model-invocation: true'
 pin   "skill: fix for a .clutch hooks cannot use"     'chmod u+rwx .clutch'
 # One pin per Step 3 fix line: the status phrase plus its fix verb.
-pin   "skill: fix line, .clutch dir"      '`.clutch present but not readable` or `.clutch not writable`: `chmod u+rwx .clutch`'
+pin   "skill: fix line, .clutch dir"      '`.clutch present but not readable` or `.clutch not writable`: `chmod u+rwx .clutch` lets the hooks back in; on a report run with this session'"'"'s tag whose `.clutch/s/<tag8>` folder exists, `.clutch not writable` means that folder: `chmod u+rwx .clutch/s/<tag8>`.'
+pin   "skill: passes the session tag"     'sh "${CLAUDE_PLUGIN_ROOT}/scripts/status.sh" '"'"'@<tag>'"'"''
 pin   "skill: fix line, state file mode"  '`state present but not writable`, or `unreadable` when the file'"'"'s mode blocks reading: `chmod u+rw .clutch/session-state`'
 pin   "skill: fix line, .clutch shape"    '`.clutch present but not a directory`: moving that `.clutch` file or link aside'
 pin   "skill: fix line, state shape"      '`session-state present but not a file`: moving `.clutch/session-state` aside'
@@ -249,6 +255,72 @@ else
   worklog_line "worklog, ~/.clutch 644, file present" "  worklog: unwritable ($WF)"
   chmod 755 "$WD"
 fi
+
+# --- ST: the session's own folder, read on a tagged run.
+BASE=fbb2aa8
+mkdir -p "$T/base/scripts" "$T/base/rules"
+cp "$ROOT/rules/constitution.md" "$T/base/rules/"
+git -C "$ROOT" show "$BASE:scripts/status.sh" > "$T/base/scripts/status.sh" 2>/dev/null \
+  || { echo "FAIL: parity base $BASE not reachable from $ROOT"; exit 1; }
+R3="$T/repo3"
+C3="$R3/.clutch"
+A=0123abcd
+trap 'chmod -R u+rwx "$T" 2>/dev/null; rm -rf "$T"' EXIT
+st() { (cd "$R3" && env "$@" sh "$ST_SH" ${ST_ARG:+"$ST_ARG"}); }
+sfx() {
+  chmod -R u+rwx "$R3" "$T/else" 2>/dev/null
+  rm -rf "$R3" "$T/else"
+  mkdir -p "$C3/s/$A"
+  git -C "$R3" init -q
+  printf 'start 1\nbase -\nstop 2\n' > "$C3/session-state"
+  printf '1700000000 theirs\n' > "$C3/sprint-start"
+  printf 'start 1\nbase -\nstop 2\nstop 3\nstop 4\nemit 5\n' > "$C3/s/$A/session-state"
+  printf '1700000000 mine\n' > "$C3/s/$A/sprint-start"
+}
+has() { printf '%s\n' "$OUT" | grep -qxF "$2" || { echo "FAIL: $1 -- want '$2', got:"; printf '%s\n' "$OUT" | grep -E 'stop hook|bell|sprint'; fail=1; }; }
+ST_SH=$ST
+# ST1: the tagged run reads this session's folder.
+sfx; ST_ARG="@$A"; OUT=$(st)
+has "ST1 tagged" '  stop hook: fired in this state (stop events recorded: 3)'
+has "ST1 tagged" '  bell: 1 of 2 emissions used this state'
+has "ST1 tagged" "  sprint: active ('mine')"
+if [ "$(id -u)" != 0 ]; then
+  sfx; chmod 555 "$C3/s/$A"; OUT=$(st); chmod 755 "$C3/s/$A"
+  has "ST1 read-only folder" '  stop hook: .clutch not writable; some hooks cannot record'
+fi
+sfx; rm -f "$C3/s/$A/session-state"; OUT=$(st)
+has "ST1 no state" '  stop hook: no session state in this repo yet'
+sfx; rm -f "$C3/s/$A/session-state"; mkdir "$C3/s/$A/session-state"; OUT=$(st)
+has "ST1 dir state" '  stop hook: session-state present but not a file'
+# ST2: anything else is the folder-wide report.
+sfx; ST_ARG=""; NOARG=$(st)
+printf '%s\n' "$NOARG" | grep -qxF '  stop hook: fired in this state (stop events recorded: 1)' || { echo "FAIL: ST2 control -- no-arg run is not folder-wide"; fail=1; }
+for arg in '@fedc9876' '@<tag>' '@../x' '@' '@123456789'; do
+  sfx; mkdir -p "$C3/s/123456789"; cp "$C3/s/$A/session-state" "$C3/s/123456789/"
+  ST_ARG=$arg; OUT=$(st)
+  [ "$OUT" = "$NOARG" ] || { echo "FAIL: ST2 [$arg] -- not the folder-wide report"; fail=1; }
+done
+for sw in CLUTCH_PER_SESSION=off CLUTCH_WATCH=off; do
+  sfx; ST_ARG="@$A"; OUT=$(st "$sw")
+  [ "$OUT" = "$NOARG" ] || { echo "FAIL: ST2 $sw -- not the folder-wide report"; fail=1; }
+done
+sfx; mv "$C3/s" "$T/else"; ln -s "$T/else" "$C3/s"; ST_ARG="@$A"; OUT=$(st)
+[ "$OUT" = "$NOARG" ] || { echo "FAIL: ST2 symlinked .clutch/s -- read through the link"; fail=1; }
+sfx; mv "$C3/s/$A" "$T/else"; ln -s "$T/else" "$C3/s/$A"; ST_ARG="@$A"; OUT=$(st)
+[ "$OUT" = "$NOARG" ] || { echo "FAIL: ST2 symlinked .clutch/s/$A -- read through the link"; fail=1; }
+# ST3: no argument equals fbb2aa8 on these fixtures and the earlier ones.
+ST_ARG=""
+for v in plainfx s000 snostate; do
+  sfx
+  case $v in s000) chmod 000 "$C3/s" ;; snostate) rm -f "$C3/session-state" ;; esac
+  ST_SH=$ST; N=$(st); ST_SH=$T/base/scripts/status.sh; B=$(st); ST_SH=$ST
+  chmod 755 "$C3/s"
+  [ "$N" = "$B" ] || { echo "FAIL: ST3 $v -- no-arg report differs from $BASE"; fail=1; }
+done
+for d in "$T/repo" "$T/repo2" "$T/plain"; do
+  N=$(cd "$d" && GIT_CEILING_DIRECTORIES="$T" sh "$ST"); B=$(cd "$d" && GIT_CEILING_DIRECTORIES="$T" sh "$T/base/scripts/status.sh")
+  [ "$N" = "$B" ] || { echo "FAIL: ST3 $d -- no-arg report differs from $BASE"; fail=1; }
+done
 
 [ "$fail" -eq 0 ] || exit 1
 echo PASS

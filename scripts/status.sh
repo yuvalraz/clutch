@@ -1,5 +1,8 @@
 #!/bin/sh
 # clutch status: read-only report. Prints facts; mutates nothing; always exits 0.
+# Optional $1 '@<tag8>': judge the session's state in .clutch/s/<tag8>/ when
+# that folder exists, neither it nor .clutch/s is a symlink, and neither
+# CLUTCH_PER_SESSION=off nor CLUTCH_WATCH=off; else the folder-wide state.
 SELF_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" 2>/dev/null && pwd)
 
 echo "clutch status"
@@ -23,11 +26,25 @@ if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   fi
 
   C="$ROOT/.clutch"
+  # SD: the folder holding the session state judged below; .clutch itself
+  # unless a valid tag names this session's own real folder.
+  SD=$C
+  case ${1:-} in
+    @?*)
+      ST8=${1#@}
+      # Spelled-out class: a range like A-Z matches é under a UTF-8 /bin/sh.
+      case $ST8 in
+        ?????????* | *[!0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz-]*) ;;
+        *) [ "${CLUTCH_PER_SESSION:-}" = off ] || [ "${CLUTCH_WATCH:-}" = off ] || [ -L "$C/s" ] ||
+          [ -L "$C/s/$ST8" ] || [ ! -d "$C/s/$ST8" ] || SD="$C/s/$ST8" ;;
+      esac
+      ;;
+  esac
   if [ -d "$C" ] && { [ ! -x "$C" ] || [ ! -r "$C" ]; }; then
     # [ -f ] is false for every file in a dir it cannot search; stay quiet.
     echo "  stop hook: .clutch present but not readable"
   elif [ -d "$C" ]; then
-    S="$C/session-state"
+    S="$SD/session-state"
     if [ -f "$S" ]; then
       LAST=$(grep '^stop ' "$S" 2>/dev/null | tail -n 1 | cut -d' ' -f2)
       NSTOP=$(grep -c '^stop ' "$S" 2>/dev/null)
@@ -35,7 +52,7 @@ if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
       # grep -c prints nothing only when it cannot read the file.
       if [ -z "$NSTOP" ]; then
         echo "  stop hook: state present but unreadable"
-      elif [ ! -w "$C" ]; then
+      elif [ ! -w "$SD" ]; then
         # Appends still land; the temp-file-plus-mv rewriters and creates fail.
         echo "  stop hook: .clutch not writable; some hooks cannot record"
       elif [ ! -w "$S" ]; then
@@ -55,13 +72,13 @@ if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
       fi
     elif [ -e "$S" ] || [ -L "$S" ]; then
       echo "  stop hook: session-state present but not a file"
-    elif [ ! -w "$C" ]; then
+    elif [ ! -w "$SD" ]; then
       echo "  stop hook: .clutch not writable; hooks cannot record"
     else
       echo "  stop hook: no session state in this repo yet"
     fi
-    if [ -f "$C/sprint-start" ]; then
-      SP=$(head -n 1 "$C/sprint-start" 2>/dev/null)
+    if [ -f "$SD/sprint-start" ]; then
+      SP=$(head -n 1 "$SD/sprint-start" 2>/dev/null)
       echo "  sprint: active ('${SP#* }')"
     else
       echo "  sprint: none active"

@@ -162,7 +162,7 @@ keep going.
 
      <!-- ponytail: rewriting captures.md in place while another fomo appends
           to the same shared file can race -- the same accepted ceiling as
-          tempo's shared gear file. A lock or sidecar done-list only if it
+          other shared pool files. A lock or sidecar done-list only if it
           ever bites. -->
    - Verdict absorb → the ideas route above when no brain exists. With a
      brain at `$HOME/.clutch`, the door snippet runs instead, filling the
