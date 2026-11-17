@@ -55,8 +55,9 @@ clock and the repeat-red record (the hook's record of a repeated red, so a
 second identical failure can be told from a first) live in each session's own
 `.clutch/s/<tag>/session-state`, beside its gear (`tempo`) and sprint clock
 (`sprint-start`), so parallel sessions in one folder never share a gear, a
-clock or a budget. A session without a tag uses the folder-wide
-`.clutch/session-state`, `.clutch/tempo` and `.clutch/sprint-start`, as
+clock or a budget. A session without its own folder (no tag, started before
+the upgrade, started in a plain folder not yet active, or pruned) uses the
+folder-wide `.clutch/session-state`, `.clutch/tempo` and `.clutch/sprint-start`, as
 before. A new session clears out other sessions' folders untouched for 7
 days. `CLUTCH_PER_SESSION=off` turns per-session state off.
 

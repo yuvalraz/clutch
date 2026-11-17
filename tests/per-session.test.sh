@@ -52,7 +52,7 @@ ideate|ideate|\.clutch/tempo|W|tempo|ballmer
 ops|ops|\.clutch/tempo|W|tempo|espresso
 review|review|\.clutch/tempo|W|tempo|espresso
 investigate|investigate|\.clutch/tempo|W|tempo|craft
-tempo|tempo|\.clutch/tempo|W|tempo|ferment
+tempo|tempo|"<gear>"|W|tempo|ferment
 sprint-start|sprint|the shippable|W|sprint-start|the shippable
 sprint-close|sprint|rm -f|X|sprint-start|
 decline|review|declined %s|W|session-state|declined '
@@ -186,6 +186,22 @@ while IFS='|' read -r n sk re k f c; do
     fi
   done
 done < "$T/snips"
+
+# PS8: the bare /clutch:tempo read resolves the file the way the writes and
+# the hooks do: the session's folder, else folder-wide under either switch
+# off or a symlinked session folder.
+extract "$ROOT/skills/tempo/SKILL.md" 'head -c 32' > "$T/snip/tempo-read.new"
+grep -qF -- "$DD3_PRE$(dd3 F tempo)" "$T/snip/tempo-read.new" || { echo "FAIL: PS8 -- the bare read has no DD3 line"; fail=1; }
+for sh in $SHELLS; do
+  mkfx; mkdir -p "$R/.clutch/s/$A"; printf 'craft\n' > "$R/.clutch/s/$A/tempo"; printf 'espresso\n' > "$R/.clutch/tempo"
+  go tempo-read.new "$sh" "@$A"; [ "$RC" = 0 ] && [ "$OUT" = craft ] || { echo "FAIL: PS8 $sh folder -- read '$OUT' rc $RC"; fail=1; }
+  for sw in CLUTCH_PER_SESSION=off CLUTCH_WATCH=off; do
+    go tempo-read.new "$sh" "@$A" "$sw"; [ "$RC" = 0 ] && [ "$OUT" = espresso ] || { echo "FAIL: PS8 $sh $sw -- read '$OUT' rc $RC"; fail=1; }
+  done
+  go tempo-read.new "$sh" "@$B"; [ "$OUT" = espresso ] || { echo "FAIL: PS8 $sh no-folder -- read '$OUT'"; fail=1; }
+  rm -rf "$R/.clutch/s/$A"; mkdir -p "$T/else"; printf 'ballmer\n' > "$T/else/tempo"; ln -s "$T/else" "$R/.clutch/s/$A"
+  go tempo-read.new "$sh" "@$A"; [ "$OUT" = espresso ] || { echo "FAIL: PS8 $sh link-tag -- read '$OUT'"; fail=1; }
+done
 
 # PS5: sprint start then close remove the same file, with and without the folder.
 for sh in $SHELLS; do
@@ -546,6 +562,12 @@ if [ "$ROOTUSER" = 0 ]; then
   ! asks || { echo "FAIL: PH12 unreadable -- asked"; fail=1; }
   chmod 755 "$X/.clutch"
 fi
+# A peer's symlinked sprint-start is never copied into a fork.
+fx repo
+mkdir -p "$SA" "$T/else"; printf 'outside\n' > "$T/else/secret"
+printf 'craft\n' > "$SA/tempo"; printf 'start 1\n' > "$SA/session-state"; ln -s "$T/else/secret" "$SA/sprint-start"
+hook anchor "$X" "$(src "$ID_F" fork)"; ok "PH12 link-file"
+[ "$(cat "$SF/tempo" 2>/dev/null)" = craft ] && [ ! -e "$SF/sprint-start" ] || { echo "FAIL: PH12 link-file -- the fork copied a peer's symlinked file"; fail=1; }
 # .clutch/s a regular file.
 fx repo
 printf 'keep\n' > "$X/.clutch/s"

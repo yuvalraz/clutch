@@ -100,7 +100,7 @@ if ! clutch_session_paths "$INPUT" && [ -n "$CLUTCH_TAG8" ] && [ -n "$PS_SRC" ] 
         PS_FILES=tempo
         [ "$COLD" = 1 ] || PS_FILES="tempo session-state sprint-start"
         for PS_F in $PS_FILES; do
-          [ ! -f "$PS_FROM/$PS_F" ] || cp "$PS_FROM/$PS_F" "$CLUTCH_SDIR/$PS_F" 2>/dev/null || :
+          [ ! -f "$PS_FROM/$PS_F" ] || [ -L "$PS_FROM/$PS_F" ] || cp "$PS_FROM/$PS_F" "$CLUTCH_SDIR/$PS_F" 2>/dev/null || :
         done
       fi
       ;;

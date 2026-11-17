@@ -15,12 +15,18 @@ gear ratio, never a fuel tank; slow output means wrong gear, not empty tank.
 ## Usage
 
 - `/clutch:tempo <gear>` engages the named gear.
-- `/clutch:tempo` bare reports: read this session's `.clutch/s/<tag8>/tempo`
-  when its folder `.clutch/s/<tag8>/` exists (`<tag8>` is the `Session tag:`
-  without the `@`), else `.clutch/tempo`; if it holds one of the five gears, report it in one line naming the shape, e.g.
+- `/clutch:tempo` bare reports: read the gear with the snippet below (it
+  picks the same file the write and the hooks use), replacing `@<tag>` as
+  the write does; if it holds one of the five gears, report it in one line naming the shape, e.g.
   "Tempo: craft. Converge-dominant, regular divergent pulses; checkpoint at
   each commit point." If it is missing or holds anything else, list the five
   gears and ask which one to engage.
+
+  ```sh
+  ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || { [ "${CLUTCH_PLAIN:-}" != off ] && ROOT=$(pwd -P) && [ "$ROOT" != / ] && [ ! "$ROOT" -ef "$HOME" ]; } || exit 0
+  T='@<tag>'; F="$ROOT/.clutch/tempo"; case $T in '' | @ | *[./]*) ;; *) [ "${CLUTCH_PER_SESSION:-}" = off ] || [ "${CLUTCH_WATCH:-}" = off ] || [ -L "$ROOT/.clutch/s" ] || [ -L "$ROOT/.clutch/s/${T#@}" ] || [ ! -d "$ROOT/.clutch/s/${T#@}" ] || F="$ROOT/.clutch/s/${T#@}/tempo" ;; esac
+  head -c 32 "$F" 2>/dev/null
+  ```
 
 On engagement (explicit invocation or accepted offer), confirm in one line
 naming the shape, then write the marker (POSIX, silent on any failure).
