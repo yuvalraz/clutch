@@ -144,7 +144,7 @@ pin "$TP" "tempo: mismatch example is design" 'a design question run in espresso
 HSEC=$(awk '/^## /{s=($0=="## When a handoff fails")} s' "$I")
 RSEC=$(awk '/^## /{s=($0=="## Review")} s' "$I")
 [ -n "$RSEC" ] || { echo "FAIL: intent: no ## Review section"; fail=1; }
-printf '%s\n' "$HSEC" | grep -qF 'For ideate, ops, and review alike: if the handoff fails' \
+printf '%s\n' "$HSEC" | grep -qF 'For ideate, ops, review, and investigate alike: if the handoff fails' \
   || { echo "FAIL: intent: failed-handoff rule not under ## When a handoff fails"; fail=1; }
 printf '%s\n' "$RSEC" | grep -qF 'if the handoff fails' \
   && { echo "FAIL: intent: failed-handoff rule still sits under ## Review"; fail=1; }
@@ -154,8 +154,8 @@ awk '/^## When a handoff fails$/{h=NR} /^## The once-only law$/{o=NR} END{exit !
 # --- intent, GLOSSARY, README: review is the fourth focus
 pin "$I" "intent: review form"               '/clutch:intent review'
 pin "$I" "intent: review handoff"            'run /clutch:review'
-pin "$I" "intent: plain review answers"      'a plain "build", "ideate", "ops", or "review" counts as an answer'
-pin "$I" "intent: argument hint"             'argument-hint: "\[build | ideate | ops | review\]"'
+pin "$I" "intent: plain review answers"      'a plain "build", "ideate", "ops", "review", or "investigate" counts as an answer'
+pin "$I" "intent: argument hint"             'argument-hint: "\[build | ideate | ops | review | investigate\]"'
 pin "$G" "GLOSSARY: review in Intent"        'Review engages espresso'
 pin "$R" "README: review command"            '/clutch:review'
 pin "$R" "README: review one PR at a time"   '`/clutch:review` closes one PR at a time'

@@ -45,7 +45,7 @@ pin() {
 # --- skill pins: the focus forms, craft marker, posture, handoff, once-only law
 pin "$S" "skill: build form"          '/clutch:intent build'
 pin "$S" "skill: ideate form"         '/clutch:intent ideate'
-pin "$S" "skill: bare form asks"      'ask one question: build, ideate, ops, or review'
+pin "$S" "skill: bare form asks"      'ask one question: build, ideate, ops, review, or investigate'
 pin "$S" "skill: craft marker write"  '{ printf .%s.n. "craft" > "\$ROOT/\.clutch/tempo"; } 2>/dev/null'
 pin "$S" "skill: marker-fail contract" 'only the re-injection is lost'
 pin "$S" "skill: posture verify"      'we verify before we claim'
@@ -59,8 +59,11 @@ pin "$S" "skill: handoff fails loud"   'if the handoff fails, say so in one line
 pin "$S" "skill: once-only law"       'never re-asks uninvited'
 pin "$S" "skill: session-scoped gear" 'The gear is session-scoped'
 pin "$S" "skill: resume inherits"     'resume and compaction inherit'
-pin "$S" "skill: unknown arg"         'one line naming the four focuses'
-pin "$S" "skill: four focuses fixed"  'no fifth and no config'
+pin "$S" "skill: unknown arg"         'one line naming the five focuses'
+pin "$S" "skill: five focuses fixed"  'no sixth and no config'
+pin "$S" "skill: investigate form"    '/clutch:intent investigate'
+pin "$S" "skill: investigate handoff" 'run /clutch:investigate'
+pin "$S" "skill: investigate confirm" 'Investigate declared; handing off.'
 pin "$S" "skill: description trigger" 'answers the session-start intent question'
 pin "$S" "skill: invocation scope"    'A stray "build" mid-conversation invokes nothing'
 # The answer path: a plain "build" or "ideate" reply must be able to invoke

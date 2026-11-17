@@ -283,7 +283,7 @@ x"
 fi
 
 # --- G15: the skill's bare form, guessed branch and answers
-fpin "$S" "G15 bare form" 'ask one question: build, ideate, ops, or review?'
+fpin "$S" "G15 bare form" 'ask one question: build, ideate, ops, review, or investigate?'
 fpin "$S" "G15 trigger" 'looks like <focus> again'
 fpin "$S" "G15 question" '"Looks like <focus> on <thread>, go?"'
 fpin "$S" "G15 threadless question" '"Looks like <focus>, go?"'

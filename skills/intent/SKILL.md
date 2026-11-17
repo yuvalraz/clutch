@@ -1,15 +1,15 @@
 ---
 name: intent
-description: Declare the session's focus, build, ideate, ops, or review, and engage the matching gear and posture.
-when_to_use: Use ONLY when the user answers the session-start intent question (a plain "build", "ideate", "ops", or "review" counts as an answer, and so does a plain "go" or "yes" when the question named a likely focus) or explicitly asks to set the session's focus. A passing mention of building, ideating, operations, or reviewing mid-conversation is not a trigger.
-argument-hint: "[build | ideate | ops | review]"
+description: Declare the session's focus, build, ideate, ops, review, or investigate, and engage the matching gear and posture.
+when_to_use: Use ONLY when the user answers the session-start intent question (a plain "build", "ideate", "ops", "review", or "investigate" counts as an answer, and so does a plain "go" or "yes" when the question named a likely focus) or explicitly asks to set the session's focus. A passing mention of building, ideating, operations, reviewing, or investigating mid-conversation is not a trigger.
+argument-hint: "[build | ideate | ops | review | investigate]"
 ---
 
 # Intent
 
 A clutch couples intention to action, and this is where the intention gets
-declared. Four focuses exist: build, ideate, ops, and review.
-There is no fifth and no config; new focuses arrive by shipped release,
+declared. Five focuses exist: build, ideate, ops, review, and investigate.
+There is no sixth and no config; new focuses arrive by shipped release,
 never by settings.
 
 ## Usage
@@ -22,10 +22,12 @@ never by settings.
   hand off.
 - `/clutch:intent review` declares a review session: one confirm line, then
   hand off.
-- `/clutch:intent` bare: ask one question: build, ideate, ops, or review?
+- `/clutch:intent investigate` declares an investigate session: one confirm
+  line, then hand off.
+- `/clutch:intent` bare: ask one question: build, ideate, ops, review, or investigate?
   Nothing else, unless a guess is in context (see Guessed focus).
 
-Any other argument gets one line naming the four focuses, no error ceremony,
+Any other argument gets one line naming the five focuses, no error ceremony,
 except a plain go or yes when a guess is in context (see Guessed focus).
 
 Invocation scope: this skill fires when the user answers the session-start
@@ -45,7 +47,7 @@ A plain go or yes declares <focus>, as the reply to that question or to the sess
 Then run it exactly as `/clutch:intent <focus>`, record included.
 Naming another focus declares that one. Any other reply is an ignored
 ask, and the once-only law holds. Without that line in context, the bare
-form asks the four-way question as before.
+form asks the five-way question as before.
 
 ## Record
 
@@ -101,9 +103,13 @@ Confirm in one line: "Review declared; handing off." Then run /clutch:review. Th
 skill is the machinery: it engages espresso, loads your conventions, and
 holds the one-PR-at-a-time rhythm. Duplicate none of it here.
 
+## Investigate
+
+Confirm in one line: "Investigate declared; handing off." Then run /clutch:investigate. That skill is the machinery: it engages craft, takes the pointer, and holds the read-only evidence rhythm. Duplicate none of it here.
+
 ## When a handoff fails
 
-For ideate, ops, and review alike: if the handoff fails, say so in one line; no new gear is engaged; any earlier gear still holds.
+For ideate, ops, review, and investigate alike: if the handoff fails, say so in one line; no new gear is engaged; any earlier gear still holds.
 
 ## The once-only law
 

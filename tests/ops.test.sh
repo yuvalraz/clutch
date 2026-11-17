@@ -249,7 +249,7 @@ fi
 # --- intent: the ops form and its handoff
 pin "$I" "intent: ops form"            '/clutch:intent ops'
 pin "$I" "intent: ops handoff"         'run /clutch:ops'
-pin "$I" "intent: four focuses"        'Four focuses exist'
+pin "$I" "intent: five focuses"        'Five focuses exist'
 
 # --- tempo, GLOSSARY, README: ops is named where the gears are
 pin "$TP" "tempo: ops drives espresso" 'ops drives espresso'
