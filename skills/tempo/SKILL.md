@@ -15,26 +15,29 @@ gear ratio, never a fuel tank; slow output means wrong gear, not empty tank.
 ## Usage
 
 - `/clutch:tempo <gear>` engages the named gear.
-- `/clutch:tempo` bare reports: read `.clutch/tempo`; if it holds one of the
-  five gears, report it in one line naming the shape, e.g.
+- `/clutch:tempo` bare reports: read this session's `.clutch/s/<tag8>/tempo`
+  when its folder `.clutch/s/<tag8>/` exists (`<tag8>` is the `Session tag:`
+  without the `@`), else `.clutch/tempo`; if it holds one of the five gears, report it in one line naming the shape, e.g.
   "Tempo: craft. Converge-dominant, regular divergent pulses; checkpoint at
   each commit point." If it is missing or holds anything else, list the five
   gears and ask which one to engage.
 
 On engagement (explicit invocation or accepted offer), confirm in one line
-naming the shape, then write the marker (POSIX, silent on any failure):
+naming the shape, then write the marker (POSIX, silent on any failure).
+Replace `@<tag>` with the `Session tag:` from the session start; with no `Session tag:` line, leave it as is:
 
 ```sh
 ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || { [ "${CLUTCH_PLAIN:-}" != off ] && ROOT=$(pwd -P) && [ "$ROOT" != / ] && [ ! "$ROOT" -ef "$HOME" ]; } || exit 0
 mkdir -p "$ROOT/.clutch" 2>/dev/null || exit 0
-{ printf '%s\n' "<gear>" > "$ROOT/.clutch/tempo"; } 2>/dev/null || exit 0
+T='@<tag>'; F="$ROOT/.clutch/tempo"; case $T in '' | @ | *[./]*) ;; *) [ "${CLUTCH_PER_SESSION:-}" = off ] || [ "${CLUTCH_WATCH:-}" = off ] || [ -L "$ROOT/.clutch/s" ] || [ -L "$ROOT/.clutch/s/${T#@}" ] || [ ! -d "$ROOT/.clutch/s/${T#@}" ] || F="$ROOT/.clutch/s/${T#@}/tempo" ;; esac
+{ printf '%s\n' "<gear>" > "$F"; } 2>/dev/null || exit 0
 ```
 
-<!-- ponytail: one shared .clutch/tempo per repo, so concurrent sessions on
-     the same repo share a gear -- the same accepted ceiling as sprint-start,
-     and last-write-wins now includes the anchor's startup wipe (a new
-     session opening on the repo resets the gear to neutral).
-     Per-session state only if it ever bites. -->
+<!-- Each session's gear lives in its own .clutch/s/<tag8>/tempo once the
+     session start has made that folder, so concurrent sessions in one
+     folder keep their own gears. Without the folder (no tag,
+     CLUTCH_PER_SESSION=off or CLUTCH_WATCH=off) the gear stays in the
+     shared .clutch/tempo, as before. -->
 
 If the write fails, skip silently: the declaration still governs the live
 session; only the long-session re-injection (the heartbeat's tempo line) is
@@ -67,7 +70,8 @@ constraints are hard:
 
 - Offers ride the shared budget: at most 2 uninvited lines per session
   across every channel. Record first, then speak: append
-  "emit model <epoch seconds>" to `.clutch/session-state`, then say the one
+  "emit model <epoch seconds>" to the session-state file the heartbeat's
+  budget line names, then say the one
   ignorable line. When the budget is spent, stay silent even on a matched
   mismatch.
 - A declined offer closes the question until the user raises it.

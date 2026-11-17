@@ -13,12 +13,13 @@ Twenty minutes, one shippable. The duration is fixed; there is no parameter.
    a run, a sent thing). Do not start until that sentence exists.
 
 2. Write the start marker (POSIX, silent on any failure). Replace the goal text
-   with the shippable in a few words:
+   with the shippable in a few words. Replace `@<tag>` with the `Session tag:` from the session start; with no `Session tag:` line, leave it as is:
 
    ```sh
    ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
    mkdir -p "$ROOT/.clutch" 2>/dev/null || exit 0
-   printf '%s %s\n' "$(date +%s)" "the shippable in a few words" > "$ROOT/.clutch/sprint-start"
+   T='@<tag>'; F="$ROOT/.clutch/sprint-start"; case $T in '' | @ | *[./]*) ;; *) [ "${CLUTCH_PER_SESSION:-}" = off ] || [ "${CLUTCH_WATCH:-}" = off ] || [ -L "$ROOT/.clutch/s" ] || [ -L "$ROOT/.clutch/s/${T#@}" ] || [ ! -d "$ROOT/.clutch/s/${T#@}" ] || F="$ROOT/.clutch/s/${T#@}/sprint-start" ;; esac
+   printf '%s %s\n' "$(date +%s)" "the shippable in a few words" > "$F"
    ```
 
 3. Work turn by turn, present tense, on that one shippable only. When scope
@@ -43,11 +44,12 @@ Twenty minutes, one shippable. The duration is fixed; there is no parameter.
 4. Close at 20 minutes. The heartbeat carries the clock each turn (sprint
    clock: N min left); when it reads time is up, stop and name what shipped,
    recognition wording: the concrete thing that moved and one smallest next
-   move. Then remove the marker:
+   move. Then remove the marker (fill `@<tag>` the same way):
 
    ```sh
    ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
-   rm -f "$ROOT/.clutch/sprint-start"
+   T='@<tag>'; F="$ROOT/.clutch/sprint-start"; case $T in '' | @ | *[./]*) ;; *) [ "${CLUTCH_PER_SESSION:-}" = off ] || [ "${CLUTCH_WATCH:-}" = off ] || [ -L "$ROOT/.clutch/s" ] || [ -L "$ROOT/.clutch/s/${T#@}" ] || [ ! -d "$ROOT/.clutch/s/${T#@}" ] || F="$ROOT/.clutch/s/${T#@}/sprint-start" ;; esac
+   rm -f "$F"
    ```
 
 Why this works: see "Point of performance (Barkley)" and "Interest-based
