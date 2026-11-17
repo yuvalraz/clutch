@@ -85,6 +85,19 @@ fi
 store 'repo build\n'
 unit "$T/repo"
 [ "$URC" = 0 ] && [ "$UOUT" = build ] || { echo "FAIL: G1 valid record -- want rc 0 and build, got rc $URC: $UOUT"; fail=1; }
+# The read is bounded in bytes: a record 70000 bytes back is out of the window.
+nostore
+{ printf 'repo build\n'; awk 'BEGIN { s = sprintf("%70000s", ""); gsub(/ /, "x", s); print s }'; } > "$ST"
+unit "$T/repo"
+[ "$URC" = 1 ] && [ -z "$UOUT" ] || { echo "FAIL: G1 byte bound -- want rc 1 and no stdout, got rc $URC: $UOUT"; fail=1; }
+printf 'repo ops\n' >> "$ST"
+unit "$T/repo"
+[ "$URC" = 0 ] && [ "$UOUT" = ops ] || { echo "FAIL: G1 byte bound tail -- want rc 0 and ops, got rc $URC: $UOUT"; fail=1; }
+# A full window starts mid-line; that fragment ("repo build" cut from "xxrepo build") never counts.
+nostore
+{ printf 'xxrepo build\n'; awk 'BEGIN { for (i = 0; i < 6552; i++) print "other ops"; print "abcd" }'; } > "$ST"
+unit "$T/repo"
+[ "$URC" = 1 ] && [ -z "$UOUT" ] || { echo "FAIL: G1 window fragment -- want rc 1 and no stdout, got rc $URC: $UOUT"; fail=1; }
 
 # --- G2: git startup, no store -> today's ask is the last line
 nostore
@@ -210,8 +223,8 @@ fpin() {
 }
 
 # --- G13: the record line is silent on failure and needs an existing ~/.clutch
-fpin "$S" "G13 redirect order" '2>/dev/null >> "$HOME/.clutch/intents" || :'
-fpin "$S" "G13 brain guard" '[ -d "$HOME/.clutch" ] && printf'
+fpin "$S" "G13 grouped redirect" '>> "$HOME/.clutch/intents"; } 2>/dev/null'
+fpin "$S" "G13 brain guard" '[ -d "$HOME/.clutch" ] && { printf'
 
 # --- G14: round trip, the skill's own record snippet then the staged anchor
 nsn=$(awk '/^[ \t]*```sh/{n++; f=1; b[n] = ""; next} /^[ \t]*```/{f=0} f{b[n] = b[n] $0 "\n"}
@@ -243,12 +256,29 @@ else
   [ "$(tail -n 1 "$ST" 2>/dev/null)" = "my-dir review" ] || { echo "FAIL: G14 (b) -- store's last line is not 'my-dir review': $(tail -n 1 "$ST" 2>/dev/null)"; fail=1; }
   run "G14 (b) anchor" "$T/plain/my dir" startup
   [ "$(last "$OUT")" = "$(guessed review)" ] || { echo "FAIL: G14 (b) -- anchor did not guess review: $(last "$OUT")"; fail=1; }
+  # (c) also kills a mutant that swaps the brain guard for mkdir -p.
   KEEP=$HOME
   HOME=$T/bare
   mkdir -p "$HOME"
   record "G14 (c)" "$T/repo" build
   [ -e "$HOME/.clutch" ] && { echo "FAIL: G14 (c) -- the record created ~/.clutch"; fail=1; }
   HOME=$KEEP
+  # (d) a key with a newline would split the record; the snippet skips it.
+  NLD="$T/plain/nl
+x"
+  mkdir -p "$NLD"
+  store 'other ops\n'
+  record "G14 (d)" "$NLD" build
+  [ "$(cat "$ST")" = "other ops" ] || { echo "FAIL: G14 (d) -- a newline key changed the store: $(cat "$ST")"; fail=1; }
+  # (e) under zsh (the Bash tool's shell) a directory store stays silent.
+  if command -v zsh >/dev/null 2>&1; then
+    dirstore
+    snip build
+    ZOUT=$(cd "$T/repo" && zsh -f "$T/rsnip.sh" 2>"$T/zerr"); zrc=$?
+    [ "$zrc" = 0 ] || { echo "FAIL: G14 (e) -- zsh snippet exited $zrc"; fail=1; }
+    [ -z "$ZOUT" ] || { echo "FAIL: G14 (e) -- zsh snippet wrote stdout: $ZOUT"; fail=1; }
+    [ -s "$T/zerr" ] && { echo "FAIL: G14 (e) -- zsh snippet wrote stderr: $(head -3 "$T/zerr")"; fail=1; }
+  fi
 fi
 
 # --- G15: the skill's bare form, guessed branch and answers
@@ -256,11 +286,11 @@ fpin "$S" "G15 bare form" 'ask one question: build, ideate, ops, or review?'
 fpin "$S" "G15 trigger" 'looks like <focus> again'
 fpin "$S" "G15 question" '"Looks like <focus> on <thread>, go?"'
 fpin "$S" "G15 threadless question" '"Looks like <focus>, go?"'
-fpin "$S" "G15 go declares" 'A plain go, yes, ok or y declares <focus>'
+fpin "$S" "G15 go declares" 'A plain go or yes declares <focus>'
 fpin "$S" "G15 same as the argument" 'run it exactly as `/clutch:intent <focus>`, record included'
 fpin "$S" "G15 other reply" 'Any other reply is an ignored'
 fpin "$S" "G15 when_to_use" 'and so does a plain "go" or "yes" when the question named a likely focus'
-fpin "$S" "G15 go is not an unknown argument" 'except go when a guess is in context'
+fpin "$S" "G15 go is not an unknown argument" 'except a plain go or yes when a guess is in context'
 # Coupling: the anchor's guessed line carries the skill's trigger with <focus> filled.
 case "$(guessed build)" in *'looks like build again'*) ;; *) echo "FAIL: G15 coupling -- guessed line lacks the trigger"; fail=1 ;; esac
 TRIG=$(grep -oF 'looks like <focus> again' "$S" | head -n 1 | sed 's/<focus>/build/')

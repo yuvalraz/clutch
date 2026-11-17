@@ -26,7 +26,7 @@ never by settings.
   Nothing else, unless a guess is in context (see Guessed focus).
 
 Any other argument gets one line naming the four focuses, no error ceremony,
-except go when a guess is in context (see Guessed focus).
+except a plain go or yes when a guess is in context (see Guessed focus).
 
 Invocation scope: this skill fires when the user answers the session-start
 question or explicitly asks to set the session's focus, and at no other
@@ -41,7 +41,7 @@ the bare form asks this one question instead:
 context: the Thread line, the Last landed line, this folder's newest
 Worklog line. With none of them, ask "Looks like <focus>, go?".
 
-A plain go, yes, ok or y declares <focus>, as the reply to that question or to the session-start ask, or as the argument.
+A plain go or yes declares <focus>, as the reply to that question or to the session-start ask, or as the argument.
 Then run it exactly as `/clutch:intent <focus>`, record included.
 Naming another focus declares that one. Any other reply is an ignored
 ask, and the once-only law holds. Without that line in context, the bare
@@ -52,10 +52,12 @@ form asks the four-way question as before.
 Every declaration, in a repo or not, first appends one line so the next
 fresh session in this folder can guess the focus. Run it once with
 <focus> filled in, before the focus's own steps. It is silent on any
-failure and writes nothing when there is no `~/.clutch` folder:
+failure, and writes nothing when there is no `~/.clutch` folder or the
+folder name holds a newline:
 
 ```sh
-[ -d "$HOME/.clutch" ] && printf '%s %s\n' "$(basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" | tr ' ' -)" '<focus>' 2>/dev/null >> "$HOME/.clutch/intents" || :
+k=$(basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" | tr ' ' -); case $k in *'
+'*) ;; *) [ -d "$HOME/.clutch" ] && { printf '%s %s\n' "$k" '<focus>' >> "$HOME/.clutch/intents"; } 2>/dev/null ;; esac || :
 ```
 
 ## Build

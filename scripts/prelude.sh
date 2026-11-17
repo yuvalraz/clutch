@@ -223,9 +223,11 @@ clutch_ops_due() {
 # cwd, spaces as hyphens. Only lines with exactly two fields, the key equal
 # (an exact compare through ENVIRON, never a pattern) and a focus of build,
 # ideate, ops or review count; the last one wins. rc 0 prints the focus;
-# rc 1 means no store or no valid line for the key; rc 2 means the store is
-# not a readable regular file, the key is empty, or tail fails.
-# shortcut: reads the last 500 lines; upgrade if a folder's last declaration can sit further back.
+# rc 1 means no store or can't stat it, or no valid line for the key; rc 2
+# means the store is not a readable regular file, the key is empty, or tail
+# or wc fails.
+# shortcut: reads the last 64 KiB, dropping its first line when the store is
+# larger (it may be cut mid-line); upgrade if a folder's last declaration can sit further back.
 clutch_guess_intent() {
   CGI_F="$HOME/.clutch/intents"
   [ -e "$CGI_F" ] || return 1
@@ -233,7 +235,9 @@ clutch_guess_intent() {
   if [ "$CLUTCH_GIT" = 1 ]; then CGI_K=$ROOT; else CGI_K=$(pwd 2>/dev/null) || return 2; fi
   CGI_K=$(basename "$CGI_K" 2>/dev/null | tr ' ' -)
   [ -n "$CGI_K" ] || return 2
-  CGI_T=$(tail -n 500 "$CGI_F" 2>/dev/null) || return 2
+  CGI_T=$(tail -c 65536 "$CGI_F" 2>/dev/null) || return 2
+  CGI_N=$(wc -c < "$CGI_F" 2>/dev/null) || return 2
+  [ $((CGI_N)) -le 65536 ] || CGI_T=$(printf '%s\n' "$CGI_T" | sed 1d)
   CGI_G=$(printf '%s\n' "$CGI_T" | CGI_K="$CGI_K" LC_ALL=C awk '$1 == ENVIRON["CGI_K"] && NF == 2 && $2 ~ /^(build|ideate|ops|review)$/ { g = $2 } END { print g }' 2>/dev/null)
   [ -n "$CGI_G" ] || return 1
   printf '%s\n' "$CGI_G"
