@@ -46,7 +46,7 @@ pin() {
 pin "$S" "skill: build form"          '/clutch:intent build'
 pin "$S" "skill: ideate form"         '/clutch:intent ideate'
 pin "$S" "skill: bare form asks"      'ask one question: build, ideate, ops, or review'
-pin "$S" "skill: craft marker write"  'printf .%s.n. "craft" 2>/dev/null > "\$ROOT/\.clutch/tempo"'
+pin "$S" "skill: craft marker write"  '{ printf .%s.n. "craft" > "\$ROOT/\.clutch/tempo"; } 2>/dev/null'
 pin "$S" "skill: marker-fail contract" 'only the re-injection is lost'
 pin "$S" "skill: posture verify"      'we verify before we claim'
 pin "$S" "skill: posture tests ship"  'the tests ship with the code'

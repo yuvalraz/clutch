@@ -55,7 +55,7 @@ fpin() {
 }
 
 # --- ops skill: gear, config home, error contracts
-pin "$O" "ops: espresso marker write"   'printf .%s.n. "espresso" 2>/dev/null > "\$ROOT/\.clutch/tempo"'
+pin "$O" "ops: espresso marker write"   '{ printf .%s.n. "espresso" > "\$ROOT/\.clutch/tempo"; } 2>/dev/null'
 pin "$O" "ops: marker-fail contract"    'only the re-injection is lost'
 pin "$O" "ops: hopping is the gait"     'Hopping between loops is the gait'
 pin "$O" "ops: config home"             '\.clutch/rituals\.md'

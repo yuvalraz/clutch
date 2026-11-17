@@ -44,7 +44,7 @@ pin() {
 }
 
 # --- review skill: gear, config home, error contracts
-pin "$RV" "review: espresso marker write"  'printf .%s.n. "espresso" 2>/dev/null > "\$ROOT/\.clutch/tempo"'
+pin "$RV" "review: espresso marker write"  '{ printf .%s.n. "espresso" > "\$ROOT/\.clutch/tempo"; } 2>/dev/null'
 pin "$RV" "review: marker-fail contract"   'only the re-injection is lost'
 pin "$RV" "review: next PR is the gait"    'Moving from one PR to the next is the gait'
 pin "$RV" "review: config home"            '\.clutch/rituals\.md'
