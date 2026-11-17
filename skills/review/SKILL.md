@@ -26,12 +26,13 @@ Review fires when you fire it. Nothing here runs on its own.
 
 Confirm in one line: "Espresso engaged: tight convergence, one blast-radius
 read per PR, checkpoint at each closed PR." Then write the marker (POSIX,
-silent on any failure):
+silent on any failure). Replace `@<tag>` with the `Session tag:` from the session start; with no `Session tag:` line, leave it as is:
 
 ```sh
 ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || { [ "${CLUTCH_PLAIN:-}" != off ] && ROOT=$(pwd -P) && [ "$ROOT" != / ] && [ ! "$ROOT" -ef "$HOME" ]; } || exit 0
 mkdir -p "$ROOT/.clutch" 2>/dev/null || exit 0
-{ printf '%s\n' "espresso" > "$ROOT/.clutch/tempo"; } 2>/dev/null || exit 0
+T='@<tag>'; F="$ROOT/.clutch/tempo"; case $T in '' | @ | *[./]*) ;; *) [ "${CLUTCH_PER_SESSION:-}" = off ] || [ "${CLUTCH_WATCH:-}" = off ] || [ -L "$ROOT/.clutch/s" ] || [ -L "$ROOT/.clutch/s/${T#@}" ] || [ ! -d "$ROOT/.clutch/s/${T#@}" ] || F="$ROOT/.clutch/s/${T#@}/tempo" ;; esac
+{ printf '%s\n' "espresso" > "$F"; } 2>/dev/null || exit 0
 ```
 
 This is the existing tempo mechanism; the heartbeat carries the gear to the
@@ -110,29 +111,32 @@ nothing is written to the conventions file and nothing is queued, and the rule i
 never proposed again this session. The rule is never queued, listed, or
 summarized for later.
 
-The decline is recorded in `.clutch/session-state` as a hash of the rule.
+The decline is recorded in the session's state file as a hash of the rule:
+`.clutch/s/<tag8>/session-state` when this session has its own folder, else
+`.clutch/session-state`.
 Here the rule is the `<rule, imperative, one line>` text without its reason,
 quoted for the shell so the check and the write hash the same bytes. Each
 `'` in the rule becomes `'\''` inside the single quotes (so `Don't log
 secrets` is written `'Don'\''t log secrets'`), and the write and the check
-hash the same escaped input, so the bytes match. The write, on a decline:
+hash the same escaped input, so the bytes match. Replace `@<tag>` with the `Session tag:` from the session start; with no `Session tag:` line, leave it as is. The write, on a decline:
 
 ```sh
 ROOT=$(git rev-parse --show-toplevel) || exit 1
 H=$(printf '%s\n' '<the rule>' | cksum | cut -d' ' -f1)
 [ -n "$H" ] || exit 1
-printf 'declined %s\n' "$H" >> "$ROOT/.clutch/session-state"
+T='@<tag>'; S="$ROOT/.clutch/session-state"; case $T in '' | @ | *[./]*) ;; *) [ "${CLUTCH_PER_SESSION:-}" = off ] || [ "${CLUTCH_WATCH:-}" = off ] || [ -L "$ROOT/.clutch/s" ] || [ -L "$ROOT/.clutch/s/${T#@}" ] || [ ! -d "$ROOT/.clutch/s/${T#@}" ] || S="$ROOT/.clutch/s/${T#@}/session-state" ;; esac
+printf 'declined %s\n' "$H" >> "$S"
 ```
 
 Failures here stay loud: a non-zero exit reaches you, unlike the silent
 marker write in Step 0. Only the hash is written, never the rule text.
 If the decline write fails, say so in the same turn and still do not re-offer the rule in this conversation.
 
-The check, before proposing any rule: compute `H` with the same `ROOT=` and
-`H=` lines above, then run:
+The check, before proposing any rule: compute `H` and `S` with the same
+`ROOT=`, `H=` and `S=` lines above, then run:
 
 ```sh
-grep -qx "declined $H" "$ROOT/.clutch/session-state"
+grep -qx "declined $H" "$S"
 ```
 
 Exit 0 means the user declined it: say nothing about it.

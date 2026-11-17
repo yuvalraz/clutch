@@ -25,12 +25,13 @@ persists — the mode side of the gearbox. Within it you might invoke
 
 Confirm in one line — "Ballmer engaged — fast divergence, periodic
 convergence checkpoints." — then write the marker (POSIX, silent on any
-failure):
+failure). Replace `@<tag>` with the `Session tag:` from the session start; with no `Session tag:` line, leave it as is:
 
 ```sh
 ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || { [ "${CLUTCH_PLAIN:-}" != off ] && ROOT=$(pwd -P) && [ "$ROOT" != / ] && [ ! "$ROOT" -ef "$HOME" ]; } || exit 0
 mkdir -p "$ROOT/.clutch" 2>/dev/null || exit 0
-{ printf '%s\n' "ballmer" > "$ROOT/.clutch/tempo"; } 2>/dev/null || exit 0
+T='@<tag>'; F="$ROOT/.clutch/tempo"; case $T in '' | @ | *[./]*) ;; *) [ "${CLUTCH_PER_SESSION:-}" = off ] || [ "${CLUTCH_WATCH:-}" = off ] || [ -L "$ROOT/.clutch/s" ] || [ -L "$ROOT/.clutch/s/${T#@}" ] || [ ! -d "$ROOT/.clutch/s/${T#@}" ] || F="$ROOT/.clutch/s/${T#@}/tempo" ;; esac
+{ printf '%s\n' "ballmer" > "$F"; } 2>/dev/null || exit 0
 ```
 
 This is the existing tempo mechanism — the heartbeat carries the gear to
