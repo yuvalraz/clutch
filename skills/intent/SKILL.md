@@ -1,7 +1,7 @@
 ---
 name: intent
 description: Declare the session's focus, build, ideate, ops, or review, and engage the matching gear and posture.
-when_to_use: Use ONLY when the user answers the session-start intent question (a plain "build", "ideate", "ops", or "review" counts as an answer) or explicitly asks to set the session's focus. A passing mention of building, ideating, operations, or reviewing mid-conversation is not a trigger.
+when_to_use: Use ONLY when the user answers the session-start intent question (a plain "build", "ideate", "ops", or "review" counts as an answer, and so does a plain "go" or "yes" when the question named a likely focus) or explicitly asks to set the session's focus. A passing mention of building, ideating, operations, or reviewing mid-conversation is not a trigger.
 argument-hint: "[build | ideate | ops | review]"
 ---
 
@@ -23,13 +23,40 @@ never by settings.
 - `/clutch:intent review` declares a review session: one confirm line, then
   hand off.
 - `/clutch:intent` bare: ask one question: build, ideate, ops, or review?
-  Nothing else.
+  Nothing else, unless a guess is in context (see Guessed focus).
 
-Any other argument gets one line naming the four focuses, no error ceremony.
+Any other argument gets one line naming the four focuses, no error ceremony,
+except go when a guess is in context (see Guessed focus).
 
 Invocation scope: this skill fires when the user answers the session-start
 question or explicitly asks to set the session's focus, and at no other
 moment. A stray "build" mid-conversation invokes nothing.
+
+## Guessed focus
+
+When the session-start ask in context reads `looks like <focus> again`,
+the bare form asks this one question instead:
+"Looks like <focus> on <thread>, go?"
+<thread> is a few words naming the work, from the first of these in
+context: the Thread line, the Last landed line, this folder's newest
+Worklog line. With none of them, ask "Looks like <focus>, go?".
+
+A plain go, yes, ok or y declares <focus>, as the reply to that question or to the session-start ask, or as the argument.
+Then run it exactly as `/clutch:intent <focus>`, record included.
+Naming another focus declares that one. Any other reply is an ignored
+ask, and the once-only law holds. Without that line in context, the bare
+form asks the four-way question as before.
+
+## Record
+
+Every declaration, in a repo or not, first appends one line so the next
+fresh session in this folder can guess the focus. Run it once with
+<focus> filled in, before the focus's own steps. It is silent on any
+failure and writes nothing when there is no `~/.clutch` folder:
+
+```sh
+[ -d "$HOME/.clutch" ] && printf '%s %s\n' "$(basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" | tr ' ' -)" '<focus>' 2>/dev/null >> "$HOME/.clutch/intents" || :
+```
 
 ## Build
 

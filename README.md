@@ -119,6 +119,7 @@ maintenance too. `/clutch:dream` consolidates it and prunes the index, and
 
 A fresh session opens with one question, the only one of the day:
 build, ideate, ops, or review? Ignoring it is also an answer, and it never asks twice.
+When you declared a focus in this folder before, the question names it first (`looks like build again`), and a plain go takes it; outside a repo it shows only then. `CLUTCH_GUESS=off` turns the guess off.
 `/clutch:intent` takes the answer and engages the matching gear.
 
 **Build.** A maker session in the craft gear (explore, then commit). The catch
@@ -286,6 +287,7 @@ instead of the repo's `.clutch/ideas/`.
 
 Every other write comes from a command you fire. `/clutch:fomo --brain` banks
 straight to the brain. `/clutch:rituals` writes `~/.clutch/rituals.md`.
+`/clutch:intent` appends the folder and focus to `~/.clutch/intents` when `~/.clutch` exists.
 `/clutch:review` appends a convention to your conventions file on a yes.
 `/clutch:dream` and `/clutch:interview` write the auto-memory directory.
 `/clutch:morning` writes today's focus file when it is missing and moves tablet

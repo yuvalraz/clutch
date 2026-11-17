@@ -9,9 +9,12 @@
 # swaps the last line for the guessed ask; resume with a gear and compact
 # stay silent. G11-G12 run outside git: the guessed ask is a new last line on
 # startup or clear only, and the key is the folder name exactly, spaces as
-# hyphens. prelude.sh and anchor.sh are staged into a scratch scripts/ dir;
-# PRELUDE_SH and ANCHOR_SH override them for replay against a historical
-# version. Every anchor run must leave stderr empty. Silent apart from PASS.
+# hyphens. G13-G16 pin the intent skill's record line, guessed question and
+# go answer and the README sentences; G14 runs the skill's own record
+# snippet, then the anchor, as a round trip. prelude.sh and anchor.sh are
+# staged into a scratch scripts/ dir; PRELUDE_SH, ANCHOR_SH, INTENT_SKILL and
+# README_FILE override the targets for replay against a historical version.
+# Every anchor run must leave stderr empty. Silent apart from PASS.
 set -u
 unset CLUTCH_GUESS CLUTCH_WATCH CLAUDE_PLUGIN_ROOT
 
@@ -19,7 +22,9 @@ HERE=$(cd "$(dirname "$0")" && pwd)
 ROOT=$(cd "$HERE/.." && pwd)
 A=${ANCHOR_SH:-$ROOT/scripts/anchor.sh}
 P=${PRELUDE_SH:-$ROOT/scripts/prelude.sh}
-for f in "$A" "$P" "$ROOT/rules/constitution.md"; do
+S=${INTENT_SKILL:-$ROOT/skills/intent/SKILL.md}
+R=${README_FILE:-$ROOT/README.md}
+for f in "$A" "$P" "$S" "$R" "$ROOT/rules/constitution.md"; do
   [ -f "$f" ] || { echo "FAIL: missing $f"; exit 1; }
 done
 
@@ -192,6 +197,81 @@ same "G12 aXb" "$OUT" "$B"
 store 'a.b build\n'
 run "G12 a.b" "$D" startup
 [ "$(last "$OUT")" = "$(guessed build)" ] || { echo "FAIL: G12 a.b -- want the build guess, got: $(last "$OUT")"; fail=1; }
+
+# fpin <file> <label> <fixed string>: rc 0 passes, 1 is a missing pin, >=2 a grep error.
+fpin() {
+  grep -qF -- "$3" "$1"
+  frc=$?
+  case $frc in
+    0) ;;
+    1) echo "FAIL: $2 -- not found: $3"; fail=1 ;;
+    *) echo "FAIL: $2 -- grep error rc=$frc: $3"; fail=1 ;;
+  esac
+}
+
+# --- G13: the record line is silent on failure and needs an existing ~/.clutch
+fpin "$S" "G13 redirect order" '2>/dev/null >> "$HOME/.clutch/intents" || :'
+fpin "$S" "G13 brain guard" '[ -d "$HOME/.clutch" ] && printf'
+
+# --- G14: round trip, the skill's own record snippet then the staged anchor
+nsn=$(awk '/^[ \t]*```sh/{n++; f=1; b[n] = ""; next} /^[ \t]*```/{f=0} f{b[n] = b[n] $0 "\n"}
+  END {k = 0; for (i = 1; i <= n; i++) if (index(b[i], ".clutch/intents")) {k++; s = b[i]}
+       printf "%s", s > out; print k}' out="$T/rsnip.raw" "$S")
+if [ "$nsn" != 1 ]; then
+  echo "FAIL: G14 -- want exactly one sh block naming .clutch/intents, got $nsn"; fail=1
+else
+  # snip <focus>: the snippet with <focus> filled, at $T/rsnip.sh.
+  snip() {
+    RF=$1 awk '{ i = index($0, "<focus>"); while (i) { $0 = substr($0, 1, i - 1) ENVIRON["RF"] substr($0, i + 7); i = index($0, "<focus>") } print }' \
+      "$T/rsnip.raw" > "$T/rsnip.sh"
+  }
+  # record <label> <dir> <focus>: run the snippet; exit 0, no stdout or stderr.
+  record() {
+    snip "$3"
+    ROUT=$(cd "$2" && sh "$T/rsnip.sh" 2>"$T/rerr"); rrc=$?
+    [ "$rrc" = 0 ] || { echo "FAIL: $1 -- snippet exited $rrc"; fail=1; }
+    [ -z "$ROUT" ] || { echo "FAIL: $1 -- snippet wrote stdout: $ROUT"; fail=1; }
+    [ -s "$T/rerr" ] && { echo "FAIL: $1 -- snippet wrote stderr: $(head -3 "$T/rerr")"; fail=1; }
+    return 0
+  }
+  nostore
+  record "G14 (a)" "$T/repo" ops
+  [ "$(tail -n 1 "$ST" 2>/dev/null)" = "repo ops" ] || { echo "FAIL: G14 (a) -- store's last line is not 'repo ops': $(tail -n 1 "$ST" 2>/dev/null)"; fail=1; }
+  run "G14 (a) anchor" "$T/repo" startup
+  [ "$(last "$OUT")" = "$(guessed ops)" ] || { echo "FAIL: G14 (a) -- anchor did not guess ops: $(last "$OUT")"; fail=1; }
+  record "G14 (b)" "$T/plain/my dir" review
+  [ "$(tail -n 1 "$ST" 2>/dev/null)" = "my-dir review" ] || { echo "FAIL: G14 (b) -- store's last line is not 'my-dir review': $(tail -n 1 "$ST" 2>/dev/null)"; fail=1; }
+  run "G14 (b) anchor" "$T/plain/my dir" startup
+  [ "$(last "$OUT")" = "$(guessed review)" ] || { echo "FAIL: G14 (b) -- anchor did not guess review: $(last "$OUT")"; fail=1; }
+  KEEP=$HOME
+  HOME=$T/bare
+  mkdir -p "$HOME"
+  record "G14 (c)" "$T/repo" build
+  [ -e "$HOME/.clutch" ] && { echo "FAIL: G14 (c) -- the record created ~/.clutch"; fail=1; }
+  HOME=$KEEP
+fi
+
+# --- G15: the skill's bare form, guessed branch and answers
+fpin "$S" "G15 bare form" 'ask one question: build, ideate, ops, or review?'
+fpin "$S" "G15 trigger" 'looks like <focus> again'
+fpin "$S" "G15 question" '"Looks like <focus> on <thread>, go?"'
+fpin "$S" "G15 threadless question" '"Looks like <focus>, go?"'
+fpin "$S" "G15 go declares" 'A plain go, yes, ok or y declares <focus>'
+fpin "$S" "G15 same as the argument" 'run it exactly as `/clutch:intent <focus>`, record included'
+fpin "$S" "G15 other reply" 'Any other reply is an ignored'
+fpin "$S" "G15 when_to_use" 'and so does a plain "go" or "yes" when the question named a likely focus'
+fpin "$S" "G15 go is not an unknown argument" 'except go when a guess is in context'
+# Coupling: the anchor's guessed line carries the skill's trigger with <focus> filled.
+case "$(guessed build)" in *'looks like build again'*) ;; *) echo "FAIL: G15 coupling -- guessed line lacks the trigger"; fail=1 ;; esac
+TRIG=$(grep -oF 'looks like <focus> again' "$S" | head -n 1 | sed 's/<focus>/build/')
+nostore
+store 'repo build\n'
+run "G15 coupling" "$T/repo" startup
+case "$(last "$OUT")" in *"${TRIG:-unset trigger}"*) ;; *) echo "FAIL: G15 coupling -- anchor line does not carry the skill trigger '$TRIG'"; fail=1 ;; esac
+
+# --- G16: README names the kill switch and the store
+fpin "$R" "G16 kill switch" '`CLUTCH_GUESS=off` turns the guess off'
+fpin "$R" "G16 store" '`~/.clutch/intents`'
 
 [ "$fail" -eq 0 ] || exit 1
 echo PASS
