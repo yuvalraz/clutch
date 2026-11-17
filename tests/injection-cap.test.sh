@@ -3,16 +3,17 @@
 # injected payloads, the SessionStart anchor and the UserPromptSubmit
 # heartbeat, must stay under BUDGET (500 chars of headroom) at their worst
 # case. (i) anchor on startup with every optional line present, including a
-# full worklog block (10 fresh 300-char lines under a scratch HOME) and the
-# session tag line; (ii) heartbeat with a gear, a live sprint and spent
+# full worklog block (10 fresh 300-char lines under a scratch HOME), the
+# session tag line and the guessed intent ask (the longer form of the ask); (ii) heartbeat with a gear, a live sprint and spent
 # budget; (iii) negative control: the anchor with a constitution padded to
 # 10,000 chars must trip the same check, so the size assert cannot pass
 # vacuously. The real anchor.sh runs beside the real prelude.sh.
 # PLUGIN_ROOT_UNDER_TEST overrides the CLAUDE_PLUGIN_ROOT used for (i), so a
 # padded rules/ tree can be replayed through it.
 set -u
-# An ambient CLUTCH_WATCH=off would drop the tag line and under-measure.
-unset CLUTCH_WATCH
+# An ambient CLUTCH_WATCH=off or CLUTCH_GUESS=off would drop the tag line or
+# the guessed ask and under-measure.
+unset CLUTCH_WATCH CLUTCH_GUESS
 
 HERE=$(cd "$(dirname "$0")" && pwd)
 ROOT=$(cd "$HERE/.." && pwd)
@@ -53,6 +54,7 @@ anchor_out() {
   printf 'one\ntwo\nthree\n' > "$R/.clutch/captures.md"
   mkdir -p "$HOME/.clutch"
   : > "$HOME/.clutch/worklog.md"
+  printf 'repo review\n' > "$HOME/.clutch/intents"
   for i in 1 2 3 4 5 6 7 8 9 10; do
     printf '%s\n' "$(date +%s) $(rep 20 p) moved: $(rep 300 m)" >> "$HOME/.clutch/worklog.md"
   done
@@ -63,7 +65,7 @@ anchor_out() {
 # --- (i) anchor worst case
 anchor_out "$PR"
 case "$OUT" in *"Last landed: '"*) ;; *) echo "FAIL: anchor -- no Last landed line, fixture under-measures"; fail=1 ;; esac
-case "$OUT" in *'build, ideate, ops, or review?'*) ;; *) echo "FAIL: anchor -- no intent ask, not the startup worst case"; fail=1 ;; esac
+case "$OUT" in *'looks like review again'*) ;; *) echo "FAIL: anchor -- no guessed intent ask, not the startup worst case"; fail=1 ;; esac
 printf '%s\n' "$OUT" | grep -qx 'Worklog:' || { echo "FAIL: anchor -- no worklog block, fixture under-measures"; fail=1; }
 printf '%s\n' "$OUT" | grep -qx 'Session tag: @0123abcd' || { echo "FAIL: anchor -- no session tag line, fixture under-measures"; fail=1; }
 N=$(printf '%s\n' "$OUT" | wc -c | tr -d ' ')
