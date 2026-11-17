@@ -4,7 +4,8 @@
 # heartbeat, must stay under BUDGET (500 chars of headroom) at their worst
 # case. (i) anchor on startup with every optional line present, including a
 # full worklog block (10 fresh 300-char lines under a scratch HOME), the
-# session tag line and the guessed intent ask (the longer form of the ask); (ii) heartbeat with a gear, a live sprint and spent
+# session tag line and the guessed intent ask (the longer form of the ask),
+# which must also keep HEADROOM (61) under BUDGET; (ii) heartbeat with a gear, a live sprint and spent
 # budget; (iv) the plain clutch folder anchor, never above (i); (v) the plain
 # heartbeat, byte-equal to (ii); (iii) negative control: the anchor with a constitution padded to
 # 10,000 chars must trip the same check, so the size assert cannot pass
@@ -22,6 +23,7 @@ A="$ROOT/scripts/anchor.sh"
 HB="$ROOT/scripts/heartbeat.sh"
 PR=${PLUGIN_ROOT_UNDER_TEST:-$ROOT}
 BUDGET=9500
+HEADROOM=61
 
 fail=0
 for f in "$A" "$HB" "$ROOT/scripts/prelude.sh" "$ROOT/rules/constitution.md"; do
@@ -31,6 +33,11 @@ done
 
 # rep <n> <char>: n copies of char.
 rep() { printf "%$1s" '' | tr ' ' "$2"; }
+
+# roomy <n>: n keeps the HEADROOM floor under BUDGET (the 2.12.0 headroom).
+roomy() { [ "$1" -le $((BUDGET - HEADROOM)) ]; }
+# Negative control for the floor: 9439 passes, 9440 fails.
+roomy 9439 && ! roomy 9440 || { echo "FAIL: headroom predicate -- 9439/9440 control broken"; fail=1; }
 
 T=$(mktemp -d) || exit 1
 HOME=$T/home; export HOME
@@ -71,6 +78,7 @@ printf '%s\n' "$OUT" | grep -qx 'Worklog:' || { echo "FAIL: anchor -- no worklog
 printf '%s\n' "$OUT" | grep -qx 'Session tag: @0123abcd' || { echo "FAIL: anchor -- no session tag line, fixture under-measures"; fail=1; }
 N=$(printf '%s\n' "$OUT" | wc -c | tr -d ' ')
 [ "$N" -lt "$BUDGET" ] || { echo "FAIL: anchor worst case -- $N chars >= $BUDGET"; fail=1; }
+roomy "$N" || { echo "FAIL: anchor worst case -- $N chars > $BUDGET - $HEADROOM headroom"; fail=1; }
 NG=$N
 
 # --- (ii) heartbeat worst case
