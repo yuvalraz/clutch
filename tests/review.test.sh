@@ -7,12 +7,13 @@
 # fourth intent focus (intent skill, GLOSSARY, README); then run the
 # heartbeat in a scratch repo to assert that a declared espresso gear rides
 # every turn and that a declined line never spends the uninvited budget, and
-# the anchor to assert the startup ask names all four focuses.
+# the anchor to assert the startup ask names all five focuses.
 # Same rc-discipline as siblings; the A/C/E/F/G wording gates are mirrored
 # locally from ops.test.sh, plus a `$` + digit argument-shorthand gate.
 # Overrides: REVIEW_SKILL, RITUALS_SKILL, TEMPO_SKILL, HB_FILE, INTENT_SKILL,
 # GLOSSARY_FILE, README_FILE, ANCHOR_SH.
 set -u
+unset CLUTCH_INVESTIGATE
 
 HERE=$(cd "$(dirname "$0")" && pwd)
 RV=${REVIEW_SKILL:-$HERE/../skills/review/SKILL.md}
@@ -249,7 +250,7 @@ OUT=$(cd "$T/repo" && sh "$HB"); RC=$?
 printf '%s\n' "$OUT" | grep -qF 'clutch-budget: 1/2 spent' \
   || { echo "FAIL: the declined line was counted as an emission: $OUT"; exit 1; }
 
-# --- behavior: a fresh startup with no gear ends on the four-focus ask.
+# --- behavior: a fresh startup with no gear ends on the five-focus ask.
 # The anchor under test is staged beside the real prelude.sh (as in ops).
 mkdir "$T/scripts"
 cp "$A" "$T/scripts/anchor.sh"
@@ -257,7 +258,7 @@ cp "$HERE/../scripts/prelude.sh" "$T/scripts/prelude.sh"
 rm -f "$T/repo/.clutch/tempo"
 OUT=$(cd "$T/repo" && printf '%s' '{"source":"startup"}' | sh "$T/scripts/anchor.sh"); RC=$?
 [ "$RC" = 0 ] || { echo "FAIL: anchor exited $RC on startup"; exit 1; }
-printf '%s\n' "$OUT" | tail -n 1 | grep -qF 'build, ideate, ops, or review?' \
-  || { echo "FAIL: startup ask does not end on the four focuses: $OUT"; exit 1; }
+printf '%s\n' "$OUT" | tail -n 1 | grep -qF 'build, ideate, ops, review, or investigate?' \
+  || { echo "FAIL: startup ask does not end on the five focuses: $OUT"; exit 1; }
 
 echo PASS

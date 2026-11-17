@@ -25,13 +25,13 @@ WLINES=$(clutch_worklog_window 2>/dev/null) || WLINES=""
 guess_ask() {
   [ "${CLUTCH_GUESS:-}" = off ] && return 1
   GUESS=$(clutch_guess_intent 2>/dev/null) || return 1
-  printf 'Intent for this session: looks like %s again; say go, or pick build, ideate, ops, or review. /clutch:intent sets the frame.\n' "$GUESS"
+  printf 'Intent for this session: looks like %s again; say go, or pick %s. /clutch:intent sets the frame.\n' "$GUESS" "$CLUTCH_FOCI"
 }
 # Outside git and outside an active plain clutch folder there is no tempo, so a new session (startup or clear) has no gear: the intent ask rides it, guessed when it can be.
 if [ "$CLUTCH_STATE" != 1 ]; then
   case "$INPUT" in
     *'"source":"startup"'* | *'"source": "startup"'* | *'"source":"clear"'* | *'"source": "clear"'*)
-      guess_ask || printf 'Intent for this session: build, ideate, ops, or review? /clutch:intent sets the frame.\n' ;;
+      guess_ask || printf 'Intent for this session: %s? /clutch:intent sets the frame.\n' "$CLUTCH_FOCI" ;;
   esac
   exit 0
 fi
@@ -128,8 +128,8 @@ if [ "$FRESH" = 1 ]; then
   fi
 fi
 if [ "$ASK" = 1 ]; then
-  # A past declaration in this folder names its focus first; otherwise today's four-way ask.
-  guess_ask || printf 'Intent for this session: build, ideate, ops, or review? /clutch:intent sets the frame.\n'
+  # A past declaration in this folder names its focus first; otherwise today's plain ask.
+  guess_ask || printf 'Intent for this session: %s? /clutch:intent sets the frame.\n' "$CLUTCH_FOCI"
 fi
 
 exit 0

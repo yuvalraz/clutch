@@ -14,6 +14,9 @@
 # CLUTCH_* unset. Silent apart from PASS.
 set -u
 unset CLUTCH_PLAIN CLUTCH_STATE CLUTCH_WATCH CLUTCH_GUESS CLAUDE_PLUGIN_ROOT
+# Parity here is against 7201788's four-way ask; the switch itself is proven
+# in investigate-off.test.sh.
+CLUTCH_INVESTIGATE=off; export CLUTCH_INVESTIGATE
 
 HERE=$(cd "$(dirname "$0")" && pwd)
 ROOT=$(cd "$HERE/.." && pwd)

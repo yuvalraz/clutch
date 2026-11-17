@@ -4,7 +4,8 @@
 # heartbeat, must stay under BUDGET (500 chars of headroom) at their worst
 # case. (i) anchor on startup with every optional line present, including a
 # full worklog block (10 fresh 300-char lines under a scratch HOME), the
-# session tag line and the guessed intent ask (the longer form of the ask),
+# session tag line and the guessed intent ask (the longer form of the ask,
+# guessing investigate, the longest focus),
 # which must also keep HEADROOM (61) under BUDGET; (ii) heartbeat with a gear, a live sprint and spent
 # budget; (iv) the plain clutch folder anchor, never above (i); (v) the plain
 # heartbeat, byte-equal to (ii); (iii) negative control: the anchor with a constitution padded to
@@ -14,8 +15,9 @@
 # padded rules/ tree can be replayed through it.
 set -u
 # An ambient CLUTCH_WATCH=off or CLUTCH_GUESS=off would drop the tag line or
-# the guessed ask and under-measure; CLUTCH_PLAIN=off would silence (iv)/(v).
-unset CLUTCH_WATCH CLUTCH_GUESS CLUTCH_PLAIN
+# the guessed ask and under-measure; CLUTCH_PLAIN=off would silence (iv)/(v);
+# CLUTCH_INVESTIGATE=off would shorten the ask.
+unset CLUTCH_WATCH CLUTCH_GUESS CLUTCH_PLAIN CLUTCH_INVESTIGATE
 
 HERE=$(cd "$(dirname "$0")" && pwd)
 ROOT=$(cd "$HERE/.." && pwd)
@@ -62,7 +64,7 @@ anchor_out() {
   printf 'one\ntwo\nthree\n' > "$R/.clutch/captures.md"
   mkdir -p "$HOME/.clutch"
   : > "$HOME/.clutch/worklog.md"
-  printf 'repo review\n' > "$HOME/.clutch/intents"
+  printf 'repo investigate\n' > "$HOME/.clutch/intents"
   for i in 1 2 3 4 5 6 7 8 9 10; do
     printf '%s\n' "$(date +%s) $(rep 20 p) moved: $(rep 300 m)" >> "$HOME/.clutch/worklog.md"
   done
@@ -73,7 +75,7 @@ anchor_out() {
 # --- (i) anchor worst case
 anchor_out "$PR"
 case "$OUT" in *"Last landed: '"*) ;; *) echo "FAIL: anchor -- no Last landed line, fixture under-measures"; fail=1 ;; esac
-case "$OUT" in *'looks like review again'*) ;; *) echo "FAIL: anchor -- no guessed intent ask, not the startup worst case"; fail=1 ;; esac
+case "$OUT" in *'looks like investigate again'*) ;; *) echo "FAIL: anchor -- no guessed intent ask, not the startup worst case"; fail=1 ;; esac
 printf '%s\n' "$OUT" | grep -qx 'Worklog:' || { echo "FAIL: anchor -- no worklog block, fixture under-measures"; fail=1; }
 printf '%s\n' "$OUT" | grep -qx 'Session tag: @0123abcd' || { echo "FAIL: anchor -- no session tag line, fixture under-measures"; fail=1; }
 N=$(printf '%s\n' "$OUT" | wc -c | tr -d ' ')
@@ -99,7 +101,7 @@ mkdir -p "$P/.clutch"
 printf 'start 1700000000\nbase -\n' > "$P/.clutch/session-state"
 POUT=$(cd "$P" && printf '%s' '{"session_id":"0123abcd-4567-89ab-cdef-0123456789ab","source":"startup"}' | GIT_CEILING_DIRECTORIES=$T CLAUDE_PLUGIN_ROOT=$PR sh "$A"); rc=$?
 [ "$rc" = 0 ] || { echo "FAIL: plain anchor exited $rc"; fail=1; }
-case "$POUT" in *'looks like review again'*) ;; *) echo "FAIL: plain anchor -- no guessed intent ask, not the plain worst case"; fail=1 ;; esac
+case "$POUT" in *'looks like investigate again'*) ;; *) echo "FAIL: plain anchor -- no guessed intent ask, not the plain worst case"; fail=1 ;; esac
 NP=$(printf '%s\n' "$POUT" | wc -c | tr -d ' ')
 [ "$NP" -le "$NG" ] || { echo "FAIL: plain anchor -- $NP chars > git worst case $NG"; fail=1; }
 [ "$NP" -lt "$BUDGET" ] || { echo "FAIL: plain anchor -- $NP chars >= $BUDGET"; fail=1; }

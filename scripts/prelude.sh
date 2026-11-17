@@ -3,7 +3,7 @@
 #
 # Sets: CLUTCH_GIT (1 inside a git work tree, else 0), CLUTCH_STATE (1 in a
 # git work tree or an active plain clutch folder, else 0), ROOT, CLUTCH_DIR,
-# EXCLUDE_FILE, CLUTCH_WORKLOG. Defines clutch_ensure_dir,
+# EXCLUDE_FILE, CLUTCH_WORKLOG, CLUTCH_FOCI, CLUTCH_FOCUS_RE. Defines clutch_ensure_dir,
 # clutch_last_authored, clutch_worklog_window, clutch_open_loops,
 # clutch_session_tag, clutch_owned_loops, clutch_ops_due,
 # clutch_guess_intent.
@@ -13,6 +13,15 @@ CLUTCH_STATE=0
 ROOT=""
 CLUTCH_DIR=""
 EXCLUDE_FILE=""
+
+# The focuses the hooks name and guess. CLUTCH_INVESTIGATE=off keeps 2.12.0's four.
+if [ "${CLUTCH_INVESTIGATE:-}" = off ]; then
+  CLUTCH_FOCI='build, ideate, ops, or review'
+  CLUTCH_FOCUS_RE='^(build|ideate|ops|review)$'
+else
+  CLUTCH_FOCI='build, ideate, ops, review, or investigate'
+  CLUTCH_FOCUS_RE='^(build|ideate|ops|review|investigate)$'
+fi
 
 if command -v git >/dev/null 2>&1; then
   if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
@@ -245,8 +254,9 @@ clutch_ops_due() {
 # "<key> <focus>" line per declaration, appended by /clutch:intent). The key
 # is the worklog's repo token: the basename of the git toplevel, else of the
 # cwd, spaces as hyphens. Only lines with exactly two fields, the key equal
-# (an exact compare through ENVIRON, never a pattern) and a focus of build,
-# ideate, ops or review count; the last one wins. rc 0 prints the focus;
+# (an exact compare through ENVIRON, never a pattern) and a focus matching
+# CLUTCH_FOCUS_RE (build, ideate, ops, review or investigate; the first four
+# under CLUTCH_INVESTIGATE=off) count; the last one wins. rc 0 prints the focus;
 # rc 1 means no store or can't stat it, or no valid line for the key; rc 2
 # means the store is not a readable regular file, the key is empty, or tail
 # or wc fails.
@@ -262,7 +272,7 @@ clutch_guess_intent() {
   CGI_T=$(tail -c 65536 "$CGI_F" 2>/dev/null) || return 2
   CGI_N=$(wc -c < "$CGI_F" 2>/dev/null) || return 2
   [ $((CGI_N)) -le 65536 ] || CGI_T=$(printf '%s\n' "$CGI_T" | sed 1d)
-  CGI_G=$(printf '%s\n' "$CGI_T" | CGI_K="$CGI_K" LC_ALL=C awk '$1 == ENVIRON["CGI_K"] && NF == 2 && $2 ~ /^(build|ideate|ops|review)$/ { g = $2 } END { print g }' 2>/dev/null)
+  CGI_G=$(printf '%s\n' "$CGI_T" | CGI_K="$CGI_K" CGI_R="$CLUTCH_FOCUS_RE" LC_ALL=C awk '$1 == ENVIRON["CGI_K"] && NF == 2 && $2 ~ ENVIRON["CGI_R"] { g = $2 } END { print g }' 2>/dev/null)
   [ -n "$CGI_G" ] || return 1
   printf '%s\n' "$CGI_G"
 }

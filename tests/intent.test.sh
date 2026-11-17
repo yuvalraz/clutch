@@ -14,6 +14,7 @@
 # scripts/ dir beside the real prelude.sh before executing it; a historical
 # anchor replayed here fails on a question assert, never on the guard.
 set -u
+unset CLUTCH_INVESTIGATE
 
 HERE=$(cd "$(dirname "$0")" && pwd)
 S=${INTENT_SKILL:-$HERE/../skills/intent/SKILL.md}
@@ -80,12 +81,16 @@ for f in "$C" "$H"; do
   pin "$f" "carve-out gear bound ($f)" 'only when no gear is declared'
   pin "$f" "carve-out not counted ($f)" 'never counted against the budget'
   pin "$f" "carve-out ignore legal ($f)" 'ignoring it is a legal answer'
-  pin "$f" "carve-out four focuses ($f)" 'build, ideate, ops, or review'
   pin "$f" "watch tick invited ($f)" "the session's armed watch is invited output too"
 done
+# The five focuses: literal in the constitution and in the prelude's default
+# enumeration, which the heartbeat carve-out prints through CLUTCH_FOCI.
+pin "$C" "carve-out five focuses" 'build, ideate, ops, review, or investigate'
+grep -qF 'intent ask (${CLUTCH_FOCI})' "$H" || { echo "FAIL: heartbeat carve-out does not print CLUTCH_FOCI"; fail=1; }
+grep -qF "CLUTCH_FOCI='build, ideate, ops, review, or investigate'" "$HERE/../scripts/prelude.sh" || { echo "FAIL: prelude lacks the five-focus enumeration"; fail=1; }
 
 # --- README eleventh moment + GLOSSARY entry
-pin "$R" "README: intent moment"      'build, ideate, ops, or review?'
+pin "$R" "README: intent moment"      'build, ideate, ops, review, or investigate?'
 pin "$R" "README: never asks twice"   'it never asks twice'
 pin "$G" "GLOSSARY: Intent entry"     '### Intent'
 pin "$G" "GLOSSARY: set via command"  'set via /clutch:intent'
@@ -95,7 +100,7 @@ pin "$G" "GLOSSARY: cites PoP entry"  'see "Point of performance"'
 
 # --- anchor behavior: the question line rides only the no-gear branch, and
 # only at a true session boundary (startup|resume|clear or a cold fork; never compact or a hot fork).
-Q='build, ideate, ops, or review?'
+Q='build, ideate, ops, review, or investigate?'
 T=$(mktemp -d) || exit 1
 HOME=$T/home; export HOME
 mkdir -p "$HOME"

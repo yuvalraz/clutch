@@ -80,7 +80,7 @@ Engagement rules:
    wall versus inattention) and for destructive impulses, where a wrong action
    does harm. One named carve-out: the session-start intent ask. At session
    start only, and only when no gear is declared, the anchor's greeting may
-   end with one question, build, ideate, ops, or review. It is asked once,
+   end with one question, build, ideate, ops, review, or investigate. It is asked once,
    never counted against the budget; ignoring it is a legal answer that
    closes the matter.
 2. Every engaged line is recognition-side. Frame by interest, novelty, or

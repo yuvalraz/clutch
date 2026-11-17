@@ -116,11 +116,11 @@ The assistant's own auto-memory directory is a different brain, and it gets
 maintenance too. `/clutch:dream` consolidates it and prunes the index, and
 `/clutch:interview` asks a short batch of questions about its thin spots.
 
-## Four focuses
+## Five focuses
 
 A fresh session opens with one question, the only one of the day:
-build, ideate, ops, or review? Ignoring it is also an answer, and it never asks twice.
-When you declared a focus in this folder before, the question names it first (`looks like build again`), and a plain go takes it. Outside a repo the question rides each new session too. `CLUTCH_GUESS=off` turns the guess off.
+build, ideate, ops, review, or investigate? Ignoring it is also an answer, and it never asks twice.
+When you declared a focus in this folder before, the question names it first (`looks like build again`), and a plain go takes it. Outside a repo the question rides each new session too. `CLUTCH_GUESS=off` turns the guess off. `CLUTCH_INVESTIGATE=off` keeps the question to the first four.
 Declaring a focus outside a repo writes `.clutch/tempo` in that folder, never in your home folder, so the gear and the budget ride every turn there as in a repo; `CLUTCH_PLAIN=off` turns that off.
 `/clutch:intent` takes the answer and engages the matching gear.
 
@@ -150,6 +150,10 @@ When the tablet inbox has new pages or typed tasks, the sweep files each line on
 **Review.** `/clutch:review` closes one PR at a time with your written
 conventions applied. When your call on a finding implies a rule, one line
 offers it as a convention, written on a yes. Each post goes out on a yes.
+
+**Investigate.** `/clutch:investigate` takes one pointer, reads the evidence
+without changing anything, and speaks findings each tied to its evidence; a
+reply goes out on a yes, and a fix hands off to build.
 
 `/clutch:tempo` hands you the gearbox directly: five gears, set or reported.
 

@@ -27,6 +27,7 @@
 # a historical version. Every hide case carries a positive control in the
 # same leg, so no case passes on the pre-change scripts.
 set -u
+unset CLUTCH_INVESTIGATE
 
 HERE=$(cd "$(dirname "$0")" && pwd)
 A=${ANCHOR_SH:-$HERE/../scripts/anchor.sh}
@@ -57,7 +58,7 @@ PLAIN="$T/plain"
 W="$HOME/.clutch/worklog.md"
 NOW=$(date +%s)
 H=3600
-Q='build, ideate, ops, or review?'
+Q='build, ideate, ops, review, or investigate?'
 
 # rep <n> <char>: n copies of char.
 rep() { printf "%$1s" '' | tr ' ' "$2"; }
