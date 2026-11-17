@@ -49,7 +49,7 @@ focuses and the upkeep commands wait until you fire them.
                            \--------> ~/.clutch  the brain
 ```
 
-`.clutch/` is the pool, one per repo. `~/.clutch` is the brain, if you keep
+`.clutch/` is the pool, one per repo, or per folder outside a repo once you declare a focus there. `~/.clutch` is the brain, if you keep
 one. `~/.clutch/worklog.md` is the worklog, shared by every repo. The session
 clock and the repeat-red record (the hook's record of a repeated red, so a
 second identical failure can be told from a first) live in
@@ -59,7 +59,7 @@ second identical failure can be told from a first) live in
 
 | When | What fires | What you might see | What it writes |
 |------|------------|--------------------|----------------|
-| Session start (startup, resume, clear, compact, fork) | `anchor.sh` | This goes to the model, which greets you with it: your thread, last landed commit, captures held, and the smallest move to resume. On a fresh session with no gear set, one question. The model also gets the constitution and the `Worklog:` block, and this session's tag. | `.clutch/session-state` on a fresh session |
+| Session start (startup, resume, clear, compact, fork) | `anchor.sh` | This goes to the model, which greets you with it: your thread, last landed commit, captures held, and the smallest move to resume. On a fresh session with no gear set, one question. The model also gets the constitution and the `Worklog:` block, and this session's tag. | `.clutch/session-state` on a fresh session, in a repo or a folder where you declared a focus |
 | Every prompt | `heartbeat.sh` | Nothing. It reminds the model which command fits which stall, how many uninvited lines are left, and the sprint clock. | nothing |
 | Before a shell command | `hot-pause.sh` | One ask before a force-push, `reset --hard`, `branch -D`, `checkout -- .` or `clean -fd`. Your yes wins in one keypress. | nothing |
 | After a shell command | `red-moment.sh` | Usually nothing. When the same runner command fails again with the tree unchanged, the model may say one line. | `.clutch/session-state` |
@@ -99,6 +99,7 @@ only at one of those moments.
 1. **The pool.** A local `.clutch/` folder your repo owns: captures,
    cross-references, spark logs, idea files, the session clock and the
    breadcrumb. Clutch adds it to git's ignore list.
+   Outside a repo, a folder where you declared a focus owns one too; that one is in no ignore list.
    Pool writes stay repo-scoped by design.
 2. **The brain.** Keep a `~/.clutch` folder and it becomes the brain,
    the second pool level every reader sweeps, across all your repos.
@@ -120,6 +121,7 @@ maintenance too. `/clutch:dream` consolidates it and prunes the index, and
 A fresh session opens with one question, the only one of the day:
 build, ideate, ops, or review? Ignoring it is also an answer, and it never asks twice.
 When you declared a focus in this folder before, the question names it first (`looks like build again`), and a plain go takes it. Outside a repo the question rides each new session too. `CLUTCH_GUESS=off` turns the guess off.
+Declaring a focus outside a repo writes `.clutch/tempo` in that folder, never in your home folder, so the gear and the budget ride every turn there as in a repo; `CLUTCH_PLAIN=off` turns that off.
 `/clutch:intent` takes the answer and engages the matching gear.
 
 **Build.** A maker session in the craft gear (explore, then commit). The catch
@@ -273,8 +275,8 @@ One thing to know before you mix contexts: a brain entry banked at home surfaces
 whatever repo you run these skills in, a work repo included. Whether that is
 fine is your call.
 
-It writes the local `.clutch/` folder, plus your brain on an absorb verdict, and
-adds the local folder to git's ignore list. Sessions also append one-line notes
+It writes the local `.clutch/` folder, plus your brain on an absorb verdict, and,
+in a repo, adds the local folder to git's ignore list. Sessions also append one-line notes
 of what moved to `~/.clutch/worklog.md`, so parallel sessions can see each
 other. That log is not pool stock: it and the watch marker
 `~/.clutch/watch/<tag>` are the only things sessions write to `~/.clutch`

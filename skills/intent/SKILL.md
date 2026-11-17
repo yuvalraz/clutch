@@ -67,9 +67,9 @@ pulses, checkpoint at each commit point." Then write the marker (POSIX, silent
 on any failure):
 
 ```sh
-ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
+ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || { [ "${CLUTCH_PLAIN:-}" != off ] && ROOT=$(pwd -P) && [ "$ROOT" != / ] && [ ! "$ROOT" -ef "$HOME" ]; } || exit 0
 mkdir -p "$ROOT/.clutch" 2>/dev/null || exit 0
-printf '%s\n' "craft" 2>/dev/null > "$ROOT/.clutch/tempo" || exit 0
+{ printf '%s\n' "craft" > "$ROOT/.clutch/tempo"; } 2>/dev/null || exit 0
 ```
 
 If the write fails, skip silently: the declaration still governs the live

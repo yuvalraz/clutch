@@ -7,7 +7,9 @@
 # loudly when that commit is unreachable, never skips) and replays every
 # fixture through both, comparing stdout, stderr, rc and a dump of the
 # fixture's files (9+ digit runs masked). DD7: move BASE in the same commit as
-# any deliberate in-git output change. Hermetic: scratch HOME, ambient
+# any deliberate in-git output change. The snippets section runs each gear
+# skill's marker snippet, extracted from its SKILL.md, under sh and zsh -f.
+# Hermetic: scratch HOME, ambient
 # CLUTCH_* unset. Silent apart from PASS.
 set -u
 unset CLUTCH_PLAIN CLUTCH_STATE CLUTCH_WATCH CLUTCH_GUESS CLAUDE_PLUGIN_ROOT
@@ -370,6 +372,103 @@ if [ "$ROOTUSER" = 0 ]; then
   four PF12-ss000 fx_start w "$(src startup)"
   POST=""
 fi
+
+# --- snippets
+# The gear-marker snippet of each of the five skills, extracted from its own
+# SKILL.md (the sh block that writes .clutch/tempo), run as a file under sh
+# and zsh -f.
+extract() {
+  awk '/^```sh/{f=1;b="";next} f && /^```/{f=0; if (b ~ /\.clutch\/tempo/) {printf "%s", b; exit} next} f{b=b $0 "\n"}' "$1" \
+    | sed 's/<gear>/ferment/'
+}
+SHELLS=sh
+command -v zsh >/dev/null 2>&1 && SHELLS="sh zsh"
+runsh() { if [ "$1" = zsh ]; then zsh -f "$2"; else sh "$2"; fi; }
+SH=$T/sk/home
+mkdir -p "$T/snip" "$SH/.clutch"
+printf 'brain\n' > "$SH/.clutch/worklog.md"
+ln -s home "$T/sk/link"
+for sk in intent:craft ideate:ballmer ops:espresso review:espresso tempo:ferment; do
+  s=${sk%%:*} g=${sk#*:}
+  N="$T/snip/$s.sh"
+  extract "$ROOT/skills/$s/SKILL.md" > "$N"
+  grep -q 'pwd -P' "$N" && grep -q CLUTCH_PLAIN "$N" || { echo "FAIL: $s marker snippet extraction came up empty"; fail=1; continue; }
+  git -C "$ROOT" show "$BASE:skills/$s/SKILL.md" > "$T/snip/$s.base.md" 2>/dev/null \
+    || { echo "FAIL: parity base $BASE not reachable from $ROOT"; exit 1; }
+  extract "$T/snip/$s.base.md" > "$T/snip/$s.base.sh"
+  for sh in $SHELLS; do
+    L="$s/$sh"
+    D="$T/sk/$s-$sh"
+    # SK1: a plain folder gets the gear, silently.
+    mkdir -p "$D/plain"
+    OUT=$(cd "$D/plain" && HOME=$SH runsh "$sh" "$N" 2>"$T/err"); RC=$?
+    [ "$RC" = 0 ] && [ -z "$OUT" ] && [ ! -s "$T/err" ] || { echo "FAIL: SK1 $L -- rc $RC out '$OUT' err $(cat "$T/err")"; fail=1; }
+    [ "$(cat "$D/plain/.clutch/tempo" 2>/dev/null)" = "$g" ] || { echo "FAIL: SK1 $L -- tempo is not $g"; fail=1; }
+    # SK2: from a repo subdir, the toplevel marker has 7201788's bytes.
+    for v in new base; do
+      mkdir -p "$D/$v/sub"
+      git -C "$D/$v" init -q
+      [ "$v" = new ] && F=$N || F="$T/snip/$s.base.sh"
+      (cd "$D/$v/sub" && HOME=$SH runsh "$sh" "$F" >/dev/null 2>&1)
+    done
+    [ -f "$D/new/.clutch/tempo" ] && cmp -s "$D/new/.clutch/tempo" "$D/base/.clutch/tempo" \
+      || { echo "FAIL: SK2 $L -- repo marker differs from $BASE"; fail=1; }
+    [ ! -e "$D/new/sub/.clutch" ] || { echo "FAIL: SK2 $L -- marker landed in the subdir"; fail=1; }
+    # SK3: $HOME and a symlink to it are never written.
+    for c in home link; do
+      B4=$(ls -la "$SH/.clutch")
+      OUT=$(cd "$T/sk/$c" && HOME=$SH runsh "$sh" "$N" 2>&1); RC=$?
+      [ "$RC" = 0 ] && [ -z "$OUT" ] || { echo "FAIL: SK3 $L $c -- rc $RC out '$OUT'"; fail=1; }
+      [ ! -e "$SH/.clutch/tempo" ] && [ "$(ls -la "$SH/.clutch")" = "$B4" ] || { echo "FAIL: SK3 $L $c -- wrote into the brain"; fail=1; }
+      rm -f "$SH/.clutch/tempo"
+      # SK3b: a noisy cd function and chpwd hook under zsh cannot break the refusal.
+      if [ "$sh" = zsh ]; then
+        OUT=$(cd "$T/sk/$c" && HOME=$SH zsh -f -c 'cd() { builtin cd "$@" && echo noise; }; chpwd() { echo noise; }; . "$1"' x "$N" 2>&1); RC=$?
+        [ "$RC" = 0 ] && [ -z "$OUT" ] && [ ! -e "$SH/.clutch/tempo" ] || { echo "FAIL: SK3b $L $c -- rc $RC out '$OUT'"; fail=1; }
+        rm -f "$SH/.clutch/tempo"
+      fi
+    done
+    # SK4: at / the write is never attempted.
+    mkdir -p "$T/stub"
+    printf '#!/bin/sh\necho "$*" >> "%s/mkdirlog"\nexit 1\n' "$T" > "$T/stub/mkdir"
+    chmod +x "$T/stub/mkdir"
+    rm -f "$T/mkdirlog"
+    OUT=$(cd / && HOME=$SH PATH="$T/stub:$PATH" runsh "$sh" "$N" 2>&1); RC=$?
+    [ "$RC" = 0 ] && [ -z "$OUT" ] && [ ! -e "$T/mkdirlog" ] || { echo "FAIL: SK4 $L -- rc $RC out '$OUT' mkdir: $(cat "$T/mkdirlog" 2>/dev/null)"; fail=1; }
+    # SK5: CLUTCH_PLAIN=off writes nothing outside git.
+    mkdir -p "$D/off"
+    (cd "$D/off" && HOME=$SH CLUTCH_PLAIN=off runsh "$sh" "$N" >/dev/null 2>&1)
+    [ ! -e "$D/off/.clutch" ] || { echo "FAIL: SK5 $L -- .clutch created under CLUTCH_PLAIN=off"; fail=1; }
+    # SK6: an unwritable folder stays silent.
+    if [ "$ROOTUSER" = 0 ]; then
+      mkdir -p "$D/ro"
+      chmod 555 "$D/ro"
+      OUT=$(cd "$D/ro" && HOME=$SH runsh "$sh" "$N" 2>&1); RC=$?
+      [ "$RC" = 0 ] && [ -z "$OUT" ] || { echo "FAIL: SK6 $L -- rc $RC out '$OUT'"; fail=1; }
+      chmod 755 "$D/ro"
+    fi
+  done
+  # SK7: round trip: the heartbeat carries the gear; a resume does not ask.
+  OUT=$(cd "$T/sk/$s-sh/plain" && printf '%s' "$HB_IN" | HOME=$SH sh "$ROOT/scripts/heartbeat.sh" 2>&1)
+  has "SK7 $s" "$OUT" "tempo gear: $g"
+  OUT=$(cd "$T/sk/$s-sh/plain" && src resume | HOME=$SH CLAUDE_PLUGIN_ROOT=$ROOT sh "$ROOT/scripts/anchor.sh" 2>&1)
+  hasnt "SK7 $s" "$OUT" 'Intent for this session'
+done
+
+# SK7b (R12): leftover emit lines in a pool-only session-state count once a
+# declaration activates the folder, until the next startup resets the clock.
+D=$T/sk/r12
+mkdir -p "$D/.clutch"
+printf 'emit model 1700000000\nemit model 1700000100\n' > "$D/.clutch/session-state"
+(cd "$D" && HOME=$SH sh "$T/snip/intent.sh" >/dev/null 2>&1)
+OUT=$(cd "$D" && printf '%s' "$HB_IN" | HOME=$SH sh "$ROOT/scripts/heartbeat.sh" 2>&1)
+has SK7b "$OUT" 'tempo gear: craft'
+has SK7b "$OUT" 'clutch-budget: 2/2 spent'
+(cd "$D" && src startup | HOME=$SH CLAUDE_PLUGIN_ROOT=$ROOT sh "$ROOT/scripts/anchor.sh" >/dev/null 2>&1)
+[ "$(sed 's/^start [0-9][0-9]*$/start N/' "$D/.clutch/session-state" 2>/dev/null)" = "$(printf 'start N\nbase -')" ] \
+  || { echo "FAIL: SK7b -- startup did not rewrite session-state"; fail=1; }
+OUT=$(cd "$D" && printf '%s' "$HB_IN" | HOME=$SH sh "$ROOT/scripts/heartbeat.sh" 2>&1)
+has SK7b "$OUT" 'clutch-budget: 0/2 spent'
 
 [ "$fail" -eq 0 ] || exit 1
 echo PASS
