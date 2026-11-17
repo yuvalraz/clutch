@@ -4,7 +4,8 @@
 # Sets: CLUTCH_GIT (1 inside a git work tree, else 0), ROOT, CLUTCH_DIR,
 # EXCLUDE_FILE, CLUTCH_WORKLOG. Defines clutch_ensure_dir,
 # clutch_last_authored, clutch_worklog_window, clutch_open_loops,
-# clutch_session_tag, clutch_owned_loops, clutch_ops_due.
+# clutch_session_tag, clutch_owned_loops, clutch_ops_due,
+# clutch_guess_intent.
 
 CLUTCH_GIT=0
 ROOT=""
@@ -214,4 +215,26 @@ clutch_ops_due() {
   [ "$DLAST" = "$DKEY" ] && return 0
   { printf '%s\n' "$DKEY" > "$DMARK"; } 2>/dev/null
   echo due
+}
+
+# The last focus declared in this folder, read from ~/.clutch/intents (one
+# "<key> <focus>" line per declaration, appended by /clutch:intent). The key
+# is the worklog's repo token: the basename of the git toplevel, else of the
+# cwd, spaces as hyphens. Only lines with exactly two fields, the key equal
+# (an exact compare through ENVIRON, never a pattern) and a focus of build,
+# ideate, ops or review count; the last one wins. rc 0 prints the focus;
+# rc 1 means no store or no valid line for the key; rc 2 means the store is
+# not a readable regular file, the key is empty, or tail fails.
+# shortcut: reads the last 500 lines; upgrade if a folder's last declaration can sit further back.
+clutch_guess_intent() {
+  CGI_F="$HOME/.clutch/intents"
+  [ -e "$CGI_F" ] || return 1
+  [ -f "$CGI_F" ] && [ -r "$CGI_F" ] || return 2
+  if [ "$CLUTCH_GIT" = 1 ]; then CGI_K=$ROOT; else CGI_K=$(pwd 2>/dev/null) || return 2; fi
+  CGI_K=$(basename "$CGI_K" 2>/dev/null | tr ' ' -)
+  [ -n "$CGI_K" ] || return 2
+  CGI_T=$(tail -n 500 "$CGI_F" 2>/dev/null) || return 2
+  CGI_G=$(printf '%s\n' "$CGI_T" | CGI_K="$CGI_K" LC_ALL=C awk '$1 == ENVIRON["CGI_K"] && NF == 2 && $2 ~ /^(build|ideate|ops|review)$/ { g = $2 } END { print g }' 2>/dev/null)
+  [ -n "$CGI_G" ] || return 1
+  printf '%s\n' "$CGI_G"
 }

@@ -21,7 +21,19 @@ WLINES=$(clutch_worklog_window 2>/dev/null) || WLINES=""
 [ -n "$WLINES" ] && printf '\nWorklog:\n%s\n' "$WLINES"
 # Before the git gate so sessions outside a repo get the tag too; CLUTCH_WATCH=off drops it.
 [ "${CLUTCH_WATCH:-}" = off ] || { STAG=$(clutch_session_tag "$INPUT") && printf 'Session tag: %s\n' "$STAG"; }
-[ "$CLUTCH_GIT" = 1 ] || exit 0
+# The guessed form of the intent ask; prints nothing and returns 1 without a guess or under CLUTCH_GUESS=off.
+guess_ask() {
+  [ "${CLUTCH_GUESS:-}" = off ] && return 1
+  GUESS=$(clutch_guess_intent 2>/dev/null) || return 1
+  printf 'Intent for this session: looks like %s again; say go, or pick build, ideate, ops, or review. /clutch:intent sets the frame.\n' "$GUESS"
+}
+# Outside git there is no tempo: the guessed ask rides only a new session (startup or clear).
+if [ "$CLUTCH_GIT" != 1 ]; then
+  case "$INPUT" in
+    *'"source":"startup"'* | *'"source": "startup"'* | *'"source":"clear"'* | *'"source": "clear"'*) guess_ask ;;
+  esac
+  exit 0
+fi
 
 # Reset the session clock only on a positively identified fresh session
 # boundary: startup, resume, or clear. A compaction is the same session
@@ -112,7 +124,8 @@ if [ "$FRESH" = 1 ]; then
   fi
 fi
 if [ "$ASK" = 1 ]; then
-  printf 'Intent for this session: build, ideate, ops, or review? /clutch:intent sets the frame.\n'
+  # A past declaration in this folder names its focus first; otherwise today's four-way ask.
+  guess_ask || printf 'Intent for this session: build, ideate, ops, or review? /clutch:intent sets the frame.\n'
 fi
 
 exit 0
