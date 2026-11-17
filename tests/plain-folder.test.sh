@@ -298,7 +298,9 @@ new_run anchor fx_start w "$(src resume)"
 clean PF4-gear
 hasnt PF4-gear "$OUT" 'Intent for this session'
 [ "$(cat "$W/w/.clutch/tempo")" = craft ] || { echo "FAIL: PF4-gear -- tempo touched"; fail=1; }
-grep -q 'start 1700000000' "$W/w/.clutch/session-state" && { echo "FAIL: PF4-gear -- clock not reset"; fail=1; }
+S=$(cat "$W/w/.clutch/session-state" 2>/dev/null) || S=missing
+[ "$S" != "$(printf 'start 1700000000\nbase -')" ] && [ "$(printf '%s\n' "$S" | sed 's/^start [0-9][0-9]*$/start N/')" = "$(printf 'start N\nbase -')" ] \
+  || { echo "FAIL: PF4-gear -- clock not reset to start/base -"; fail=1; }
 TEMPO=""
 new_run anchor fx_start w "$(src resume)"
 clean PF4-nogear
@@ -453,6 +455,9 @@ for sk in intent:craft ideate:ballmer ops:espresso review:espresso tempo:ferment
   has "SK7 $s" "$OUT" "tempo gear: $g"
   OUT=$(cd "$T/sk/$s-sh/plain" && src resume | HOME=$SH CLAUDE_PLUGIN_ROOT=$ROOT sh "$ROOT/scripts/anchor.sh" 2>&1)
   hasnt "SK7 $s" "$OUT" 'Intent for this session'
+  # Outside git a resume never asks, so prove the active path ran: the clock was rewritten.
+  [ "$(sed 's/^start [0-9][0-9]*$/start N/' "$T/sk/$s-sh/plain/.clutch/session-state" 2>/dev/null)" = "$(printf 'start N\nbase -')" ] \
+    || { echo "FAIL: SK7 $s -- resume did not rewrite session-state"; fail=1; }
 done
 
 # SK7b (R12): leftover emit lines in a pool-only session-state count once a
