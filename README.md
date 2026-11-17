@@ -119,7 +119,7 @@ maintenance too. `/clutch:dream` consolidates it and prunes the index, and
 
 A fresh session opens with one question, the only one of the day:
 build, ideate, ops, or review? Ignoring it is also an answer, and it never asks twice.
-When you declared a focus in this folder before, the question names it first (`looks like build again`), and a plain go takes it; outside a repo it shows only then. `CLUTCH_GUESS=off` turns the guess off.
+When you declared a focus in this folder before, the question names it first (`looks like build again`), and a plain go takes it. Outside a repo the question rides each new session too. `CLUTCH_GUESS=off` turns the guess off.
 `/clutch:intent` takes the answer and engages the matching gear.
 
 **Build.** A maker session in the craft gear (explore, then commit). The catch

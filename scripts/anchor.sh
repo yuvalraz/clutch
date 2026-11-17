@@ -27,10 +27,11 @@ guess_ask() {
   GUESS=$(clutch_guess_intent 2>/dev/null) || return 1
   printf 'Intent for this session: looks like %s again; say go, or pick build, ideate, ops, or review. /clutch:intent sets the frame.\n' "$GUESS"
 }
-# Outside git there is no tempo: the guessed ask rides only a new session (startup or clear).
+# Outside git there is no tempo, so a new session (startup or clear) has no gear: the intent ask rides it, guessed when it can be.
 if [ "$CLUTCH_GIT" != 1 ]; then
   case "$INPUT" in
-    *'"source":"startup"'* | *'"source": "startup"'* | *'"source":"clear"'* | *'"source": "clear"'*) guess_ask ;;
+    *'"source":"startup"'* | *'"source": "startup"'* | *'"source":"clear"'* | *'"source": "clear"'*)
+      guess_ask || printf 'Intent for this session: build, ideate, ops, or review? /clutch:intent sets the frame.\n' ;;
   esac
   exit 0
 fi

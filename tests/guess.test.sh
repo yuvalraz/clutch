@@ -7,8 +7,8 @@
 # record, another key only, CLUTCH_GUESS=off, an unreadable store or invalid
 # lines the output equals the no-store output byte for byte; a valid record
 # swaps the last line for the guessed ask; resume with a gear and compact
-# stay silent. G11-G12 run outside git: the guessed ask is a new last line on
-# startup or clear only, and the key is the folder name exactly, spaces as
+# stay silent. G11-G12 run outside git: startup and clear end with the ask
+# (today's four-way line, or the guessed one), resume/compact/fork never ask, and the key is the folder name exactly, spaces as
 # hyphens. G13-G16 pin the intent skill's record line, guessed question and
 # go answer and the README sentences; G14 runs the skill's own record
 # snippet, then the anchor, as a round trip. prelude.sh and anchor.sh are
@@ -170,16 +170,16 @@ nostore
 printf '%s plain moved: the seed\n' "$(date +%s)" > "$HOME/.clutch/worklog.md"
 run "G11 today" "$D" startup ',"session_id":"0123abcd-4567"'
 rm -f "$HOME/.clutch/worklog.md"
-WANT=$(cat "$ROOT/rules/constitution.md"; printf '\nWorklog:\nplain moved: the seed\nSession tag: @0123abcd\n')
-[ "$OUT" = "$WANT" ] || { echo "FAIL: G11 today -- no-record output outside git is not constitution, Worklog block, Session tag"; fail=1; }
+WANT=$(cat "$ROOT/rules/constitution.md"; printf '\nWorklog:\nplain moved: the seed\nSession tag: @0123abcd\n%s\n' "$TODAY")
+[ "$OUT" = "$WANT" ] || { echo "FAIL: G11 today -- no-record startup outside git is not constitution, Worklog block, Session tag, today's ask"; fail=1; }
 run "G11 no store" "$D" startup
 N0=$OUT
-case "$N0" in *'Intent for this session'*) echo "FAIL: G11 -- no-store run outside git asks"; fail=1 ;; esac
+[ "$(last "$N0")" = "$TODAY" ] || { echo "FAIL: G11 -- no-store startup outside git does not end with today's ask"; fail=1; }
 store 'my-dir ideate\n'
 for src in startup clear; do
   run "G11 $src" "$D" "$src"
   [ "$(last "$OUT")" = "$(guessed ideate)" ] || { echo "FAIL: G11 $src -- last line is not the guessed ask: $(last "$OUT")"; fail=1; }
-  [ "$(butlast "$OUT")" = "$N0" ] || { echo "FAIL: G11 $src -- output differs above the ask line"; fail=1; }
+  [ "$(butlast "$OUT")" = "$(butlast "$N0")" ] || { echo "FAIL: G11 $src -- output differs above the ask line"; fail=1; }
 done
 for src in resume compact fork; do
   extra=""
@@ -187,6 +187,7 @@ for src in resume compact fork; do
   nostore
   run "G11 $src no store" "$D" "$src" "$extra"
   B=$OUT
+  case "$B" in *'Intent for this session'*) echo "FAIL: G11 $src -- a continued session outside git asks"; fail=1 ;; esac
   store 'my-dir ideate\n'
   run "G11 $src" "$D" "$src" "$extra"
   same "G11 $src" "$OUT" "$B"
