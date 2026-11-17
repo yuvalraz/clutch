@@ -12,6 +12,7 @@
 # The watch skill: fixed-string pins on its tick prose, and its tagged read
 # line run as a round trip against the same wait snippet.
 set -u
+unset CLUTCH_INVESTIGATE
 
 HERE=$(cd "$(dirname "$0")" && pwd)
 O=${OPS_SKILL:-$HERE/../skills/ops/SKILL.md}
@@ -249,14 +250,14 @@ fi
 # --- intent: the ops form and its handoff
 pin "$I" "intent: ops form"            '/clutch:intent ops'
 pin "$I" "intent: ops handoff"         'run /clutch:ops'
-pin "$I" "intent: four focuses"        'Four focuses exist'
+pin "$I" "intent: five focuses"        'Five focuses exist'
 
 # --- tempo, GLOSSARY, README: ops is named where the gears are
 pin "$TP" "tempo: ops drives espresso" 'ops drives espresso'
 pin "$TP" "tempo: ops names its gear"  '/clutch:ops. engages espresso'
 pin "$G"  "GLOSSARY: ops in Intent"    'Ops engages espresso'
 pin "$R"  "README: ops command"        '/clutch:ops'
-pin "$R"  "README: four-way ask"       'build, ideate, ops, or review?'
+pin "$R"  "README: five-way ask"       'build, ideate, ops, review, or investigate?'
 fpin "$R" "README: wait bullet"        'In ops, an action you approve that awaits a reply logs a `wait:` line'
 fpin "$R" "README: watch code span"    '`watch <thing>`'
 fpin "$R" "README: closing ref"        'A later `moved:` line that starts with the same ref closes it.'
@@ -418,7 +419,7 @@ mkdir "$T/repo"
 git -C "$T/repo" init -q
 git -C "$T/repo" -c user.email=t@t -c user.name=t commit -q --allow-empty -m seed
 mkdir -p "$T/repo/.clutch"
-Q='build, ideate, ops, or review?'
+Q='build, ideate, ops, review, or investigate?'
 
 # heartbeat: espresso -> tempo line names the gear and its shape
 printf 'espresso\n' > "$T/repo/.clutch/tempo"
@@ -435,11 +436,11 @@ printf '%s\n' "$OUT" | grep -qF "$Q" \
 grep -q '^espresso$' "$T/repo/.clutch/tempo" \
   || { echo "FAIL: resume wiped or mangled an espresso tempo"; exit 1; }
 
-# anchor on startup -> the ask names all four focuses as its final line
+# anchor on startup -> the ask names all five focuses as its final line
 OUT=$(cd "$T/repo" && printf '%s' '{"source":"startup"}' | sh "$RUN"); RC=$?
 [ "$RC" = 0 ] || { echo "FAIL: anchor exited $RC on startup"; exit 1; }
 printf '%s\n' "$OUT" | tail -n 1 | grep -qF "$Q" \
-  || { echo "FAIL: startup ask does not name the four focuses as its final line"; exit 1; }
+  || { echo "FAIL: startup ask does not name the five focuses as its final line"; exit 1; }
 
 # --- O-run: the skill's own worklog read line, run against the real
 # prelude.sh from a plain dir, prints a fresh on: claim and hides a 5 h one.

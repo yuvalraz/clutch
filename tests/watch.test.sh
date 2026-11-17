@@ -20,7 +20,7 @@
 # HOME. PRELUDE_SH, ANCHOR_SH, STOP_SH and CONST_FILE override the targets
 # for replay against a historical version. Silent on pass apart from PASS.
 set -u
-unset CLUTCH_WATCH CLAUDE_PLUGIN_ROOT
+unset CLUTCH_WATCH CLUTCH_INVESTIGATE CLAUDE_PLUGIN_ROOT
 
 HERE=$(cd "$(dirname "$0")" && pwd)
 P=${PRELUDE_SH:-$HERE/../scripts/prelude.sh}
@@ -230,7 +230,7 @@ untagged() {
   [ "$RC" = 0 ] && ! printf '%s\n' "$OUT" | grep -q 'Session tag:' \
     || { echo "FAIL: $1 -- rc $RC, want no Session tag line in [$OUT]"; fail=1; }
 }
-ASKLINE='Intent for this session: build, ideate, ops, or review? /clutch:intent sets the frame.'
+ASKLINE='Intent for this session: build, ideate, ops, review, or investigate? /clutch:intent sets the frame.'
 
 # A1: startup in a repo: one tag line, the intent ask still last.
 fix

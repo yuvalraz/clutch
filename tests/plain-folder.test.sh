@@ -3,8 +3,9 @@
 # declaration) or a session-state whose first line starts with "start " (the
 # anchor's write) gets the gear line, the budget line and the session clock.
 # Everything else must match 7201788 byte for byte: the parity section stages
-# 7201788's own hook scripts and constitution from git history (it fails
-# loudly when that commit is unreachable, never skips) and replays every
+# 7201788's own hook scripts from git history (it fails loudly when that
+# commit is unreachable, never skips); the rules tree is the working tree's
+# on both sides, so constitution edits are held constant, and it replays every
 # fixture through both, comparing stdout, stderr, rc and a dump of the
 # fixture's files (9+ digit runs masked). DD7: move BASE in the same commit as
 # any deliberate in-git output change. The snippets section runs each gear
@@ -13,6 +14,9 @@
 # CLUTCH_* unset. Silent apart from PASS.
 set -u
 unset CLUTCH_PLAIN CLUTCH_STATE CLUTCH_WATCH CLUTCH_GUESS CLAUDE_PLUGIN_ROOT
+# Parity here is against 7201788's four-way ask; the switch itself is proven
+# in investigate-off.test.sh.
+CLUTCH_INVESTIGATE=off; export CLUTCH_INVESTIGATE
 
 HERE=$(cd "$(dirname "$0")" && pwd)
 ROOT=$(cd "$HERE/.." && pwd)
@@ -32,8 +36,8 @@ for f in anchor heartbeat stop red-moment prelude; do
   git -C "$ROOT" show "$BASE:scripts/$f.sh" > "$T/base/scripts/$f.sh" 2>/dev/null \
     || { echo "FAIL: parity base $BASE not reachable from $ROOT"; exit 1; }
 done
-git -C "$ROOT" show "$BASE:rules/constitution.md" > "$T/base/rules/constitution.md" 2>/dev/null \
-  || { echo "FAIL: parity base $BASE not reachable from $ROOT"; exit 1; }
+cp "$ROOT/rules/constitution.md" "$T/base/rules/constitution.md" \
+  || { echo "FAIL: could not stage the working-tree constitution for the base side"; exit 1; }
 
 SID='"session_id":"0123abcd-4567-89ab-cdef-0123456789ab"'
 src() { printf '{%s,"source":"%s"%s}' "$SID" "$1" "${2:-}"; }

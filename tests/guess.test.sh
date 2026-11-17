@@ -1,22 +1,26 @@
 #!/bin/sh
 # Guessed intent: each declaration appends "<key> <focus>" to
 # ~/.clutch/intents, and a fresh session's anchor names the last focus for
-# this folder in place of the four-way ask. G1 covers clutch_guess_intent
+# this folder in place of the five-way ask. G1 covers clutch_guess_intent
 # (rc 0 prints the focus, rc 1 no file or no valid line, rc 2 an unreadable
 # or non-regular store). G2-G10 run the anchor in a scratch repo: with no
 # record, another key only, CLUTCH_GUESS=off, an unreadable store or invalid
 # lines the output equals the no-store output byte for byte; a valid record
 # swaps the last line for the guessed ask; resume with a gear and compact
 # stay silent. G11-G12 run outside git: startup and clear end with the ask
-# (today's four-way line, or the guessed one), resume/compact/fork never ask, and the key is the folder name exactly, spaces as
+# (today's five-way line, or the guessed one), resume/compact/fork never ask, and the key is the folder name exactly, spaces as
 # hyphens. G13-G16 pin the intent skill's record line, guessed question and
 # go answer and the README sentences; G14 runs the skill's own record
 # snippet, then the anchor, as a round trip. prelude.sh and anchor.sh are
 # staged into a scratch scripts/ dir; PRELUDE_SH, ANCHOR_SH, INTENT_SKILL and
 # README_FILE override the targets for replay against a historical version.
+# G17-G20 cover investigate: it is guessed by default, and
+# CLUTCH_INVESTIGATE=off keeps 2.12.0's four-way texts and skips its lines
+# (G17 guessed, G18 off falls back to build, G19 off with investigate only
+# asks four-way, G20 clutch_guess_intent rc both ways).
 # Every anchor run must leave stderr empty. Silent apart from PASS.
 set -u
-unset CLUTCH_GUESS CLUTCH_WATCH CLAUDE_PLUGIN_ROOT
+unset CLUTCH_GUESS CLUTCH_WATCH CLUTCH_INVESTIGATE CLAUDE_PLUGIN_ROOT
 
 HERE=$(cd "$(dirname "$0")" && pwd)
 ROOT=$(cd "$HERE/.." && pwd)
@@ -43,8 +47,11 @@ git -C "$T/repo" config user.email t@t
 git -C "$T/repo" config user.name t
 git -C "$T/repo" commit -q --allow-empty -m seed
 ST="$HOME/.clutch/intents"
-TODAY='Intent for this session: build, ideate, ops, or review? /clutch:intent sets the frame.'
-guessed() { printf 'Intent for this session: looks like %s again; say go, or pick build, ideate, ops, or review. /clutch:intent sets the frame.' "$1"; }
+TODAY='Intent for this session: build, ideate, ops, review, or investigate? /clutch:intent sets the frame.'
+guessed() { printf 'Intent for this session: looks like %s again; say go, or pick build, ideate, ops, review, or investigate. /clutch:intent sets the frame.' "$1"; }
+# 2.12.0's texts, kept under CLUTCH_INVESTIGATE=off.
+TODAY4='Intent for this session: build, ideate, ops, or review? /clutch:intent sets the frame.'
+guessed4() { printf 'Intent for this session: looks like %s again; say go, or pick build, ideate, ops, or review. /clutch:intent sets the frame.' "$1"; }
 fail=0
 ROOTUSER=0
 [ "$(id -u)" = 0 ] && ROOTUSER=1
@@ -55,11 +62,13 @@ nostore() { chmod -R u+rwx "$ST" 2>/dev/null; rm -rf "$ST"; }
 dirstore() { nostore; mkdir "$ST"; }
 
 # run <label> <dir> <source> [extra json]: the staged anchor; sets OUT.
-# GV is the CLUTCH_GUESS value for the run (empty means unset-equivalent).
+# GV is the CLUTCH_GUESS value for the run (empty means unset-equivalent);
+# IV is the CLUTCH_INVESTIGATE value, the same way.
 GV=""
+IV=""
 OUT=""
 run() {
-  OUT=$(cd "$2" && printf '{"source":"%s"%s}' "$3" "${4:-}" | CLUTCH_GUESS=$GV sh "$T/scripts/anchor.sh" 2>"$T/err"); rc=$?
+  OUT=$(cd "$2" && printf '{"source":"%s"%s}' "$3" "${4:-}" | CLUTCH_GUESS=$GV CLUTCH_INVESTIGATE=$IV sh "$T/scripts/anchor.sh" 2>"$T/err"); rc=$?
   [ "$rc" = 0 ] || { echo "FAIL: $1 -- anchor exited $rc"; fail=1; }
   [ -s "$T/err" ] && { echo "FAIL: $1 -- stderr: $(head -3 "$T/err")"; fail=1; }
   return 0
@@ -135,12 +144,12 @@ run G6 "$T/repo" startup
 [ "$(butlast "$OUT")" = "$(butlast "$X0")" ] || { echo "FAIL: G6 -- output differs above the ask line"; fail=1; }
 
 # --- G7: the last valid line for the key wins; invalid lines are skipped
-store 'repo build\nrepo review\nrepo bogus\nrepo ops extra\nother ideate\n'
+store 'repo build\nrepo review\nrepo rebuild\nrepo investigated\nrepo bogus\nrepo ops extra\nrepo investigate extra\nrepo Investigate\nother ideate\n'
 run G7 "$T/repo" startup
 [ "$(last "$OUT")" = "$(guessed review)" ] || { echo "FAIL: G7 -- want the review guess, got: $(last "$OUT")"; fail=1; }
 
-# --- G8: only invalid lines (bogus word, 3 fields, CRLF)
-store 'repo bogus\nrepo build extra\nrepo ops\r\n'
+# --- G8: only invalid lines (bogus word, unanchored near-misses, 3 fields, CRLF)
+store 'repo bogus\nrepo rebuild\nrepo investigated\nrepo build extra\nrepo ops\r\nrepo investigate extra\nrepo Investigate\n'
 run G8 "$T/repo" startup
 same G8 "$OUT" "$X0"
 
@@ -283,7 +292,7 @@ x"
 fi
 
 # --- G15: the skill's bare form, guessed branch and answers
-fpin "$S" "G15 bare form" 'ask one question: build, ideate, ops, or review?'
+fpin "$S" "G15 bare form" 'ask one question: build, ideate, ops, review, or investigate?'
 fpin "$S" "G15 trigger" 'looks like <focus> again'
 fpin "$S" "G15 question" '"Looks like <focus> on <thread>, go?"'
 fpin "$S" "G15 threadless question" '"Looks like <focus>, go?"'
@@ -303,6 +312,30 @@ case "$(last "$OUT")" in *"${TRIG:-unset trigger}"*) ;; *) echo "FAIL: G15 coupl
 # --- G16: README names the kill switch and the store
 fpin "$R" "G16 kill switch" '`CLUTCH_GUESS=off` turns the guess off'
 fpin "$R" "G16 store" '`~/.clutch/intents`'
+
+# --- G17: an investigate record is guessed by default
+rm -f "$T/repo/.clutch/tempo"
+store 'repo investigate\n'
+run G17 "$T/repo" startup
+[ "$(last "$OUT")" = "$(guessed investigate)" ] || { echo "FAIL: G17 -- want the investigate guess, got: $(last "$OUT")"; fail=1; }
+
+# --- G18: off skips investigate lines; the earlier build wins, four-way text
+IV=off
+store 'repo build\nrepo investigate\n'
+run G18 "$T/repo" startup
+[ "$(last "$OUT")" = "$(guessed4 build)" ] || { echo "FAIL: G18 -- want 2.12.0's build guess, got: $(last "$OUT")"; fail=1; }
+
+# --- G19: off with investigate only: 2.12.0's plain ask
+store 'repo investigate\n'
+run G19 "$T/repo" startup
+[ "$(last "$OUT")" = "$TODAY4" ] || { echo "FAIL: G19 -- want 2.12.0's plain ask, got: $(last "$OUT")"; fail=1; }
+IV=""
+
+# --- G20 (unit): clutch_guess_intent prints investigate by default, rc 1 under off
+unit "$T/repo"
+[ "$URC" = 0 ] && [ "$UOUT" = investigate ] || { echo "FAIL: G20 default -- want rc 0 and investigate, got rc $URC: $UOUT"; fail=1; }
+UOUT=$(cd "$T/repo" && CLUTCH_INVESTIGATE=off && . "$T/scripts/prelude.sh" && clutch_guess_intent 2>/dev/null); URC=$?
+[ "$URC" = 1 ] && [ -z "$UOUT" ] || { echo "FAIL: G20 off -- want rc 1 and no stdout, got rc $URC: $UOUT"; fail=1; }
 
 [ "$fail" -eq 0 ] || exit 1
 echo PASS

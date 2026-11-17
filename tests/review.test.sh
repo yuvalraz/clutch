@@ -7,12 +7,13 @@
 # fourth intent focus (intent skill, GLOSSARY, README); then run the
 # heartbeat in a scratch repo to assert that a declared espresso gear rides
 # every turn and that a declined line never spends the uninvited budget, and
-# the anchor to assert the startup ask names all four focuses.
+# the anchor to assert the startup ask names all five focuses.
 # Same rc-discipline as siblings; the A/C/E/F/G wording gates are mirrored
 # locally from ops.test.sh, plus a `$` + digit argument-shorthand gate.
 # Overrides: REVIEW_SKILL, RITUALS_SKILL, TEMPO_SKILL, HB_FILE, INTENT_SKILL,
 # GLOSSARY_FILE, README_FILE, ANCHOR_SH.
 set -u
+unset CLUTCH_INVESTIGATE
 
 HERE=$(cd "$(dirname "$0")" && pwd)
 RV=${REVIEW_SKILL:-$HERE/../skills/review/SKILL.md}
@@ -144,7 +145,7 @@ pin "$TP" "tempo: mismatch example is design" 'a design question run in espresso
 HSEC=$(awk '/^## /{s=($0=="## When a handoff fails")} s' "$I")
 RSEC=$(awk '/^## /{s=($0=="## Review")} s' "$I")
 [ -n "$RSEC" ] || { echo "FAIL: intent: no ## Review section"; fail=1; }
-printf '%s\n' "$HSEC" | grep -qF 'For ideate, ops, and review alike: if the handoff fails' \
+printf '%s\n' "$HSEC" | grep -qF 'For ideate, ops, review, and investigate alike: if the handoff fails' \
   || { echo "FAIL: intent: failed-handoff rule not under ## When a handoff fails"; fail=1; }
 printf '%s\n' "$RSEC" | grep -qF 'if the handoff fails' \
   && { echo "FAIL: intent: failed-handoff rule still sits under ## Review"; fail=1; }
@@ -154,8 +155,8 @@ awk '/^## When a handoff fails$/{h=NR} /^## The once-only law$/{o=NR} END{exit !
 # --- intent, GLOSSARY, README: review is the fourth focus
 pin "$I" "intent: review form"               '/clutch:intent review'
 pin "$I" "intent: review handoff"            'run /clutch:review'
-pin "$I" "intent: plain review answers"      'a plain "build", "ideate", "ops", or "review" counts as an answer'
-pin "$I" "intent: argument hint"             'argument-hint: "\[build | ideate | ops | review\]"'
+pin "$I" "intent: plain review answers"      'a plain "build", "ideate", "ops", "review", or "investigate" counts as an answer'
+pin "$I" "intent: argument hint"             'argument-hint: "\[build | ideate | ops | review | investigate\]"'
 pin "$G" "GLOSSARY: review in Intent"        'Review engages espresso'
 pin "$R" "README: review command"            '/clutch:review'
 pin "$R" "README: review one PR at a time"   '`/clutch:review` closes one PR at a time'
@@ -249,7 +250,7 @@ OUT=$(cd "$T/repo" && sh "$HB"); RC=$?
 printf '%s\n' "$OUT" | grep -qF 'clutch-budget: 1/2 spent' \
   || { echo "FAIL: the declined line was counted as an emission: $OUT"; exit 1; }
 
-# --- behavior: a fresh startup with no gear ends on the four-focus ask.
+# --- behavior: a fresh startup with no gear ends on the five-focus ask.
 # The anchor under test is staged beside the real prelude.sh (as in ops).
 mkdir "$T/scripts"
 cp "$A" "$T/scripts/anchor.sh"
@@ -257,7 +258,7 @@ cp "$HERE/../scripts/prelude.sh" "$T/scripts/prelude.sh"
 rm -f "$T/repo/.clutch/tempo"
 OUT=$(cd "$T/repo" && printf '%s' '{"source":"startup"}' | sh "$T/scripts/anchor.sh"); RC=$?
 [ "$RC" = 0 ] || { echo "FAIL: anchor exited $RC on startup"; exit 1; }
-printf '%s\n' "$OUT" | tail -n 1 | grep -qF 'build, ideate, ops, or review?' \
-  || { echo "FAIL: startup ask does not end on the four focuses: $OUT"; exit 1; }
+printf '%s\n' "$OUT" | tail -n 1 | grep -qF 'build, ideate, ops, review, or investigate?' \
+  || { echo "FAIL: startup ask does not end on the five focuses: $OUT"; exit 1; }
 
 echo PASS

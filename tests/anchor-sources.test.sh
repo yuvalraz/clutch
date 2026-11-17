@@ -10,6 +10,7 @@
 # real prelude.sh, so a historical anchor fails on a behavior assert, not on
 # the prelude guard.
 set -u
+unset CLUTCH_INVESTIGATE
 
 HERE=$(cd "$(dirname "$0")" && pwd)
 ROOT=$(cd "$HERE/.." && pwd)
@@ -40,7 +41,7 @@ pin "$J" "matcher includes fork" '"matcher": "startup|resume|clear|compact|fork"
 pin "$S" "intent: fork inherits gear" 'A fork inherits the declared gear too.'
 
 # --- (iii) harness
-Q='build, ideate, ops, or review?'
+Q='build, ideate, ops, review, or investigate?'
 T=$(mktemp -d) || exit 1
 HOME=$T/home; export HOME
 mkdir -p "$HOME"

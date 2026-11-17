@@ -116,11 +116,11 @@ The assistant's own auto-memory directory is a different brain, and it gets
 maintenance too. `/clutch:dream` consolidates it and prunes the index, and
 `/clutch:interview` asks a short batch of questions about its thin spots.
 
-## Four focuses
+## Five focuses
 
 A fresh session opens with one question, the only one of the day:
-build, ideate, ops, or review? Ignoring it is also an answer, and it never asks twice.
-When you declared a focus in this folder before, the question names it first (`looks like build again`), and a plain go takes it. Outside a repo the question rides each new session too. `CLUTCH_GUESS=off` turns the guess off.
+build, ideate, ops, review, or investigate? Ignoring it is also an answer, and it never asks twice.
+When you declared a focus in this folder before, the question names it first (`looks like build again`), and a plain go takes it. Outside a repo the question rides each new session too. `CLUTCH_GUESS=off` turns the guess off. `CLUTCH_INVESTIGATE=off` keeps the question to the first four.
 Declaring a focus outside a repo writes `.clutch/tempo` in that folder, never in your home folder, so the gear and the budget ride every turn there as in a repo; `CLUTCH_PLAIN=off` turns that off.
 `/clutch:intent` takes the answer and engages the matching gear.
 
@@ -150,6 +150,10 @@ When the tablet inbox has new pages or typed tasks, the sweep files each line on
 **Review.** `/clutch:review` closes one PR at a time with your written
 conventions applied. When your call on a finding implies a rule, one line
 offers it as a convention, written on a yes. Each post goes out on a yes.
+
+**Investigate.** `/clutch:investigate` takes one pointer, reads the evidence
+without changing anything, and speaks findings each tied to its evidence; a
+reply goes out on a yes, and a fix hands off to build.
 
 `/clutch:tempo` hands you the gearbox directly: five gears, set or reported.
 
@@ -182,7 +186,7 @@ Slow is legal. You are allowed to think.
 
 ## Commands at a glance
 
-Twenty-one commands, same heartbeat, opposite directions. The catch side meets you
+Twenty-two commands, same heartbeat, opposite directions. The catch side meets you
 when work stops moving. The spark side banks what pulls you and hands it back
 as ignition. The rest set the session's focus, run the day, and check on clutch.
 
@@ -205,6 +209,7 @@ as ignition. The rest set the session's focus, run the day, and check on clutch.
 | `/clutch:ops` | Operations mode: one sweep, one loop at a time | A day of meetings, people, and threads |
 | `/clutch:watch` | One tick of a session's armed watch: reads only that session's waits, `No change.` unless one moved | Sent by the watch a session arms; you rarely type it |
 | `/clutch:review` | Review mode: one PR at a time, your conventions applied | A review session |
+| `/clutch:investigate` | Investigate mode: one pointer read to findings, each tied to its evidence | A DM, thread, PR, error or claim to check |
 | `/clutch:tempo` | Sets or reports the gear: espresso, craft, ballmer, freefall, ferment | You want the gearbox itself |
 | `/clutch:morning` | Opens the day: focus check, deep ping, one divergent beat, one quick win, the first move | The start of your day |
 | `/clutch:eod` | Closes the day: a mini-retro without shame, tomorrow's focuses, one fun slot | The end of your day |
@@ -262,8 +267,9 @@ It carries nothing personal. It reads your git state, its own `.clutch/` folder,
 your `~/.clutch` brain if you keep one, and the conversation in front of it.
 Some commands read more, and only when you fire them or a session's armed
 watch fires one: `/clutch:dream` and
-`/clutch:interview` read the assistant's auto-memory directory, and
-`/clutch:review` reads your conventions file and the PR in front of it.
+`/clutch:interview` read the assistant's auto-memory directory,
+`/clutch:review` reads your conventions file and the PR in front of it, and
+`/clutch:investigate` reads the pointer you give it and what that pointer names.
 `/clutch:morning`, `/clutch:eod`, `/clutch:ops` and `/clutch:review` read
 `~/.clutch/rituals.md` for your day's facts, integrations and conventions path.
 Morning and eod also read the state dir it names and your focus files.
@@ -308,6 +314,7 @@ search. `/clutch:ops` and `/clutch:morning` check the integrations you named.
 `/clutch:morning` and `/clutch:eod` run the prep command you set, and the
 extra and close-out steps you wrote can use your integrations.
 `/clutch:review` reads PRs and posts to one only on a yes.
+`/clutch:investigate` reads what the pointer names and sends a reply only on a yes.
 `/clutch:watch` checks the integrations its session's waits name, every 15
 minutes until none is left. No hook script here touches the network, and you
 can verify it:
