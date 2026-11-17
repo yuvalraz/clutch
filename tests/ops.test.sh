@@ -24,9 +24,10 @@ HB=${HB_FILE:-$HERE/../scripts/heartbeat.sh}
 A=${ANCHOR_SH:-$HERE/../scripts/anchor.sh}
 C=${CONST_FILE:-$HERE/../rules/constitution.md}
 WS=${WATCH_SKILL:-$HERE/../skills/watch/SKILL.md}
+BS=${BEAT_SKILL:-$HERE/../skills/beat/SKILL.md}
 
 fail=0
-for f in "$O" "$I" "$TP" "$G" "$R" "$HB" "$A" "$C" "$WS"; do
+for f in "$O" "$I" "$TP" "$G" "$R" "$HB" "$A" "$C" "$WS" "$BS"; do
   [ -f "$f" ] || { echo "FAIL: missing $f"; fail=1; }
 done
 [ "$fail" -eq 0 ] || exit 1
@@ -299,6 +300,51 @@ nws_l=$(grep -c '' "$WS")
 fpin "$WS" "W12 re-hold open thing"     'If the thing is still open after the move, such as approved, commented or changes requested, append a fresh `wait:` line right after that `moved:` line, with the same snippet and text `<kind>:<ref> <new baseline> @<tag> <text>`: the same ref, the new baseline and the same `@<tag>`, so a later merge stays watched.'
 fpin "$WS" "W13 merged not held"        'A thing that merged or closed is not held again.'
 
+# --- ops: the beat record in Step 0, and the pointer to the beat
+fpin "$O" "ops: beat record"            'Then record this session as an ops session, so its turn end asks once a day for the beat (`/clutch:beat`).'
+fpin "$O" "ops: beat record tag"        'Replace `@<tag>` with the `Session tag:` from the session start; with no `Session tag:` line, skip this. Silent on any failure:'
+fpin "$O" "ops: beat record snippet"    'T='"'"'@<tag>'"'"'; F="$HOME/.clutch/watch/${T#@}.beat"; [ "${CLUTCH_BEAT:-}" = off ] || [ ! -d "$HOME/.clutch" ] || [ -e "$F" ] || { mkdir -p "$HOME/.clutch/watch" && printf '"'"'last %s\n'"'"' "$(date +%s)" > "$F"; } 2>/dev/null'
+fpin "$O" "ops: beat pointer"           'An ops session'"'"'s beat does not send a tick either: it sends `/clutch:beat @<tag>`, which reads what other sessions moved and the waits no session'"'"'s tag owns.'
+
+# --- beat skill: one beat of an ops session
+fpin "$BS" "BT0 name"                   'name: beat'
+fpin "$BS" "BT0 description"            'description: Run one beat of an ops session. Read the moves other sessions logged since the last beat and the waits no session'"'"'s tag owns, reply `No change.` when nothing moved, and name what moved with one smallest move.'
+fpin "$BS" "BT1 trigger"                'when_to_use: Use ONLY when the prompt is `/clutch:beat @<tag>`, the line an ops session'"'"'s armed beat sends. Any other mention of a beat or a check-in is not a trigger.'
+fpin "$BS" "BT0 argument"               'argument-hint: "@<tag>"'
+# A fire only runs skills the model may invoke, so model invocation stays on.
+if grep -qiE '^disable-model-invocation:[[:space:]]*["'"'"']?true' "$BS"; then
+  echo "FAIL: BT2 beat skill disables model invocation -- its fires never run"
+  fail=1
+fi
+fpin "$BS" "BT3 what sends it"          '`/clutch:beat @<tag>` is what an ops session'"'"'s armed beat sends, every two hours from 08:07 to 20:07 while the session is open.'
+fpin "$BS" "BT4 no gear"                'It sets no gear, no focus and no mode: the session keeps the rules it had.'
+fpin "$BS" "BT4b not a sweep"           'It is not a sweep or a tick: no sweep, no config read.'
+fpin "$BS" "BT5 read line"              'sh -c '"'"'. "${CLAUDE_PLUGIN_ROOT}/scripts/prelude.sh" && L=$(clutch_beat_window "@<tag>") || exit; [ -z "$L" ] || printf "%s\n" "$L" | LC_ALL=C cut -c1-300'"'"
+fpin "$BS" "BT6 line shapes"            'Each line is a wait no session'"'"'s tag owns, `<epoch> <repo> wait: <kind>:<ref> <baseline> <text>`, or a move another session logged since the last beat, `<epoch> <repo> moved: <text>`.'
+fpin "$BS" "BT6b read is for the reply" 'Unlike the session-start Worklog block, the beat'"'"'s read is for the reply: name a peer'"'"'s `moved:` line.'
+fpin "$BS" "BT7 nothing to read"        'Exit status 0 with empty output, or exit status 1 with no error text, means nothing to read: reply `No change.`'
+fpin "$BS" "BT8 cannot read once"       'Any other outcome, error text included: say once that the beat cannot read the worklog, and stay silent about it on later beats.'
+fpin "$BS" "BT9 moved already"          'A `moved:` line already moved: name it, never read its thing again.'
+fpin "$BS" "BT9b skip own lines"        'Skip a `moved:` line this session wrote itself, such as a loop it closed or a wait an earlier beat closed.'
+fpin "$BS" "BT10 slack"                 '- slack: replies in the thread newer than the baseline ts, from someone other than the user.'
+fpin "$BS" "BT10 gh"                    '- gh: `gh pr view <number> --repo <owner>/<repo> --json state,reviewDecision,updatedAt`; a changed state or review decision, or `updatedAt` newer than the baseline.'
+fpin "$BS" "BT10 linear"                '- linear: `updatedAt` newer than the baseline, or a new comment.'
+fpin "$BS" "BT10 gmail"                 '- gmail: a message in the thread newer than the baseline id.'
+fpin "$BS" "BT10 ld"                    '- ld: a flag version other than the baseline.'
+fpin "$BS" "BT10 dd"                    '- dd: a monitor state other than the baseline.'
+fpin "$BS" "BT-moved-untagged"          'A wait that moved: append its `moved:` line first, with the constitution'"'"'s worklog snippet, verb `moved:` and text `<kind>:<ref> <what moved>`. Copy the ref exactly from its `wait:` line, as its own token followed by a space, with no tag after it.'
+if grep -qF '<kind>:<ref> @<tag>' "$BS"; then
+  echo "FAIL: BT-moved-untagged -- the beat skill writes a tagged moved: or wait: text"; fail=1
+fi
+fpin "$BS" "BT11 never held, stays"     'A beat never holds a wait again and never removes itself: it ends with the session.'
+fpin "$BS" "BT12 reply shape"           'Then reply in at most two lines: what moved, naming at most two movements, the ones nearest the day'"'"'s work, and one smallest move. An outward action waits for its usual yes.'
+fpin "$BS" "BT13 fixed line"            'When nothing moved, reply with exactly `No change.` and nothing more: an empty reply gets prompted for one.'
+fpin "$BS" "BT14 invited"               'The reply answers the beat'"'"'s prompt, so it is not an uninvited line.'
+fpin "$BS" "BT15 unreachable"           'A tool that is not reachable keeps its wait open: name it once, then stay silent about it.'
+fpin "$BS" "BT16 no counts"             'Never count, never say how long anything has waited, and never name something that did not move.'
+nbs_l=$(grep -c '' "$BS")
+[ "$nbs_l" -lt 60 ] || { echo "FAIL: BT-size beat skill is $nbs_l lines, want under 60"; fail=1; }
+
 # --- the tablet inbox: the sweep claims, reads, sorts and routes it once
 pin  "$O" "tablet: section"             '^### Tablet inbox$'
 fpin "$O" "tablet: read in the sweep"   'Read the tablet inbox once, after the tick pass (see Tablet inbox).'
@@ -395,6 +441,11 @@ check_empty "C intent (watch)"        -nE  "$PAT_C" "$WS"
 check_empty "E fuel (watch)"          -niE "$PAT_E" "$WS"
 check_empty "F daemon (watch)"        -niE "$PAT_F" "$WS"
 check_empty "G template (watch)"      -nF  "$PAT_T" "$WS"
+check_empty "A private-vocab (beat)" -niE "$PAT_A" "$BS"
+check_empty "C intent (beat)"        -nE  "$PAT_C" "$BS"
+check_empty "E fuel (beat)"          -niE "$PAT_E" "$BS"
+check_empty "F daemon (beat)"        -niE "$PAT_F" "$BS"
+check_empty "G template (beat)"      -nF  "$PAT_T" "$BS"
 
 T=$(mktemp -d) || exit 1
 HOME=$T/home; export HOME

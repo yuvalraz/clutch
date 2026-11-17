@@ -46,6 +46,13 @@ This is the existing tempo mechanism; the heartbeat carries the gear to the
 model next turn, no new state. If the write fails, the declaration still
 governs the live session; only the re-injection is lost.
 
+Then record this session as an ops session, so its turn end asks once a day for the beat (`/clutch:beat`).
+Replace `@<tag>` with the `Session tag:` from the session start; with no `Session tag:` line, skip this. Silent on any failure:
+
+```sh
+T='@<tag>'; F="$HOME/.clutch/watch/${T#@}.beat"; [ "${CLUTCH_BEAT:-}" = off ] || [ ! -d "$HOME/.clutch" ] || [ -e "$F" ] || { mkdir -p "$HOME/.clutch/watch" && printf 'last %s\n' "$(date +%s)" > "$F"; } 2>/dev/null
+```
+
 Hopping between loops is the gait in this gear, not a shape mismatch. The
 dispatch spine's gear-shift row reads a sustained change in the shape of the
 work; the ops rhythm of close, next, close is the shape holding.
@@ -245,6 +252,7 @@ A tool that is not reachable gets one line naming it, and that loop stays open.
 A tick never re-arms a loop, never names one that did not move, and never says how long anything has waited.
 In the sweep's tick pass, moved loops fold into the situation instead of their own lines.
 A session's armed watch does not send a tick: it sends `/clutch:watch @<tag>`, which reads only the waits that tag owns.
+An ops session's beat does not send a tick either: it sends `/clutch:beat @<tag>`, which reads what other sessions moved and the waits no session's tag owns.
 
 ### Delegation
 

@@ -3,8 +3,8 @@
 # thread breadcrumb writer, the worklog writer (~/.clutch/worklog.md) and the
 # recognition bell live in one process, run sequentially, and never race each
 # other on .clutch/ state.
-# Silent by default; any error degrades to nothing. Exit 0 always. The one
-# stdout exception is the watch gate's block line below.
+# Silent by default; any error degrades to nothing. Exit 0 always. The
+# stdout exceptions are the watch and beat gates' block lines below.
 
 INPUT=$(cat 2>/dev/null) || INPUT=""
 PRELUDE=$(dirname "$0")/prelude.sh
@@ -46,6 +46,39 @@ if [ "${CLUTCH_WATCH:-}" != off ]; then
               exit 0
             ;;
         esac
+      fi
+      ;;
+  esac
+fi
+
+# --- beat gate: a session whose tag has an ops record
+# (~/.clutch/watch/<tag8>.beat, written by ops Step 0) and no armed
+# /clutch:beat is blocked with the arming step once a local day. "asked
+# <YYYY-MM-DD>" lands in the record before the block prints, so a lost block
+# is possible and a repeated one is not; an unreadable record (grep rc 2)
+# never blocks. Runs after the watch gate, whose block wins the stop, and
+# outside git too. Never creates the record. Every failure falls through.
+# CLUTCH_BEAT=off skips it. Same linear matches and armed-prompt rule as the
+# watch gate.
+if [ "${CLUTCH_BEAT:-}" != off ]; then
+  case $INPUT in
+    *'"stop_hook_active":true'* | *'"stop_hook_active": true'*) ;;
+    *'"session_crons":'*)
+      if BEAT_TAG=$(clutch_session_tag "$INPUT") &&
+        BEAT_FILE="$HOME/.clutch/watch/${BEAT_TAG#@}.beat" &&
+        [ -f "$BEAT_FILE" ] &&
+        BEAT_DAY=$(date +%Y-%m-%d 2>/dev/null) && [ -n "$BEAT_DAY" ]; then
+        grep -qx "asked $BEAT_DAY" "$BEAT_FILE" 2>/dev/null
+        if [ "$?" = 1 ]; then
+          case $INPUT in
+            *"\"prompt\":\"/clutch:beat $BEAT_TAG\""* | *"\"prompt\": \"/clutch:beat $BEAT_TAG\""*) ;;
+            *)
+              { printf 'asked %s\n' "$BEAT_DAY" >> "$BEAT_FILE"; } 2>/dev/null &&
+                printf '{"decision":"block","reason":"This ops session has no beat. Arm one now with CronCreate, schedule `7 8-20/2 * * *`, recurring, prompt `/clutch:beat %s`, then end the turn. If the user said not to arm a beat, just end the turn."}\n' "$BEAT_TAG" &&
+                exit 0
+              ;;
+          esac
+        fi
       fi
       ;;
   esac
