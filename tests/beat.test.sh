@@ -5,9 +5,10 @@
 # "asked <YYYY-MM-DD>" lands in the record before the block prints. The watch
 # gate keeps priority (B5). Every failure falls through: no block (B6-B10).
 # CLUTCH_BEAT=off skips it (B11). B-scrub pins the brain scrub line.
-# H1-H10 cover clutch_beat_window (the untagged open waits, then the newest
-# 20 moved: lines after the record's last epoch whose field 5 is not the tag;
-# "last <now>" appended to an existing record before printing). R1 runs the
+# H1-H14 cover clutch_beat_window (the untagged open waits, then the newest
+# 20 moved: lines after the record's last epoch and at or before now - 120
+# whose field 5 is not the tag; "last <now - 120>" appended to an existing
+# record before printing; unreadable state is rc 2). R1 runs the
 # beat skill's read line, R2 the ops Step 0 record snippet under sh and
 # zsh -f, R3 the beat skill's moved: text through the constitution snippet.
 # prelude.sh and stop.sh are staged into a scratch tree and run from a scratch
@@ -281,6 +282,11 @@ for v in CLUTCH_BEAT BEAT_SKILL; do
     || { echo "FAIL: B-scrub -- $v missing from brain.test.sh's run_scrubbed unset line"; fail=1; }
 done
 
+# B-readme: the README beat bullet names both switches that turn the beat off.
+awk '/^- An ops session is told at turn end/{f=1} f && /^- / && !/^- An ops/{f=0} f' "$HERE/../README.md" |
+  tr '\n' ' ' | grep -q 'CLUTCH_WATCH=off.*beat' \
+  || { echo "FAIL: B-readme -- the beat bullet does not say CLUTCH_WATCH=off turns the beat off"; fail=1; }
+
 # --- H1-H10: clutch_beat_window. bw <tag>: the helper sourced from the
 # staged prelude in a plain dir; sets OUT, RC and ERR. mkrec <line>...: a
 # record holding exactly those lines.
@@ -305,29 +311,40 @@ bw '@0123abcd'
 is H1 0 "$(wl 500 'proj wait: gh:o/r#1 b1 untagged one')
 $(wl 200 'proj wait: gh:o/r#4 b1 @Dan handle text')"
 
-# H2: moves after last only (not before, not equal, not future), never this
-# tag's field 5, never on: lines; waits first.
+# bwat <now> <tag>: bw with date +%s pinned to <now> by a PATH shim.
+mkdir -p "$T/bin"
+printf '#!/bin/sh\n[ -n "${FAKE_NOW:-}" ] && [ "$*" = "+%%s" ] && { echo "$FAKE_NOW"; exit 0; }\nexec /bin/date "$@"\n' > "$T/bin/date"
+chmod +x "$T/bin/date"
+bwat() {
+  OUT=$(cd "$T/plain" && PATH="$T/bin:$PATH" && FAKE_NOW=$1 && export PATH FAKE_NOW &&
+    . "$T/scripts/prelude.sh" && clutch_beat_window "$2" 2>"$T/err"); RC=$?
+  ERR=$(cat "$T/err")
+}
+
+# H2: moves after last and at or before now - 120 only (not before, not
+# equal, not inside the grace, not future), never this tag's field 5, never
+# on: lines; waits first; last records now - 120.
 seed
-add 500 'proj wait: gh:o/r#9 b1 plain'
-add 400 'proj moved: before'
-add 300 'proj moved: equal'
-add 200 'proj moved: gh:o/r#1 @0123abcd own'
-add 150 'proj moved: gh:o/r#2 @ffffffff other'
-add 100 'proj on: claim'
-add 90 "proj moved: landed 'x'"
+add 900 'proj wait: gh:o/r#9 b1 plain'
+add 700 'proj moved: before'
+add 600 'proj moved: equal'
+add 400 'proj moved: gh:o/r#1 @0123abcd own'
+add 350 'proj moved: gh:o/r#2 @ffffffff other'
+add 300 'proj on: claim'
+add 290 "proj moved: landed 'x'"
+add 60 'proj moved: in grace'
 add -1000 'proj moved: future'
-mkrec "last $((NOW - 300))"
-bw '@0123abcd'
-is H2 0 "$(wl 500 'proj wait: gh:o/r#9 b1 plain')
-$(wl 150 'proj moved: gh:o/r#2 @ffffffff other')
-$(wl 90 "proj moved: landed 'x'")"
+mkrec "last $((NOW - 600))"
+bwat "$NOW" '@0123abcd'
+is H2 0 "$(wl 900 'proj wait: gh:o/r#9 b1 plain')
+$(wl 350 'proj moved: gh:o/r#2 @ffffffff other')
+$(wl 290 "proj moved: landed 'x'")"
 [ "$(lastn)" = 2 ] || { echo "FAIL: H2 -- want 2 last lines: $(cat "$BF")"; fail=1; }
-H2_LAST=$(tail -n 1 "$BF")
-[ "${H2_LAST#last }" -ge "$NOW" ] 2>/dev/null || { echo "FAIL: H2 -- last not advanced to now: $H2_LAST"; fail=1; }
+[ "$(tail -n 1 "$BF")" = "last $((NOW - 120))" ] || { echo "FAIL: H2 -- last is not now - 120: $(tail -n 1 "$BF")"; fail=1; }
 
 # H3: a second read straight after prints the waits only.
 bw '@0123abcd'
-is H3 0 "$(wl 500 'proj wait: gh:o/r#9 b1 plain')"
+is H3 0 "$(wl 900 'proj wait: gh:o/r#9 b1 plain')"
 [ "$(lastn)" = 3 ] || { echo "FAIL: H3 -- want 3 last lines: $(cat "$BF")"; fail=1; }
 
 # H4: no record: waits only, nothing created.
@@ -386,7 +403,7 @@ done
 
 # H9: a moved line ending in one invalid UTF-8 byte hides no later line.
 seed
-printf '%s proj moved: caf\303\n%s proj moved: after\n' "$((NOW - 100))" "$((NOW - 50))" >> "$W"
+printf '%s proj moved: caf\303\n%s proj moved: after\n' "$((NOW - 300))" "$((NOW - 250))" >> "$W"
 mkrec "last $((NOW - 1000))"
 OUT=$(cd "$T/plain" && . "$T/scripts/prelude.sh" && LC_ALL=en_US.UTF-8 && export LC_ALL && clutch_beat_window '@0123abcd' 2>/dev/null); RC=$?
 [ "$RC" = 0 ] && printf '%s\n' "$OUT" | grep -qF ' proj moved: after' \
@@ -397,16 +414,90 @@ seed
 i=1
 H10_WANT=""
 while [ "$i" -le 25 ]; do
-  add $((300 - i * 10)) "proj moved: m$i"
+  add $((500 - i * 10)) "proj moved: m$i"
   if [ "$i" -gt 5 ]; then
     H10_WANT="$H10_WANT${H10_WANT:+
-}$(wl $((300 - i * 10)) "proj moved: m$i")"
+}$(wl $((500 - i * 10)) "proj moved: m$i")"
   fi
   i=$((i + 1))
 done
 mkrec "last $((NOW - 1000))"
 bw '@0123abcd'
 is H10 0 "$H10_WANT"
+
+# H11: a line stamped before a read but appended after it (stop.sh stamps
+# then appends), and a same-second line, land in the next beat past the
+# grace, exactly once; no beat repeats a move.
+seed
+add 900 'proj wait: gh:o/r#9 b1 plain'
+add 500 'proj moved: early'
+mkrec "last $((NOW - 1000))"
+H11_W=$(wl 900 'proj wait: gh:o/r#9 b1 plain')
+bwat "$NOW" '@0123abcd'
+is "H11 first" 0 "$H11_W
+$(wl 500 'proj moved: early')"
+add 30 'proj moved: late append'
+add 0 'proj moved: same second'
+bwat "$NOW" '@0123abcd'
+is "H11 inside grace" 0 "$H11_W"
+bwat "$((NOW + 200))" '@0123abcd'
+is "H11 next" 0 "$H11_W
+$(wl 30 'proj moved: late append')
+$(wl 0 'proj moved: same second')"
+bwat "$((NOW + 400))" '@0123abcd'
+is "H11 after" 0 "$H11_W"
+
+# H12: a record armed just now (last <now>) is never moved back by the grace.
+seed
+add 10 'proj moved: before arming'
+mkrec "last $NOW"
+bwat "$NOW" '@0123abcd'
+is "H12 now" 0 ''
+[ "$(tail -n 1 "$BF")" = "last $NOW" ] || { echo "FAIL: H12 -- last moved back: $(cat "$BF")"; fail=1; }
+bwat "$((NOW + 200))" '@0123abcd'
+is "H12 next" 0 ''
+
+# H13: state that cannot be read is rc 2, not "no worklog": an empty HOME,
+# a dangling worklog symlink, an unsearchable ~/.clutch, a record that
+# exists but cannot be read (nothing appended).
+OUT=$(cd "$T/plain" && HOME='' && . "$T/scripts/prelude.sh" && clutch_beat_window '@0123abcd' 2>/dev/null); RC=$?
+is "H13 empty HOME" 2 ''
+rm -rf "$HOME/.clutch"
+mkdir -p "$HOME/.clutch"
+ln -s "$T/nowhere" "$W"
+bw '@0123abcd'
+is "H13 dangling" 2 ''
+if [ "$(id -u)" = 0 ]; then
+  echo "SKIP: H13 modes (root reads through chmod)"
+else
+  seed
+  chmod 000 "$HOME/.clutch"
+  bw '@0123abcd'
+  chmod 755 "$HOME/.clutch"
+  is "H13 unsearchable" 2 ''
+  seed
+  add 500 'proj wait: gh:o/r#9 b1 plain'
+  add 300 'proj moved: peer'
+  mkrec "last $((NOW - 1000))"
+  chmod 222 "$BF"
+  bw '@0123abcd'
+  chmod 644 "$BF"
+  is "H13 unreadable record" 2 ''
+  [ "$(cat "$BF")" = "last $((NOW - 1000))" ] || { echo "FAIL: H13 -- record changed: $(cat "$BF")"; fail=1; }
+fi
+
+# H14: the worklog tail read failing is rc 2, not "no moves". A tail shim
+# fails the second tail -n 2000 (the first is clutch_open_loops').
+printf '#!/bin/sh\nif [ "$1 $2" = "-n 2000" ]; then n=$(cat "%s/tailn" 2>/dev/null || echo 0); n=$((n + 1)); echo $n > "%s/tailn"; [ $n -ge 2 ] && exit 1; fi\nexec /usr/bin/tail "$@"\n' "$T" "$T" > "$T/bin/tail"
+chmod +x "$T/bin/tail"
+seed
+add 500 'proj wait: gh:o/r#9 b1 plain'
+add 300 'proj moved: peer'
+mkrec "last $((NOW - 1000))"
+rm -f "$T/tailn"
+OUT=$(cd "$T/plain" && PATH="$T/bin:$PATH" && export PATH && . "$T/scripts/prelude.sh" && clutch_beat_window '@0123abcd' 2>/dev/null); RC=$?
+rm -f "$T/bin/tail"
+is H14 2 ''
 
 # --- R1: the beat skill's one read line, the plugin root replaced by the
 # staged tree and @<tag> filled, prints what the helper prints and passes

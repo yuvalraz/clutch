@@ -90,7 +90,8 @@ only at one of those moments.
 - An ops session is told at turn end, once a day, to arm a beat: `/clutch:beat @<tag>`
   every two hours from 08:07 to 20:07 while the session is open. It reads the moves
   other sessions logged since the last beat and the waits no session's tag owns, and
-  says `No change.` unless something moved. `CLUTCH_BEAT=off` turns off the ask.
+  says `No change.` unless something moved. `CLUTCH_BEAT=off` turns off the ask;
+  `CLUTCH_WATCH=off` also turns off the beat, since the session has no tag.
 - The next session start shows them in its `Worklog:` block.
   Claims age out after 4 h and moves after 24 h.
   At most eight lines show, and a burst of moves never pushes a claim out.

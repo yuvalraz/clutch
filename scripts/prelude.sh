@@ -212,12 +212,14 @@ clutch_owned_loops() {
 # The ops beat's read for tag $1 (record ~/.clutch/watch/<tag8>.beat): the
 # open waits no session's tag owns, raw, oldest first; then the newest 20
 # moved: lines whose epoch is after the record's last "last <epoch>" line and
-# at or before now, and whose fifth field is not the tag, oldest first. With
-# no record, or none with a last line, there are no moves. "last <now>" is
-# appended to an existing record before anything prints; the record and
-# ~/.clutch/watch are never created. Returns 2 on a malformed tag, a date
-# failure, an unreadable worklog or a failed append (nothing printed), and 1
-# with no worklog (nothing recorded).
+# at or before now - 120 s (a grace for lines appended after their stamp),
+# and whose fifth field is not the tag, oldest first. With no record, or none
+# with a last line, there are no moves. "last <now - 120>" (never below the
+# previous last) is appended to an existing record before anything prints;
+# the record and ~/.clutch/watch are never created. Returns 2 on a malformed
+# tag, a date failure, an unreadable worklog or record, a ~/.clutch or HOME
+# that cannot be searched, or a failed append (nothing printed), and 1 only
+# with no worklog proven absent (nothing recorded).
 clutch_beat_window() {
   # Spelled-out class: a range like A-Z matches é under a UTF-8 /bin/sh.
   case $1 in @????????) ;; *) return 2 ;; esac
@@ -226,16 +228,29 @@ clutch_beat_window() {
   case $CBW_NOW in '' | *[!0-9]*) return 2 ;; esac
   CBW_W=$(clutch_open_loops)
   CBW_RC=$?
-  [ "$CBW_RC" = 1 ] && return 1
+  if [ "$CBW_RC" = 1 ]; then
+    [ -n "$HOME" ] && [ ! -L "$CLUTCH_WORKLOG" ] || return 2
+    if [ -e "$HOME/.clutch" ] || [ -L "$HOME/.clutch" ]; then
+      [ -d "$HOME/.clutch" ] && [ -x "$HOME/.clutch" ] || return 2
+    else
+      [ -d "$HOME" ] && [ -x "$HOME" ] || return 2
+    fi
+    return 1
+  fi
   [ "$CBW_RC" = 0 ] || return 2
   CBW_F="$HOME/.clutch/watch/${1#@}.beat"
+  [ ! -f "$CBW_F" ] || [ -r "$CBW_F" ] || return 2
+  # shortcut: a 120 s grace, so a moved: line appended up to 120 s after its stamp is never lost; widen it if a writer lags more
+  CBW_E=$((CBW_NOW - 120))
   CBW_S=$(LC_ALL=C sed -n 's/^last \([0-9][0-9]*\)$/\1/p' "$CBW_F" 2>/dev/null | tail -n 1)
-  [ -n "$CBW_S" ] || CBW_S=$CBW_NOW
+  [ -n "$CBW_S" ] || CBW_S=$CBW_E
+  [ "$CBW_S" -le "$CBW_E" ] || CBW_E=$CBW_S
+  CBW_T=$(tail -n 2000 "$CLUTCH_WORKLOG" 2>/dev/null) || return 2
   # shortcut: newest 20 moves only; upgrade if a beat gap logs more that matter
-  CBW_M=$(tail -n 2000 "$CLUTCH_WORKLOG" 2>/dev/null | LC_ALL=C awk -v s="$CBW_S" -v n="$CBW_NOW" -v t="$1" \
+  CBW_M=$(printf '%s\n' "$CBW_T" | LC_ALL=C awk -v s="$CBW_S" -v n="$CBW_E" -v t="$1" \
     '$1 ~ /^[0-9]+$/ && $3 == "moved:" && $1 + 0 > s + 0 && $1 + 0 <= n + 0 && $5 != t' | tail -n 20) || return 2
   if [ -f "$CBW_F" ]; then
-    { printf 'last %s\n' "$CBW_NOW" >> "$CBW_F"; } 2>/dev/null || return 2
+    { printf 'last %s\n' "$CBW_E" >> "$CBW_F"; } 2>/dev/null || return 2
   fi
   [ -z "$CBW_W" ] || printf '%s\n' "$CBW_W" |
     LC_ALL=C awk '$6 !~ /^@[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]$/'
