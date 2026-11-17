@@ -60,8 +60,10 @@ PRELUDE=$(dirname "$0")/prelude.sh
 . "$PRELUDE" || exit 0
 [ "$CLUTCH_GIT" = 1 ] || exit 0
 clutch_ensure_dir || exit 0
+# This session's own state folder when it has one, else the folder-wide files.
+clutch_session_paths "$IN"
 
-STATE="$CLUTCH_DIR/session-state"
+STATE="$CLUTCH_SDIR/session-state"
 CMDHASH=$(printf '%s' "$CMD" | cksum 2>/dev/null | cut -d' ' -f1) || exit 0
 [ -n "$CMDHASH" ] || exit 0
 

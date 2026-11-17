@@ -8,6 +8,7 @@
 # clutch_session_tag, clutch_owned_loops, clutch_ops_due,
 # clutch_guess_intent.
 # Also defines clutch_beat_window.
+# Also defines clutch_session_paths (CLUTCH_TAG8, CLUTCH_SDIR, CLUTCH_SREL).
 
 CLUTCH_GIT=0
 CLUTCH_STATE=0
@@ -325,4 +326,29 @@ clutch_guess_intent() {
   CGI_G=$(printf '%s\n' "$CGI_T" | CGI_K="$CGI_K" CGI_R="$CLUTCH_FOCUS_RE" LC_ALL=C awk '$1 == ENVIRON["CGI_K"] && NF == 2 && $2 ~ ENVIRON["CGI_R"] { g = $2 } END { print g }' 2>/dev/null)
   [ -n "$CGI_G" ] || return 1
   printf '%s\n' "$CGI_G"
+}
+
+# This session's state folder from hook input JSON ($1). Sets CLUTCH_TAG8
+# (the session tag without @; empty under CLUTCH_PER_SESSION=off or
+# CLUTCH_WATCH=off, or with no tag), CLUTCH_SDIR ($CLUTCH_DIR/s/<tag8> when
+# it is a directory and neither it nor $CLUTCH_DIR/s is a symlink, else
+# $CLUTCH_DIR) and CLUTCH_SREL (.clutch/s/<tag8>/ or .clutch/). Returns 0
+# when CLUTCH_SDIR is the session's own folder, else 1. Never creates
+# anything. The tag is read from the line holding the first "session_id"
+# key, cut there by awk, so a long field before the key stays linear.
+clutch_session_paths() {
+  CLUTCH_TAG8=""
+  CLUTCH_SDIR=$CLUTCH_DIR
+  CLUTCH_SREL=.clutch/
+  [ "${CLUTCH_PER_SESSION:-}" = off ] && return 1
+  [ "${CLUTCH_WATCH:-}" = off ] && return 1
+  case $1 in *'"session_id"'*) ;; *) return 1 ;; esac
+  CSP_T=$(printf '%s\n' "$1" | LC_ALL=C awk '{ i = index($0, "\"session_id\""); if (i) { print substr($0, i); exit } }' 2>/dev/null)
+  CSP_T=$(clutch_session_tag "$CSP_T") || return 1
+  CLUTCH_TAG8=${CSP_T#@}
+  [ -n "$CLUTCH_DIR" ] && [ ! -L "$CLUTCH_DIR/s" ] && [ ! -L "$CLUTCH_DIR/s/$CLUTCH_TAG8" ] &&
+    [ -d "$CLUTCH_DIR/s/$CLUTCH_TAG8" ] || return 1
+  CLUTCH_SDIR="$CLUTCH_DIR/s/$CLUTCH_TAG8"
+  CLUTCH_SREL=".clutch/s/$CLUTCH_TAG8/"
+  return 0
 }

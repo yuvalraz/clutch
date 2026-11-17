@@ -233,19 +233,19 @@ git -C "$T/repo" -c user.email=t@t -c user.name=t commit -q --allow-empty -m see
 mkdir -p "$T/repo/.clutch"
 
 printf 'espresso\n' > "$T/repo/.clutch/tempo"
-OUT=$(cd "$T/repo" && sh "$HB"); RC=$?
+OUT=$(cd "$T/repo" && sh "$HB" </dev/null); RC=$?
 [ "$RC" = 0 ] || { echo "FAIL: heartbeat exited $RC with espresso"; exit 1; }
 printf '%s\n' "$OUT" | grep -q 'tempo gear: espresso (tight convergence, one divergent pulse)' \
   || { echo "FAIL: heartbeat missing the espresso tempo line: $OUT"; exit 1; }
 
 # --- behavior (guard, OD-1 B): a declined line never counts as an emission.
 printf 'start 100\nbase -\nemit model 101\n' > "$T/repo/.clutch/session-state"
-OUT=$(cd "$T/repo" && sh "$HB"); RC=$?
+OUT=$(cd "$T/repo" && sh "$HB" </dev/null); RC=$?
 [ "$RC" = 0 ] || { echo "FAIL: heartbeat exited $RC with one emission"; exit 1; }
 printf '%s\n' "$OUT" | grep -qF 'clutch-budget: 1/2 spent' \
   || { echo "FAIL: heartbeat budget wrong before a declined line: $OUT"; exit 1; }
 printf 'declined 889814453\n' >> "$T/repo/.clutch/session-state"
-OUT=$(cd "$T/repo" && sh "$HB"); RC=$?
+OUT=$(cd "$T/repo" && sh "$HB" </dev/null); RC=$?
 [ "$RC" = 0 ] || { echo "FAIL: heartbeat exited $RC with a declined line"; exit 1; }
 printf '%s\n' "$OUT" | grep -qF 'clutch-budget: 1/2 spent' \
   || { echo "FAIL: the declined line was counted as an emission: $OUT"; exit 1; }

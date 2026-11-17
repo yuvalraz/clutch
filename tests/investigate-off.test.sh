@@ -11,7 +11,9 @@
 # five-way heartbeat differ from base, and CLUTCH_INVESTIGATE=on equals
 # unset. Hermetic: scratch HOME, ambient CLUTCH_* unset. Silent apart from PASS.
 set -u
-unset CLUTCH_PLAIN CLUTCH_STATE CLUTCH_WATCH CLUTCH_GUESS CLUTCH_INVESTIGATE CLAUDE_PLUGIN_ROOT
+unset CLUTCH_PLAIN CLUTCH_STATE CLUTCH_WATCH CLUTCH_GUESS CLUTCH_INVESTIGATE CLUTCH_PER_SESSION CLAUDE_PLUGIN_ROOT
+# 5f709b5 has no per-session state; that switch is proven in per-session-off.test.sh.
+CLUTCH_PER_SESSION=off; export CLUTCH_PER_SESSION
 
 HERE=$(cd "$(dirname "$0")" && pwd)
 ROOT=$(cd "$HERE/.." && pwd)
