@@ -144,12 +144,12 @@ run G6 "$T/repo" startup
 [ "$(butlast "$OUT")" = "$(butlast "$X0")" ] || { echo "FAIL: G6 -- output differs above the ask line"; fail=1; }
 
 # --- G7: the last valid line for the key wins; invalid lines are skipped
-store 'repo build\nrepo review\nrepo bogus\nrepo ops extra\nrepo investigate extra\nrepo Investigate\nother ideate\n'
+store 'repo build\nrepo review\nrepo rebuild\nrepo investigated\nrepo bogus\nrepo ops extra\nrepo investigate extra\nrepo Investigate\nother ideate\n'
 run G7 "$T/repo" startup
 [ "$(last "$OUT")" = "$(guessed review)" ] || { echo "FAIL: G7 -- want the review guess, got: $(last "$OUT")"; fail=1; }
 
-# --- G8: only invalid lines (bogus word, 3 fields, CRLF)
-store 'repo bogus\nrepo build extra\nrepo ops\r\nrepo investigate extra\nrepo Investigate\n'
+# --- G8: only invalid lines (bogus word, unanchored near-misses, 3 fields, CRLF)
+store 'repo bogus\nrepo rebuild\nrepo investigated\nrepo build extra\nrepo ops\r\nrepo investigate extra\nrepo Investigate\n'
 run G8 "$T/repo" startup
 same G8 "$OUT" "$X0"
 

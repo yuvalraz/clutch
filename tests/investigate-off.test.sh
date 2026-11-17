@@ -127,7 +127,7 @@ fx_g() {
     printf 'start 1700000000\nbase -\n' > "$1/w/.clutch/session-state"
   fi
 }
-for STORE in "" 'w build\n' 'w investigate\n' 'w build\nw investigate\n' 'w investigate\nw build\n'; do
+for STORE in "" 'w build\n' 'w investigate\n' 'w rebuild\nw investigated\n' 'w build\nw investigate\n' 'w investigate\nw build\n'; do
   for TEMPO in "" craft; do
     L="store[$STORE]-${TEMPO:-none}"
     for s in startup resume clear compact; do

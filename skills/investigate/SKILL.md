@@ -44,7 +44,7 @@ in, and where it lives.
 
 Read the pointer and what it points at: the message, the thread, the diff,
 the log, the code the claim is about. Read-only until a yes: no edits, no
-posts, no writes anywhere outside the marker above.
+posts, no writes outside clutch's own `.clutch` state.
 
 Work one hypothesis at a time: name it, read what would confirm or break it,
 then keep it or drop it before the next. If the pointer is unreachable (a
@@ -65,9 +65,8 @@ One of three:
 - **A reply.** If the pointer wants an answer, draft it, show it, send on a yes.
   Once it is sent, log a `wait:` line when a reply back is expected (see
   "Worklog" in the constitution).
-- **A fix.** If the findings name a change, name it and hand off with
-  `/clutch:intent build` in this same session; the build starts from the
-  findings.
+- **A fix.** If the findings name a change, name it; on a yes, run `/clutch:intent build` in this same session;
+  the build starts from the findings.
 - **A bank.** If it can wait, bank it with `/clutch:fomo` in one line.
 
 ## Session guardrails
@@ -75,8 +74,8 @@ One of three:
 For the rest of the session these rules are HARD and override default
 behavior:
 
-- **Read-only until a yes.** No edit, post, reply or write before the user
-  says yes. Reading is free.
+- **Read-only until a yes.** No edit, post, reply or write outside clutch's own `.clutch` state
+  before the user says yes. Reading is free, and banking a tangent with `/clutch:fomo` is free.
 - **One pointer at a time.** A second pointer is banked with `/clutch:fomo`
   until the first one closes.
 - **Evidence before claims.** Every finding names what it rests on, or says
@@ -92,14 +91,14 @@ behavior:
 | Skill | In investigate mode |
 |-------|---------------------|
 | `/clutch:fomo <content>` | a tangent or a second pointer, banked in one line |
-| `/clutch:intent build` | findings that name a fix: build in this session |
+| `/clutch:intent build` | findings that name a fix: build in this session, on a yes |
 | `/clutch:triage` | a pointer that keeps not closing: wall or inattention |
 | `/clutch:sprint <goal>` | a fixed 20 minutes on one pointer |
 
 ## What this skill does NOT do
 
 - Fire on its own, or watch anything in the background
-- Edit, post, reply or write anything without a yes
+- Edit, post, reply or write outside clutch's own `.clutch` state without a yes
 - Open a second pointer before the first closes
 - State a finding as verified without its evidence
 - Count open, waiting, or overdue anything

@@ -11,6 +11,7 @@
 # from passing vacuously. Overrides: INVESTIGATE_SKILL, INTENT_SKILL.
 # Hermetic: scratch HOME. Silent apart from PASS.
 set -u
+unset CLUTCH_PLAIN
 
 HERE=$(cd "$(dirname "$0")" && pwd)
 ROOT=$(cd "$HERE/.." && pwd)
@@ -53,8 +54,17 @@ for p in \
   '/clutch:intent build' \
   '/clutch:fomo' \
   'One pointer at a time' \
+  'on a yes, run `/clutch:intent build` in this same session' \
+  "outside clutch's own \`.clutch\` state" \
+  'banking a tangent with `/clutch:fomo` is free' \
   'No counts, no overdue framing'; do
   fpin "$V" "body" "$p"
+done
+
+# The guardrail is scoped to work outside clutch's own state, and the build
+# handoff waits for a yes (negative pins on the pre-fix wording).
+for p in 'no writes anywhere outside the marker above' 'and hand off with' 'reply or write anything without a yes'; do
+  if grep -qF -- "$p" "$V"; then echo "FAIL: stale guardrail wording: $p"; fail=1; fi
 done
 
 # The handoff path: /clutch:intent investigate must be able to invoke the
