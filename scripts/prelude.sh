@@ -1,13 +1,15 @@
 # Shared prelude for clutch hook scripts. Sourced, not executed.
 # POSIX sh only. Every failure degrades to "do nothing".
 #
-# Sets: CLUTCH_GIT (1 inside a git work tree, else 0), ROOT, CLUTCH_DIR,
+# Sets: CLUTCH_GIT (1 inside a git work tree, else 0), CLUTCH_STATE (1 in a
+# git work tree or an active plain clutch folder, else 0), ROOT, CLUTCH_DIR,
 # EXCLUDE_FILE, CLUTCH_WORKLOG. Defines clutch_ensure_dir,
 # clutch_last_authored, clutch_worklog_window, clutch_open_loops,
 # clutch_session_tag, clutch_owned_loops, clutch_ops_due,
 # clutch_guess_intent.
 
 CLUTCH_GIT=0
+CLUTCH_STATE=0
 ROOT=""
 CLUTCH_DIR=""
 EXCLUDE_FILE=""
@@ -30,13 +32,34 @@ if command -v git >/dev/null 2>&1; then
   fi
 fi
 
+# A plain clutch folder: outside git, the physical cwd is active once its
+# .clutch holds tempo (a declaration) or a session-state whose first line
+# starts with "start " (only the anchor writes that). A model-written
+# "emit model" line must not activate a pool-only .clutch. Never $HOME (its
+# .clutch is the brain; -ef also refuses a symlink to it) or /.
+# CLUTCH_PLAIN=off turns this off.
+if [ "$CLUTCH_GIT" = 1 ]; then
+  CLUTCH_STATE=1
+elif [ "${CLUTCH_PLAIN:-}" != off ]; then
+  CP_D=$(pwd -P 2>/dev/null) || CP_D=""
+  if [ -n "$CP_D" ] && [ "$CP_D" != / ] && [ ! "$CP_D" -ef "$HOME" ]; then
+    if [ -f "$CP_D/.clutch/tempo" ]; then
+      CLUTCH_STATE=1
+    elif [ -f "$CP_D/.clutch/session-state" ]; then
+      CP_L=$(head -c 6 "$CP_D/.clutch/session-state" 2>/dev/null) || CP_L=""
+      [ "$CP_L" = "start " ] && CLUTCH_STATE=1
+    fi
+    [ "$CLUTCH_STATE" = 1 ] && CLUTCH_DIR="$CP_D/.clutch"
+  fi
+fi
+
 # The cross-session worklog is global, so it is set inside a repo or not.
 CLUTCH_WORKLOG="$HOME/.clutch/worklog.md"
 
 # Create .clutch/ on first write and keep it out of git status via the
 # repo-local exclude file. Fail-open: any error returns nonzero, caller exits 0.
 clutch_ensure_dir() {
-  [ "$CLUTCH_GIT" = 1 ] || return 1
+  [ "$CLUTCH_STATE" = 1 ] || return 1
   if [ ! -d "$CLUTCH_DIR" ]; then
     mkdir -p "$CLUTCH_DIR" 2>/dev/null || return 1
   fi
@@ -58,6 +81,7 @@ clutch_ensure_dir() {
 # user.name. Walk is bounded to the 50 most recent commits.
 # Prints nothing if there is no author identity or no authored commit.
 clutch_last_authored() {
+  [ "$CLUTCH_GIT" = 1 ] || return 1
   FMT="$1"
   AE=$(git config user.email 2>/dev/null) || AE=""
   AN=$(git config user.name 2>/dev/null) || AN=""

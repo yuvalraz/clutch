@@ -11,7 +11,7 @@
 PRELUDE=$(dirname "$0")/prelude.sh
 [ -f "$PRELUDE" ] || exit 0
 . "$PRELUDE" || exit 0
-[ "$CLUTCH_GIT" = 1 ] || exit 0
+[ "$CLUTCH_STATE" = 1 ] || exit 0
 
 # Emission budget: count of recorded uninvited lines this session (sprint,
 # landing, and safe-landing all record as '^emit '). No file means zero.

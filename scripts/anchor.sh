@@ -27,8 +27,8 @@ guess_ask() {
   GUESS=$(clutch_guess_intent 2>/dev/null) || return 1
   printf 'Intent for this session: looks like %s again; say go, or pick build, ideate, ops, or review. /clutch:intent sets the frame.\n' "$GUESS"
 }
-# Outside git there is no tempo, so a new session (startup or clear) has no gear: the intent ask rides it, guessed when it can be.
-if [ "$CLUTCH_GIT" != 1 ]; then
+# Outside git and outside an active plain clutch folder there is no tempo, so a new session (startup or clear) has no gear: the intent ask rides it, guessed when it can be.
+if [ "$CLUTCH_STATE" != 1 ]; then
   case "$INPUT" in
     *'"source":"startup"'* | *'"source": "startup"'* | *'"source":"clear"'* | *'"source": "clear"'*)
       guess_ask || printf 'Intent for this session: build, ideate, ops, or review? /clutch:intent sets the frame.\n' ;;
@@ -81,27 +81,30 @@ if [ "$FRESH" = 1 ]; then
   fi
 fi
 
-echo ""
-# The breadcrumb's last field is the most-recently-modified path (written by
-# stop.sh). When present it turns the generic resume line into a specific one.
-RECENT_PATH=""
-if [ -f "$CLUTCH_DIR/breadcrumb" ]; then
-  BC=$(cat "$CLUTCH_DIR/breadcrumb" 2>/dev/null)
-  [ -n "$BC" ] && printf 'Thread: %s\n' "$BC"
-  case "$BC" in
-    *"most recent: "*) RECENT_PATH=${BC##*most recent: } ;;
-  esac
-fi
-SUBJECT=$(clutch_last_authored %s) || SUBJECT=""
-[ -n "$SUBJECT" ] && printf "Last landed: '%s'\n" "$SUBJECT"
-if [ -s "$CLUTCH_DIR/captures.md" ]; then
-  NCAP=$(grep -c . "$CLUTCH_DIR/captures.md" 2>/dev/null) || NCAP=0
-  [ "$NCAP" -gt 0 ] 2>/dev/null && printf 'Captures held: %s.\n' "$NCAP"
-fi
-if [ -n "$RECENT_PATH" ]; then
-  printf 'Smallest move to resume: finish or bank the change in %s.\n' "$RECENT_PATH"
-else
-  printf 'Smallest legal move: one commit.\n'
+# Git-derived lines; a plain clutch folder has no commits to name.
+if [ "$CLUTCH_GIT" = 1 ]; then
+  echo ""
+  # The breadcrumb's last field is the most-recently-modified path (written by
+  # stop.sh). When present it turns the generic resume line into a specific one.
+  RECENT_PATH=""
+  if [ -f "$CLUTCH_DIR/breadcrumb" ]; then
+    BC=$(cat "$CLUTCH_DIR/breadcrumb" 2>/dev/null)
+    [ -n "$BC" ] && printf 'Thread: %s\n' "$BC"
+    case "$BC" in
+      *"most recent: "*) RECENT_PATH=${BC##*most recent: } ;;
+    esac
+  fi
+  SUBJECT=$(clutch_last_authored %s) || SUBJECT=""
+  [ -n "$SUBJECT" ] && printf "Last landed: '%s'\n" "$SUBJECT"
+  if [ -s "$CLUTCH_DIR/captures.md" ]; then
+    NCAP=$(grep -c . "$CLUTCH_DIR/captures.md" 2>/dev/null) || NCAP=0
+    [ "$NCAP" -gt 0 ] 2>/dev/null && printf 'Captures held: %s.\n' "$NCAP"
+  fi
+  if [ -n "$RECENT_PATH" ]; then
+    printf 'Smallest move to resume: finish or bank the change in %s.\n' "$RECENT_PATH"
+  else
+    printf 'Smallest legal move: one commit.\n'
+  fi
 fi
 
 # Intent ask: one final line, only at a true session boundary (the same
