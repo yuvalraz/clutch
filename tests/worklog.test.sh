@@ -76,8 +76,8 @@ anchor() {
   [ "$rc" = 0 ] || { echo "FAIL: $1 -- anchor exited $rc"; fail=1; }
 }
 
-# block: the lines after the Worklog: header (outside git the block is last).
-block() { printf '%s\n' "$OUT" | awk 'f { print } $0 == "Worklog:" { f = 1 }'; }
+# block: the lines after the Worklog: header, up to the next blank, Session tag or intent line.
+block() { printf '%s\n' "$OUT" | awk 'f && ($0 == "" || /^Session tag: / || /^Intent for this session: /) { exit } f { print } $0 == "Worklog:" { f = 1 }'; }
 
 # has <label> <line>: an exact output line must be present.
 has() {
