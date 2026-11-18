@@ -13,7 +13,7 @@
 # Overrides: REVIEW_SKILL, RITUALS_SKILL, TEMPO_SKILL, HB_FILE, INTENT_SKILL,
 # GLOSSARY_FILE, README_FILE, ANCHOR_SH.
 set -u
-unset CLUTCH_INVESTIGATE
+unset CLUTCH_INVESTIGATE CLUTCH_BEAT CLUTCH_WATCH CLUTCH_PER_SESSION CLUTCH_PLAIN
 
 HERE=$(cd "$(dirname "$0")" && pwd)
 RV=${REVIEW_SKILL:-$HERE/../skills/review/SKILL.md}
@@ -230,6 +230,10 @@ done
 # real stop.sh: it asks before and is quiet after; a peer's record stays.
 grep -qF 'If this session was an ops session, it is not one now: remove its record, so its turn end stops asking for the beat and the sweep.' "$RV" \
   || { echo "FAIL: review drops ops record -- the prose is gone"; fail=1; }
+grep -qF 'Then cancel the recurring tasks in this session'"'"'s own task list whose prompt is exactly `/clutch:beat @<tag>` or `/clutch:ops re-sweep armed`, silently, and only those.' "$RV" \
+  || { echo "FAIL: review drops ops record -- the armed beat and sweep are not cancelled"; fail=1; }
+grep -qF 'Replace `@<tag>` with the latest `Session tag:` line; with no `Session tag:` line, skip this.' "$RV" \
+  || { echo "FAIL: review drops ops record -- a fork must take the latest Session tag line"; fail=1; }
 nrb=$(awk '/^```sh/{n++; f=1; b[n] = ""; next} /^```/{f=0} f{b[n] = b[n] $0 "\n"}
   END {k = 0; for (i = 1; i <= n; i++) if (index(b[i], ".beat")) {k++; s = b[i]}
        printf "%s", s > out; print k}' out="$T/rv-raw.sh" "$RV")
@@ -252,7 +256,8 @@ else
     OUT=$(cd "$T/plain" && $run "$T/rv.sh" 2>&1)
     [ -z "$OUT" ] && [ ! -e "$HOME/.clutch/watch/0123abcd.beat" ] && [ -f "$HOME/.clutch/watch/89abcdef.beat" ] \
       || { echo "FAIL: review drops ops record ($sh) -- out [$OUT], watch [$(ls "$HOME/.clutch/watch" 2>/dev/null)]"; fail=1; }
-    [ -z "$(stop_out)" ] || { echo "FAIL: review drops ops record ($sh) -- the turn end still asks: $(stop_out)"; fail=1; }
+    SO=$(stop_out)
+    [ -z "$SO" ] || { echo "FAIL: review drops ops record ($sh) -- the turn end still asks: $SO"; fail=1; }
     # No ~/.clutch, or the tag left unfilled: silent, nothing created or removed.
     rm -rf "$HOME/.clutch"
     OUT=$(cd "$T/plain" && $run "$T/rv.sh" 2>&1)
@@ -262,6 +267,27 @@ else
     OUT=$(cd "$T/plain" && $run "$T/rv-raw.sh" 2>&1)
     [ -z "$OUT" ] && [ -f "$HOME/.clutch/watch/89abcdef.beat" ] || { echo "FAIL: review drops ops record ($sh) -- unfilled tag: out [$OUT]"; fail=1; }
     rm -rf "$HOME/.clutch"
+    # The case guard: an empty, dot or slash tag removes nothing outside the
+    # session's own record. A mutant without the guard must go red.
+    sed 's/case \$T in .* \*) \(.*\) ;; esac$/\1/' "$T/rv-raw.sh" > "$T/rv-mut.sh"
+    cmp -s "$T/rv-raw.sh" "$T/rv-mut.sh" && { echo "FAIL: review drops ops record ($sh) -- guard mutant did not change the snippet"; fail=1; }
+    for v in snip mut; do
+      [ "$v" = snip ] && src="$T/rv-raw.sh" || src="$T/rv-mut.sh"
+      lost=
+      for tg in '@' '@../x' '@a/b'; do
+        mkdir -p "$HOME/.clutch/watch/a"
+        for s in "$HOME/.clutch/x.beat" "$HOME/.clutch/watch/.beat" "$HOME/.clutch/watch/a/b.beat"; do printf 'last 1\n' > "$s"; done
+        sed "s|@<tag>|$tg|" "$src" > "$T/rv-g.sh"
+        (cd "$T/plain" && $run "$T/rv-g.sh" >/dev/null 2>&1)
+        for s in "$HOME/.clutch/x.beat" "$HOME/.clutch/watch/.beat" "$HOME/.clutch/watch/a/b.beat"; do [ -f "$s" ] || lost="$lost $tg:$s"; done
+      done
+      rm -rf "$HOME/.clutch"
+      if [ "$v" = snip ]; then
+        [ -z "$lost" ] || { echo "FAIL: review drops ops record ($sh) -- the guard let a bad tag remove:$lost"; fail=1; }
+      else
+        [ -n "$lost" ] || { echo "FAIL: review drops ops record ($sh) -- the guard check is vacuous: the unguarded mutant removed nothing"; fail=1; }
+      fi
+    done
   done
 fi
 

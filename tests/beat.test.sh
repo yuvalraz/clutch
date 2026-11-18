@@ -418,8 +418,8 @@ done
 
 # B-readme: the README beat bullet names both switches that turn the beat off.
 awk '/^- An ops session is told at turn end/{f=1} f && /^- / && !/^- An ops/{f=0} f' "$HERE/../README.md" |
-  tr '\n' ' ' | grep -q 'CLUTCH_WATCH=off.*beat' \
-  || { echo "FAIL: B-readme -- the beat bullet does not say CLUTCH_WATCH=off turns the beat off"; fail=1; }
+  tr -s '[:space:]' ' ' | grep -q 'CLUTCH_WATCH=off. also turns off both the beat and sweep asks\.' \
+  || { echo "FAIL: B-readme -- the beat bullet does not say CLUTCH_WATCH=off turns off both the beat and sweep asks"; fail=1; }
 
 # B-readme-sweep: the README beat bullet names the armed sweep, its times and the switch.
 awk '/^- An ops session is told at turn end/{f=1} f && /^- / && !/^- An ops/{f=0} f' "$HERE/../README.md" |
