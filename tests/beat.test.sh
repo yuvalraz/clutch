@@ -86,8 +86,9 @@ mkrepo() {
 SF=$T/sfix
 mkrepo "$SF" || exit 1
 
-BLOCK='{"decision":"block","reason":"This ops session has no beat. Arm one now with CronCreate, schedule `7 8-20/2 * * *`, recurring, prompt `/clutch:beat @0123abcd`, then end the turn. If the user said not to arm a beat, just end the turn."}'
-WBLOCK='{"decision":"block","reason":"This session holds open wait loops and no watch. Arm one now with CronCreate, schedule `*/15 8-21 * * *`, recurring, prompt `/clutch:watch @0123abcd`, then end the turn. If the user said not to watch them, just end the turn."}'
+BLOCK='{"decision":"block","reason":"This ops session has no beat. Arm one now with CronCreate, schedule `7 8-20 * * *`, recurring, prompt `/clutch:beat @0123abcd`, then end the turn. If the user said not to arm a beat, just end the turn."}'
+WBLOCK='{"decision":"block","reason":"This session holds open wait loops and no watch. Arm one now with CronCreate, schedule `*/10 8-21 * * *`, recurring, prompt `/clutch:watch @0123abcd`, then end the turn. If the user said not to watch them, just end the turn."}'
+SBLOCK='{"decision":"block","reason":"This ops session has no sweep. Arm one now with CronCreate, schedule `37 8,12,16 * * *`, recurring, prompt `/clutch:ops re-sweep`, then end the turn. If the user said not to arm a sweep, just end the turn."}'
 IN="{\"session_id\":\"$ID\",\"stop_hook_active\":false,\"session_crons\":[]}"
 blocked() {
   [ "$RC" = 0 ] && [ "$OUT" = "$BLOCK" ] \
@@ -99,9 +100,24 @@ asked() {
   A_N=$(grep -cx "asked $TODAY" "$BF" 2>/dev/null)
   [ "$A_N" = "$2" ] || { echo "FAIL: $1 -- $A_N 'asked $TODAY' lines, want $2: $(cat "$BF" 2>/dev/null)"; fail=1; }
 }
-crons() {
-  printf '{"session_id":"%s","stop_hook_active":false,"session_crons":[{"id":"c1","cron":"7 8-20/2 * * *","prompt":"%s","recurring":true}]}' "$ID" "$1"
+# sweepasked <label> <n>: the record holds exactly n "sweep asked <today>" lines.
+sweepasked() {
+  A_N=$(grep -cx "sweep asked $TODAY" "$BF" 2>/dev/null)
+  [ "$A_N" = "$2" ] || { echo "FAIL: $1 -- $A_N 'sweep asked $TODAY' lines, want $2: $(cat "$BF" 2>/dev/null)"; fail=1; }
 }
+sblocked() {
+  [ "$RC" = 0 ] && [ "$OUT" = "$SBLOCK" ] \
+    || { echo "FAIL: $1 -- rc $RC stdout [$OUT], want rc 0 and the sweep block line"; fail=1; }
+}
+# crons <prompt>: the session's crons, <prompt> plus an armed sweep. The beat
+# keeps the pre-2.16.0 two-hour schedule on purpose: a live session's older
+# beat is matched by its prompt and never asked again.
+SWC='{"id":"c2","cron":"37 8,12,16 * * *","prompt":"/clutch:ops re-sweep","recurring":true}'
+crons() {
+  printf '{"session_id":"%s","stop_hook_active":false,"session_crons":[{"id":"c1","cron":"7 8-20/2 * * *","prompt":"%s","recurring":true},%s]}' "$ID" "$1" "$SWC"
+}
+# bcrons <json crons>: the session's crons exactly as given.
+bcrons() { printf '{"session_id":"%s","stop_hook_active":false,"session_crons":[%s]}' "$ID" "$1"; }
 docin() {
   printf '{"session_id":"%s","transcript_path":"/t/x.jsonl","cwd":"/c","hook_event_name":"Stop","stop_hook_active":false,"last_assistant_message":"%s","background_tasks":[],"session_crons":%s}' "$ID" "$1" "$2"
 }
@@ -113,20 +129,24 @@ fresh "$SF"
 stp "$T/run" "$IN"
 blocked B1
 if [ -x /usr/bin/python3 ]; then
-  printf '%s' "$OUT" | /usr/bin/python3 -I -c 'import json,sys; d=json.load(sys.stdin); assert d["decision"] == "block"; assert "7 8-20/2 * * *" in d["reason"]; assert "/clutch:beat @0123abcd" in d["reason"]' 2>/dev/null \
+  printf '%s' "$OUT" | /usr/bin/python3 -I -c 'import json,sys; d=json.load(sys.stdin); assert d["decision"] == "block"; assert "7 8-20 * * *" in d["reason"]; assert "/clutch:beat @0123abcd" in d["reason"]' 2>/dev/null \
     || { echo "FAIL: B1 -- block line is not the JSON block object"; fail=1; }
 fi
 asked B1 1
 [ ! -e "$T/run/.clutch/breadcrumb" ] || { echo "FAIL: B1 -- a breadcrumb was written on a blocking stop"; fail=1; }
 
-# B4: asked today already: quiet, no second asked line.
+# B4: asked today already: no second beat ask; the next stop asks the
+# sweep once, and the one after is quiet.
 stp "$T/run" "$IN"
-quiet B4
+sblocked B4
 asked B4 1
+stp "$T/run" "$IN"
+quiet "B4 third"
+asked "B4 third" 1
 
 # B2, B2s: an armed beat, either spacing: quiet, breadcrumb written, no ask.
 for c in "$(crons '/clutch:beat @0123abcd')" \
-  "{\"session_id\":\"$ID\",\"stop_hook_active\":false,\"session_crons\":[{\"id\":\"c1\",\"prompt\": \"/clutch:beat @0123abcd\",\"recurring\":true}]}"; do
+  "{\"session_id\":\"$ID\",\"stop_hook_active\":false,\"session_crons\":[{\"id\":\"c1\",\"prompt\": \"/clutch:beat @0123abcd\",\"recurring\":true},$SWC]}"; do
   rec
   fresh "$SF"
   stp "$T/run" "$c"
@@ -264,17 +284,124 @@ blocked B12
 
 # B13: a ~160 KB last_assistant_message full of escaped mentions finishes
 # well inside the hook timeout (whole seconds: a diff of 1 or less is < 2 s).
-FILL=$(i=0; while [ $i -lt 2200 ]; do printf 'lorem \\"session_crons\\":[ \\"prompt\\":\\"/clutch:beat @0123abcd\\" ] ipsum '; i=$((i + 1)); done)
+FILL=$(i=0; while [ $i -lt 2200 ]; do printf 'lorem \\"session_crons\\":[ \\"prompt\\":\\"/clutch:beat @0123abcd\\" ] \\"prompt\\":\\"/clutch:ops re-sweep\\" ipsum '; i=$((i + 1)); done)
 BCRON='{"id":"c9","schedule":"7 8-20/2 * * *","recurring":true,"prompt":"/clutch:beat @0123abcd"}'
-for c in '[]' "[$BCRON]"; do
+SCRON='{"id":"c8","schedule":"37 8,12,16 * * *","recurring":true,"prompt":"/clutch:ops re-sweep"}'
+for c in '[]' "[$BCRON]" "[$BCRON,$SCRON]"; do
   rec
   fresh "$SF"
   B13_T0=$(date +%s)
   stp "$T/run" "$(docin "$FILL" "$c")"
   B13_DT=$(($(date +%s) - B13_T0))
   [ "$B13_DT" -le 1 ] || { echo "FAIL: B13 [$c] -- ${B13_DT}s for a ${#FILL}-byte message"; fail=1; }
-  if [ "$c" = '[]' ]; then blocked "B13 unarmed"; else quiet "B13 armed"; fi
+  case $c in
+    '[]') blocked "B13 unarmed" ;;
+    "[$BCRON]") sblocked "B13 beat only" ;;
+    *) quiet "B13 armed" ;;
+  esac
 done
+
+# --- SW1-SW9: the sweep ask, in the beat gate after the beat. An ops
+# session with no "prompt" whose whole value is /clutch:ops re-sweep is
+# blocked once a local day with the sweep's arming step; "sweep asked
+# <YYYY-MM-DD>" lands in the record before the block prints.
+BONLY='{"id":"c1","cron":"7 8-20 * * *","prompt":"/clutch:beat @0123abcd","recurring":true}'
+
+# SW1: ops record, beat armed, no sweep: the sweep block, valid JSON, sweep
+# asked today recorded, the beat's asked line untouched, no breadcrumb.
+rec
+fresh "$SF"
+stp "$T/run" "$(bcrons "$BONLY")"
+sblocked SW1
+if [ -x /usr/bin/python3 ]; then
+  printf '%s' "$OUT" | /usr/bin/python3 -I -c 'import json,sys; d=json.load(sys.stdin); assert d["decision"] == "block"; r=d["reason"]; assert "37 8,12,16 * * *" in r; assert "prompt `/clutch:ops re-sweep`" in r; assert "recurring" in r; assert r.endswith("If the user said not to arm a sweep, just end the turn.")' 2>/dev/null \
+    || { echo "FAIL: SW1 -- block line is not the JSON sweep block object"; fail=1; }
+fi
+sweepasked SW1 1
+asked SW1 0
+[ ! -e "$T/run/.clutch/breadcrumb" ] || { echo "FAIL: SW1 -- a breadcrumb was written on a blocking stop"; fail=1; }
+
+# SW2: asked today already: quiet, no second line.
+stp "$T/run" "$(bcrons "$BONLY")"
+quiet SW2
+sweepasked SW2 1
+
+# SW3, SW3s: an armed sweep, either spacing: quiet, breadcrumb, no ask.
+for sw in "$SWC" '{"id":"c2","prompt": "/clutch:ops re-sweep","recurring":true}'; do
+  rec
+  fresh "$SF"
+  stp "$T/run" "$(bcrons "$BONLY,$sw")"
+  quiet "SW3 [$sw]"
+  [ -s "$T/run/.clutch/breadcrumb" ] || { echo "FAIL: SW3 -- no breadcrumb"; fail=1; }
+  sweepasked SW3 0
+done
+
+# SW4: no ops record: no sweep ask, nothing under ~/.clutch/watch.
+seed
+fresh "$SF"
+stp "$T/run" "$(bcrons "$BONLY")"
+quiet SW4
+[ ! -e "$HOME/.clutch/watch" ] || { echo "FAIL: SW4 -- ~/.clutch/watch created for a non-ops session"; fail=1; }
+
+# SW5: nothing armed: the beat block first and no sweep ask; once the beat
+# is armed, the next stop brings the sweep block.
+rec
+fresh "$SF"
+stp "$T/run" "$IN"
+blocked "SW5 first"
+sweepasked "SW5 first" 0
+stp "$T/run" "$(bcrons "$BONLY")"
+sblocked "SW5 second"
+sweepasked "SW5 second" 1
+
+# SW6: the beat declined today (asked, not armed): the sweep is still asked.
+rec "asked $TODAY"
+fresh "$SF"
+stp "$T/run" "$IN"
+sblocked SW6
+
+# SW7: a mention of the sweep prompt, a /loop prompt naming it, or a
+# re-sweep with more after it is not an armed sweep.
+# Built outside $(...): bash 3.2 brace-expands a {a,b} there despite the quotes.
+LOOPC='{"id":"c2","prompt":"/loop 4h /clutch:ops re-sweep"}'
+MOREC='{"id":"c2","prompt":"/clutch:ops re-sweep now"}'
+for c in "$(docin 'Armed: \"prompt\":\"/clutch:ops re-sweep\" now' "[$BONLY]")" \
+  "$(bcrons "$BONLY,$LOOPC")" "$(bcrons "$BONLY,$MOREC")"; do
+  rec
+  fresh "$SF"
+  stp "$T/run" "$c"
+  sblocked "SW7 [$c]"
+done
+
+# SW8: an older sweep asked line only: asked again, today appended.
+rec 'sweep asked 2000-01-01'
+fresh "$SF"
+stp "$T/run" "$(bcrons "$BONLY")"
+sblocked SW8
+sweepasked SW8 1
+
+# SW9: CLUTCH_BEAT=off: no sweep ask, nothing written. stop_hook_active:
+# quiet. Unwritable record: no block.
+rec
+fresh "$SF"
+BEAT=off
+stp "$T/run" "$(bcrons "$BONLY")"
+BEAT=''
+quiet "SW9 off"
+sweepasked "SW9 off" 0
+rec
+fresh "$SF"
+stp "$T/run" "{\"session_id\":\"$ID\",\"stop_hook_active\":true,\"session_crons\":[$BONLY]}"
+quiet "SW9 active"
+sweepasked "SW9 active" 0
+if [ "$(id -u)" != 0 ]; then
+  rec
+  chmod 444 "$BF"
+  fresh "$SF"
+  stp "$T/run" "$(bcrons "$BONLY")"
+  quiet "SW9 unwritable"
+  chmod 644 "$BF"
+fi
 
 # B-scrub: brain.test.sh's sibling runs clear CLUTCH_BEAT and BEAT_SKILL.
 for v in CLUTCH_BEAT BEAT_SKILL; do
@@ -286,6 +413,11 @@ done
 awk '/^- An ops session is told at turn end/{f=1} f && /^- / && !/^- An ops/{f=0} f' "$HERE/../README.md" |
   tr '\n' ' ' | grep -q 'CLUTCH_WATCH=off.*beat' \
   || { echo "FAIL: B-readme -- the beat bullet does not say CLUTCH_WATCH=off turns the beat off"; fail=1; }
+
+# B-readme-sweep: the README beat bullet names the armed sweep, its times and the switch.
+awk '/^- An ops session is told at turn end/{f=1} f && /^- / && !/^- An ops/{f=0} f' "$HERE/../README.md" |
+  tr -s '[:space:]' ' ' | grep -q '`/clutch:ops re-sweep` at 08:37, 12:37 and 16:37.*CLUTCH_BEAT=off. turns off both asks' \
+  || { echo "FAIL: B-readme-sweep -- the beat bullet does not name the armed sweep and its switch"; fail=1; }
 
 # --- H1-H10: clutch_beat_window. bw <tag>: the helper sourced from the
 # staged prelude in a plain dir; sets OUT, RC and ERR. mkrec <line>...: a

@@ -29,12 +29,19 @@ for f in stop prelude; do
   git -C "$ROOT" show "$BASE:scripts/$f.sh" > "$T/base/scripts/$f.sh" 2>/dev/null \
     || { echo "FAIL: parity base $BASE not reachable from $ROOT"; exit 1; }
 done
+# 2.16.0 moved the watch from every 15 to every 10 minutes on purpose; the
+# base's watch line takes the new schedule so the rest still compares byte
+# for byte.
+sed 's#`\*/15 8-21 \* \* \*`#`*/10 8-21 * * *`#' "$T/base/scripts/stop.sh" > "$T/base/stop.tmp" &&
+  mv "$T/base/stop.tmp" "$T/base/scripts/stop.sh" &&
+  grep -qF '`*/10 8-21 * * *`' "$T/base/scripts/stop.sh" \
+  || { echo "FAIL: the base watch schedule was not carried to */10"; exit 1; }
 
 ID='0123abcd-4567-89ab-cdef-0123456789ab'
 STOP_IN="{\"session_id\":\"$ID\",\"stop_hook_active\":false,\"session_crons\":[]}"
 W=$T/work
 OFF=CLUTCH_BEAT=off
-BLOCK='{"decision":"block","reason":"This ops session has no beat. Arm one now with CronCreate, schedule `7 8-20/2 * * *`, recurring, prompt `/clutch:beat @0123abcd`, then end the turn. If the user said not to arm a beat, just end the turn."}'
+BLOCK='{"decision":"block","reason":"This ops session has no beat. Arm one now with CronCreate, schedule `7 8-20 * * *`, recurring, prompt `/clutch:beat @0123abcd`, then end the turn. If the user said not to arm a beat, just end the turn."}'
 
 # dump: every path under the work dir (no .git internals) with file contents,
 # 9+ digit runs and YYYY-MM-DD dates masked.

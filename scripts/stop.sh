@@ -42,7 +42,7 @@ if [ "${CLUTCH_WATCH:-}" != off ]; then
               [ -n "$WATCH_NEW" ] &&
               mkdir -p "$HOME/.clutch/watch" 2>/dev/null &&
               printf '%s\n' "$WATCH_NEW" 2>/dev/null >> "$WATCH_FILE" &&
-              printf '{"decision":"block","reason":"This session holds open wait loops and no watch. Arm one now with CronCreate, schedule `*/15 8-21 * * *`, recurring, prompt `/clutch:watch %s`, then end the turn. If the user said not to watch them, just end the turn."}\n' "$WATCH_TAG" &&
+              printf '{"decision":"block","reason":"This session holds open wait loops and no watch. Arm one now with CronCreate, schedule `*/10 8-21 * * *`, recurring, prompt `/clutch:watch %s`, then end the turn. If the user said not to watch them, just end the turn."}\n' "$WATCH_TAG" &&
               exit 0
             ;;
         esac
@@ -59,7 +59,9 @@ fi
 # never blocks. Runs after the watch gate, whose block wins the stop, and
 # outside git too. Never creates the record. Every failure falls through.
 # CLUTCH_BEAT=off skips it. Same linear matches and armed-prompt rule as the
-# watch gate.
+# watch gate. When the beat does not block, the same record asks the sweep
+# (`/clutch:ops re-sweep`, no tag) the same way, once a local day, with its
+# own "sweep asked <YYYY-MM-DD>" line.
 if [ "${CLUTCH_BEAT:-}" != off ]; then
   case $INPUT in
     *'"stop_hook_active":true'* | *'"stop_hook_active": true'*) ;;
@@ -74,7 +76,18 @@ if [ "${CLUTCH_BEAT:-}" != off ]; then
             *"\"prompt\":\"/clutch:beat $BEAT_TAG\""* | *"\"prompt\": \"/clutch:beat $BEAT_TAG\""*) ;;
             *)
               { printf 'asked %s\n' "$BEAT_DAY" >> "$BEAT_FILE"; } 2>/dev/null &&
-                printf '{"decision":"block","reason":"This ops session has no beat. Arm one now with CronCreate, schedule `7 8-20/2 * * *`, recurring, prompt `/clutch:beat %s`, then end the turn. If the user said not to arm a beat, just end the turn."}\n' "$BEAT_TAG" &&
+                printf '{"decision":"block","reason":"This ops session has no beat. Arm one now with CronCreate, schedule `7 8-20 * * *`, recurring, prompt `/clutch:beat %s`, then end the turn. If the user said not to arm a beat, just end the turn."}\n' "$BEAT_TAG" &&
+                exit 0
+              ;;
+          esac
+        fi
+        grep -qx "sweep asked $BEAT_DAY" "$BEAT_FILE" 2>/dev/null
+        if [ "$?" = 1 ]; then
+          case $INPUT in
+            *'"prompt":"/clutch:ops re-sweep"'* | *'"prompt": "/clutch:ops re-sweep"'*) ;;
+            *)
+              { printf 'sweep asked %s\n' "$BEAT_DAY" >> "$BEAT_FILE"; } 2>/dev/null &&
+                printf '%s\n' '{"decision":"block","reason":"This ops session has no sweep. Arm one now with CronCreate, schedule `37 8,12,16 * * *`, recurring, prompt `/clutch:ops re-sweep`, then end the turn. If the user said not to arm a sweep, just end the turn."}' &&
                 exit 0
               ;;
           esac

@@ -21,6 +21,7 @@ Ops fires when you fire it. Nothing here runs on its own.
 - `/clutch:ops re-sweep` runs a fresh sweep mid-day with the same bounds and
   the same close. A re-sweep happens on request only, never on your own read
   that the situation may have moved.
+  The session's armed sweep, which an ops session's turn end asks once a day to arm, sends this same line at 08:37, 12:37 and 16:37; that arrival is a request, with the same bounds and the same close.
 - `/clutch:ops tick` checks only the wait loops, once each, and speaks only
   when one moved. "Anything move?" in an ops session is the same request.
   A tick happens on request only, never on your own read that a loop moved.
@@ -207,8 +208,8 @@ behavior:
 - **A loop that keeps not closing** gets `/clutch:triage`'s question, a
   flinch at the wall versus never entering awareness, before anything else
   engages. **A loop that wants a clock** gets `/clutch:sprint`.
-- **Re-sweep on request only.** `/clutch:ops re-sweep` is the only path to a
-  second sweep.
+- **Re-sweep on request only.**
+  `/clutch:ops re-sweep` is the only path to a second sweep, whether you type it or the session's armed sweep sends it.
 - **A closed loop logs one line.** Append its `moved:` line with the
   constitution's worklog snippet, silently; speak on MISS or an error.
   That line is the only thing a closed loop writes; the sweep itself still writes nothing beyond its L2 and Auto lines and the tablet inbox items.
@@ -409,7 +410,7 @@ and the one open loop with its next move. Nothing else is written.
 
 ## What this skill does NOT do
 
-- Fire on its own, re-sweep on its own, or watch anything in the background
+- Fire on its own, re-sweep on its own (the session's armed sweep is a request), or watch anything in the background
 - Send anything without a yes, or write to any integration without one beyond the L2 actions and Auto posts your policy lists
 - Produce a dashboard, a report, or a list for later
 - Count unread, waiting, overdue, or missed anything

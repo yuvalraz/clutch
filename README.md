@@ -69,7 +69,7 @@ days. `CLUTCH_PER_SESSION=off` turns per-session state off.
 | Every prompt | `heartbeat.sh` | Nothing. It reminds the model which command fits which stall, how many uninvited lines are left, and the sprint clock. | nothing |
 | Before a shell command | `hot-pause.sh` | One ask before a force-push, `reset --hard`, `branch -D`, `checkout -- .` or `clean -fd`. Your yes wins in one keypress. | nothing |
 | After a shell command | `red-moment.sh` | Usually nothing. When the same runner command fails again with the tree unchanged, the model may say one line. | `.clutch/s/<tag>/session-state` |
-| Turn end | `stop.sh` | The bell: `Landed: '<subject>'. Smallest next move: one commit.`, only after 25 minutes and real movement. A live sprint shows `Sprint: N min left on '<goal>'` instead. After a long run with unbanked work, one offer to bank it. When this session holds its own open waits and no watch, the session is told to arm a watch once per new wait, first instead. In an ops session with no beat, the session is told to arm one, once a day. | `.clutch/breadcrumb`, and one `moved:` line in `~/.clutch/worklog.md` naming your latest commit, when the turn landed one, and `~/.clutch/watch/<tag>` when it asks, and `~/.clutch/watch/<tag>.beat` when it asks the beat |
+| Turn end | `stop.sh` | The bell: `Landed: '<subject>'. Smallest next move: one commit.`, only after 25 minutes and real movement. A live sprint shows `Sprint: N min left on '<goal>'` instead. After a long run with unbanked work, one offer to bank it. When this session holds its own open waits and no watch, the session is told to arm a watch once per new wait, first instead. In an ops session with no beat, the session is told to arm one, once a day, and then a sweep. | `.clutch/breadcrumb`, and one `moved:` line in `~/.clutch/worklog.md` naming your latest commit, when the turn landed one, and `~/.clutch/watch/<tag>` when it asks, and `~/.clutch/watch/<tag>.beat` when it asks the beat or the sweep |
 | On a command | the skill you named | What that command does (see Commands at a glance) | Depends on the command: the pool, the brain, `~/.clutch/rituals.md`, your review conventions file, or the auto-memory directory |
 
 ### Sessions see each other
@@ -91,12 +91,15 @@ only at one of those moments.
 - Any session that hands off an outward step, such as a PR or an ask, logs a
   `wait:` line that starts with its session tag. At turn end, a session that
   holds such waits and no watch is told to arm a watch once per new wait: `/clutch:watch @<tag>`
-  every 15 minutes from 08:00 to 21:45, one `No change.` line unless one of its waits moved,
+  every 10 minutes from 08:00 to 21:50, one `No change.` line unless one of its waits moved,
   gone once none is left. `CLUTCH_WATCH=off` turns off the ask, the session tag and per-session state.
 - An ops session is told at turn end, once a day, to arm a beat: `/clutch:beat @<tag>`
-  every two hours from 08:07 to 20:07 while the session is open. It reads the moves
+  every hour from 08:07 to 20:07 while the session is open. It reads the moves
   other sessions logged since the last beat and the waits no session's tag owns, and
-  says `No change.` unless something moved. `CLUTCH_BEAT=off` turns off the ask;
+  says `No change.` unless something moved. When what moved sits off the day's
+  focuses, it names the focus it sits beside. After the beat's ask, the session is
+  told, once a day, to arm a sweep: `/clutch:ops re-sweep` at 08:37, 12:37 and 16:37,
+  the same read-only sweep you can ask for. `CLUTCH_BEAT=off` turns off both asks;
   `CLUTCH_WATCH=off` also turns off the beat, since the session has no tag.
 - The next session start shows them in its `Worklog:` block.
   Claims age out after 4 h and moves after 24 h.
@@ -328,9 +331,10 @@ search. `/clutch:ops` and `/clutch:morning` check the integrations you named.
 extra and close-out steps you wrote can use your integrations.
 `/clutch:review` reads PRs and posts to one only on a yes.
 `/clutch:investigate` reads what the pointer names and sends a reply only on a yes.
-`/clutch:watch` checks the integrations its session's waits name, every 15
+`/clutch:watch` checks the integrations its session's waits name, every 10
 minutes until none is left.
-`/clutch:beat` checks the integrations its waits name, every two hours while an ops session is open.
+`/clutch:beat` checks the integrations its waits name, every hour while an ops session is open.
+An ops session's armed sweep runs the same `/clutch:ops re-sweep` at 08:37, 12:37 and 16:37.
 No hook script here touches the network, and you
 can verify it:
 

@@ -86,6 +86,13 @@ pin "$O" "ops: build leaves ops"        '/clutch:intent build'
 pin "$O" "ops: no counts"               'No counts'
 pin "$O" "ops: no overdue framing"      'never as overdue'
 pin "$O" "ops: re-sweep on request"     'Re-sweep on request only'
+fpin "$O" "ops: armed sweep is a request" 'The session'"'"'s armed sweep, which an ops session'"'"'s turn end asks once a day to arm, sends this same line at 08:37, 12:37 and 16:37; that arrival is a request, with the same bounds and the same close.'
+fpin "$O" "ops: armed sweep only path"  '`/clutch:ops re-sweep` is the only path to a second sweep, whether you type it or the session'"'"'s armed sweep sends it.'
+fpin "$O" "ops: never re-sweep alone"   '- Fire on its own, re-sweep on its own (the session'"'"'s armed sweep is a request), or watch anything in the background'
+# Only the armed sweep is allowed: no other armed or timed ops path.
+if grep -n 'armed' "$O" | grep -v 'armed sweep' | grep -viE 'armed watch|armed beat|beat' | grep -q .; then
+  echo "FAIL: ops: armed sweep only -- another armed path in ops: $(grep -n 'armed' "$O" | grep -v 'armed sweep' | grep -viE 'armed watch|armed beat|beat' | head -2)"; fail=1
+fi
 pin "$O" "ops: one smallest move"       'one loop that closes in one sitting'
 pin "$O" "ops: fires when fired"        'Nothing here runs on its own'
 pin "$O" "ops: eod owns the close"      '/clutch:eod'
@@ -316,7 +323,7 @@ if grep -qiE '^disable-model-invocation:[[:space:]]*["'"'"']?true' "$BS"; then
   echo "FAIL: BT2 beat skill disables model invocation -- its fires never run"
   fail=1
 fi
-fpin "$BS" "BT3 what sends it"          '`/clutch:beat @<tag>` is what an ops session'"'"'s armed beat sends, every two hours from 08:07 to 20:07 while the session is open.'
+fpin "$BS" "BT3 what sends it"          '`/clutch:beat @<tag>` is what an ops session'"'"'s armed beat sends, every hour from 08:07 to 20:07 while the session is open.'
 fpin "$BS" "BT4 no gear"                'It sets no gear, no focus and no mode: the session keeps the rules it had.'
 fpin "$BS" "BT4b not a sweep"           'It is not a sweep or a tick: no sweep, no config read.'
 fpin "$BS" "BT5 read line"              'sh -c '"'"'. "${CLAUDE_PLUGIN_ROOT}/scripts/prelude.sh" && L=$(clutch_beat_window "@<tag>") || exit; [ -z "$L" ] || printf "%s\n" "$L" | LC_ALL=C cut -c1-300'"'"
@@ -342,6 +349,16 @@ fpin "$BS" "BT13 fixed line"            'When nothing moved, reply with exactly 
 fpin "$BS" "BT14 invited"               'The reply answers the beat'"'"'s prompt, so it is not an uninvited line.'
 fpin "$BS" "BT15 unreachable"           'A tool that is not reachable keeps its wait open: name it once, then stay silent about it.'
 fpin "$BS" "BT16 no counts"             'Never count, never say how long anything has waited, and never name something that did not move.'
+fpin "$BS" "BT17 drift line"            'When what moved sits off the day'"'"'s focuses, one more line names what moved and the focus it sits beside, such as `<what moved> sits beside <focus>.` When what moved converges with the focuses, nothing more.'
+fpin "$BS" "BT17 focuses in view"       'The focuses are the ones this ops session'"'"'s sweep read from today'"'"'s focus file; with none in view, nothing more.'
+fpin "$BS" "BT17 not on no change"      'With nothing moved there is no drift line: `No change.` stays the whole reply.'
+# The drift text stays recognition-shaped: no counts, no still or yet, no
+# overdue or behind. Joined first, so a wrapped word cannot hide.
+DRIFT=$(grep -iE 'focus|drift' "$BS" | tr -s '[:space:]' ' ')
+case $DRIFT in *'sits beside'*) ;; *) echo "FAIL: BT17 negative -- no drift text to check"; fail=1 ;; esac
+if printf '%s\n' "$DRIFT" | grep -iwqE 'still|yet|overdue|behind|late|again|[0-9]+'; then
+  echo "FAIL: BT17 negative -- the drift text counts, waits or nags: $(printf '%s\n' "$DRIFT" | grep -iwoE 'still|yet|overdue|behind|late|again|[0-9]+' | head -3 | tr '\n' ' ')"; fail=1
+fi
 nbs_l=$(grep -c '' "$BS")
 [ "$nbs_l" -lt 60 ] || { echo "FAIL: BT-size beat skill is $nbs_l lines, want under 60"; fail=1; }
 
