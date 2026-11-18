@@ -7,7 +7,7 @@ argument-hint: "@<tag>"
 
 # Beat
 
-`/clutch:beat @<tag>` is what an ops session's armed beat sends, every two hours from 08:07 to 20:07 while the session is open.
+`/clutch:beat @<tag>` is what an ops session's armed beat sends, every hour from 08:07 to 20:07 while the session is open.
 It sets no gear, no focus and no mode: the session keeps the rules it had.
 It is not a sweep or a tick: no sweep, no config read.
 
@@ -38,6 +38,9 @@ A wait that moved: append its `moved:` line first, with the constitution's workl
 A beat never holds a wait again and never removes itself: it ends with the session.
 
 Then reply in at most two lines: what moved, naming at most two movements, the ones nearest the day's work, and one smallest move. An outward action waits for its usual yes.
+When what moved sits off the day's focuses, one more line names what moved and the focus it sits beside, such as `<what moved> sits beside <focus>.` When what moved converges with the focuses, nothing more.
+The focuses are the ones this ops session's sweep read from today's focus file; with none in view, nothing more.
+With nothing moved there is no drift line: `No change.` stays the whole reply.
 When nothing moved, reply with exactly `No change.` and nothing more: an empty reply gets prompted for one.
 The reply answers the beat's prompt, so it is not an uninvited line.
 A tool that is not reachable keeps its wait open: name it once, then stay silent about it.

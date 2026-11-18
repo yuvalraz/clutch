@@ -86,6 +86,41 @@ pin "$O" "ops: build leaves ops"        '/clutch:intent build'
 pin "$O" "ops: no counts"               'No counts'
 pin "$O" "ops: no overdue framing"      'never as overdue'
 pin "$O" "ops: re-sweep on request"     'Re-sweep on request only'
+fpin "$O" "ops: armed sweep line"       '- `/clutch:ops re-sweep armed` is the line the session'"'"'s armed sweep sends at 08:37, 12:37 and 16:37, after an ops session'"'"'s turn end asks once a day to arm it.'
+fpin "$O" "ops: armed sweep own rules"  'It is a read-only sweep with its own rules (see Armed sweep), never a hand-typed re-sweep.'
+fpin "$O" "ops: armed sweep only path"  '`/clutch:ops re-sweep` is the only path to a second sweep that acts, and only you type it; the session'"'"'s armed sweep sends `/clutch:ops re-sweep armed`, which only reads (see Armed sweep).'
+fpin "$O" "ops: never re-sweep alone"   '- Fire on its own, re-sweep on its own (the session'"'"'s armed sweep is a request that only reads), or watch anything in the background'
+pin  "$O" "AS section"                  '^### Armed sweep$'
+fpin "$O" "AS writes nothing"           '`/clutch:ops re-sweep armed` comes from the session'"'"'s armed sweep, not from you, so it reads and speaks and writes nothing.'
+fpin "$O" "AS skips Step 0"             'It skips Step 0: no gear change and no record.'
+fpin "$O" "AS outside ops"              'Skip it only when a `tempo gear:` line in view names a gear other than espresso: reply with exactly `Not in ops; the sweep skipped.` and nothing else.'
+fpin "$O" "AS no gear line reads"       'With no gear line in view, run the read-only sweep anyway: it writes nothing, so a read is the safe default.'
+# The skip never claims a read: no `No change.` and no gear-only skip in the
+# Armed sweep section (joined so a wrap cannot hide it).
+ASEC=$(awk '/^### Armed sweep$/{f=1;next} /^### /{f=0} f' "$O" | tr -s '[:space:]' ' ')
+case $ASEC in *'No change.'*) echo "FAIL: AS skip -- the armed sweep section still says No change."; fail=1 ;; esac
+case $ASEC in *"session's gear is not espresso"*) echo "FAIL: AS skip -- still skips on gear alone, with no gear line in view"; fail=1 ;; esac
+fpin "$O" "AS reads only"               'Otherwise it runs Steps 1-4 with reads only: the config read, the Step 2 sweep reads, the tick pass'"'"'s read of each wait loop, then the situation and one smallest move.'
+fpin "$O" "AS no writes list"           'It skips the L2 actions and Auto posts, the day brief and approval window checks and their drafts, the tablet inbox fold, claim and route, and every worklog or wait-loop write, `moved:` lines included.'
+fpin "$O" "AS no question"              'A missing config, key or state dir gets one line, never a question or a persisted answer.'
+fpin "$O" "AS waits for typed"          'What an L2 action or Auto post would do, and a wait loop that moved, are named in the situation as what waits for a sweep you type.'
+# The hand-typed re-sweep keeps its 2.15.0 bullet, word for word.
+fpin "$O" "ops: hand re-sweep unchanged" '- `/clutch:ops re-sweep` runs a fresh sweep mid-day with the same bounds and'
+# The old claim that the armed sweep sends the hand-typed line is gone.
+if tr -s '[:space:]' ' ' < "$O" | grep -qF 'sends this same line'; then
+  echo "FAIL: ops: armed sweep -- still says the armed sweep sends the hand-typed line"; fail=1
+fi
+# README: the armed sweep is described as it runs.
+tr -s '[:space:]' ' ' < "$R" | grep -qF 'The armed sweep only reads and speaks: it keeps the session'"'"'s mode, and the actions and posts your delegation policy pre-approves wait for a sweep you type.' \
+  || { echo "FAIL: README: armed sweep -- the read-only, mode-keeping sentence is missing"; fail=1; }
+if tr -s '[:space:]' ' ' < "$R" | grep -qF 'the same read-only sweep you can ask for'; then
+  echo "FAIL: README: armed sweep -- still calls it the same sweep you can ask for"; fail=1
+fi
+# Only the armed sweep is allowed: no other armed or timed ops path. Joined
+# first so a wrapped "armed" cannot hide; the armed sweep's own prompt is
+# dropped, then every armed word but armed beat, watch or sweep fails.
+OARM=$(tr -s '[:space:]' ' ' < "$O" | sed 's/re-sweep armed//g' | grep -oiE 'armed[^a-z]*[a-z]*' | grep -viE '^armed (beat|watch|sweep)$')
+[ -z "$OARM" ] || { echo "FAIL: ops: armed sweep only -- another armed path in ops: $(printf '%s' "$OARM" | head -2 | tr '\n' ' ')"; fail=1; }
 pin "$O" "ops: one smallest move"       'one loop that closes in one sitting'
 pin "$O" "ops: fires when fired"        'Nothing here runs on its own'
 pin "$O" "ops: eod owns the close"      '/clutch:eod'
@@ -114,7 +149,7 @@ nwa=$(grep -c 'is written anywhere;' "$O")
 [ "$nwa" = 0 ] || { echo "FAIL: ops -- still says 'is written anywhere;' ($nwa hit)"; fail=1; }
 
 # --- ops skill: wait loops, the tick, the sweep's tick pass
-fpin "$O" "ops: tick argument hint"     'argument-hint: "[re-sweep|tick]"'
+fpin "$O" "ops: tick argument hint"     'argument-hint: "[re-sweep|re-sweep armed|tick]"'
 fpin "$O" "ops: tick trigger"           '"re-sweep", "tick")'
 fpin "$O" "tick: on request only"       'A tick happens on request only'
 fpin "$O" "tick: skips Steps 0-4"       'A tick skips Steps 0-4: no gear, no config read, no sweep.'
@@ -301,7 +336,7 @@ fpin "$WS" "W12 re-hold open thing"     'If the thing is still open after the mo
 fpin "$WS" "W13 merged not held"        'A thing that merged or closed is not held again.'
 
 # --- ops: the beat record in Step 0, and the pointer to the beat
-fpin "$O" "ops: beat record"            'Then record this session as an ops session, so its turn end asks once a day for the beat (`/clutch:beat`).'
+fpin "$O" "ops: beat record"            'Then record this session as an ops session, so its turn end asks once a day for the beat (`/clutch:beat`) and the sweep (`/clutch:ops re-sweep armed`).'
 fpin "$O" "ops: beat record tag"        'Replace `@<tag>` with the `Session tag:` from the session start; with no `Session tag:` line, skip this. Silent on any failure:'
 fpin "$O" "ops: beat record snippet"    'T='"'"'@<tag>'"'"'; F="$HOME/.clutch/watch/${T#@}.beat"; [ "${CLUTCH_BEAT:-}" = off ] || [ ! -d "$HOME/.clutch" ] || [ -e "$F" ] || { mkdir -p "$HOME/.clutch/watch" && printf '"'"'last %s\n'"'"' "$(date +%s)" > "$F"; } 2>/dev/null'
 fpin "$O" "ops: beat pointer"           'An ops session'"'"'s beat does not send a tick either: it sends `/clutch:beat @<tag>`, which reads what other sessions moved and the waits no session'"'"'s tag owns.'
@@ -316,7 +351,7 @@ if grep -qiE '^disable-model-invocation:[[:space:]]*["'"'"']?true' "$BS"; then
   echo "FAIL: BT2 beat skill disables model invocation -- its fires never run"
   fail=1
 fi
-fpin "$BS" "BT3 what sends it"          '`/clutch:beat @<tag>` is what an ops session'"'"'s armed beat sends, every two hours from 08:07 to 20:07 while the session is open.'
+fpin "$BS" "BT3 what sends it"          '`/clutch:beat @<tag>` is what an ops session'"'"'s armed beat sends, every hour from 08:07 to 20:07 while the session is open.'
 fpin "$BS" "BT4 no gear"                'It sets no gear, no focus and no mode: the session keeps the rules it had.'
 fpin "$BS" "BT4b not a sweep"           'It is not a sweep or a tick: no sweep, no config read.'
 fpin "$BS" "BT5 read line"              'sh -c '"'"'. "${CLAUDE_PLUGIN_ROOT}/scripts/prelude.sh" && L=$(clutch_beat_window "@<tag>") || exit; [ -z "$L" ] || printf "%s\n" "$L" | LC_ALL=C cut -c1-300'"'"
@@ -342,6 +377,17 @@ fpin "$BS" "BT13 fixed line"            'When nothing moved, reply with exactly 
 fpin "$BS" "BT14 invited"               'The reply answers the beat'"'"'s prompt, so it is not an uninvited line.'
 fpin "$BS" "BT15 unreachable"           'A tool that is not reachable keeps its wait open: name it once, then stay silent about it.'
 fpin "$BS" "BT16 no counts"             'Never count, never say how long anything has waited, and never name something that did not move.'
+fpin "$BS" "BT17 drift line"            'When what moved sits off the day'"'"'s focuses, one more line names what moved and the focus it sits beside, such as `<what moved> sits beside <focus>.` When what moved converges with the focuses, nothing more.'
+fpin "$BS" "BT17 focuses in view"       'The focuses are the ones this ops session'"'"'s sweep read from today'"'"'s focus file; with none in view, nothing more.'
+fpin "$BS" "BT17 not on no change"      'With nothing moved there is no drift line: `No change.` stays the whole reply.'
+# The drift text stays recognition-shaped: no counts, no still or yet, no
+# overdue or behind. Joined first, so a wrapped word cannot hide.
+DRIFT=$(awk '/^When what moved sits off the day/{f=1} f; /stays the whole reply\.$/{exit}' "$BS" | tr -s '[:space:]' ' ')
+case $DRIFT in *'stays the whole reply.'*) ;; *) echo "FAIL: BT17 negative -- the drift paragraph has no last line"; fail=1 ;; esac
+case $DRIFT in *'sits beside'*) ;; *) echo "FAIL: BT17 negative -- no drift text to check"; fail=1 ;; esac
+if printf '%s\n' "$DRIFT" | grep -iwqE 'still|yet|overdue|behind|late|again|[0-9]+'; then
+  echo "FAIL: BT17 negative -- the drift text counts, waits or nags: $(printf '%s\n' "$DRIFT" | grep -iwoE 'still|yet|overdue|behind|late|again|[0-9]+' | head -3 | tr '\n' ' ')"; fail=1
+fi
 nbs_l=$(grep -c '' "$BS")
 [ "$nbs_l" -lt 60 ] || { echo "FAIL: BT-size beat skill is $nbs_l lines, want under 60"; fail=1; }
 

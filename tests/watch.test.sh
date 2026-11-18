@@ -316,7 +316,7 @@ mkdir -p "$BF/.clutch"
 printf 'stop %s\nbase %s\n' "$((NOW - 2000))" "$(git -C "$BF" rev-parse HEAD)" > "$BF/.clutch/session-state"
 git -C "$BF" commit -q --allow-empty -m "feat bell"
 
-BLOCK='{"decision":"block","reason":"This session holds open wait loops and no watch. Arm one now with CronCreate, schedule `*/15 8-21 * * *`, recurring, prompt `/clutch:watch @0123abcd`, then end the turn. If the user said not to watch them, just end the turn."}'
+BLOCK='{"decision":"block","reason":"This session holds open wait loops and no watch. Arm one now with CronCreate, schedule `*/10 8-21 * * *`, recurring, prompt `/clutch:watch @0123abcd`, then end the turn. If the user said not to watch them, just end the turn."}'
 IN="{\"session_id\":\"$ID\",\"stop_hook_active\":false,\"session_crons\":[]}"
 FP="$HOME/.clutch/watch/0123abcd"
 # blocked <label>: rc 0 and stdout exactly the block line.
@@ -328,6 +328,8 @@ blocked() {
 quiet() { is "$1" 0 ''; }
 # owned1: a fresh worklog holding one owned open wait.
 owned1() { seed; add 100 'proj wait: gh:o/r#1 b1 @0123abcd pr one'; }
+# The armed fixtures keep the pre-2.16.0 */15 schedule on purpose: a live
+# session's older watch is matched by its prompt and never asked again.
 crons() {
   printf '{"session_id":"%s","stop_hook_active":false,"session_crons":[{"id":"c1","cron":"*/15 8-21 * * *","prompt":"%s","recurring":true}]}' "$ID" "$1"
 }
@@ -339,7 +341,7 @@ fresh "$SF"
 stp "$T/run" "$IN"
 blocked S1
 if [ -x /usr/bin/python3 ]; then
-  printf '%s' "$OUT" | /usr/bin/python3 -I -c 'import json,sys; d=json.load(sys.stdin); assert d["decision"] == "block"; assert "*/15 8-21 * * *" in d["reason"]; assert "/clutch:watch @0123abcd" in d["reason"]' 2>/dev/null \
+  printf '%s' "$OUT" | /usr/bin/python3 -I -c 'import json,sys; d=json.load(sys.stdin); assert d["decision"] == "block"; assert "*/10 8-21 * * *" in d["reason"]; assert "/clutch:watch @0123abcd" in d["reason"]' 2>/dev/null \
     || { echo "FAIL: S1 -- block line is not the JSON block object"; fail=1; }
 fi
 grep -qx "$((NOW - 100)) proj wait: gh:o/r#1 b1 @0123abcd pr one" "$FP" 2>/dev/null \
