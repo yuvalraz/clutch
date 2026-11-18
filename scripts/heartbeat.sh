@@ -8,14 +8,25 @@
 # additionalContext only, never a user-visible message. Fail-open everywhere:
 # any error emits nothing and exits 0. No anti-nag budget is spent here.
 
+# Hook input JSON on stdin, for the session tag only. Never read a terminal.
+INPUT=""
+[ -t 0 ] || INPUT=$(cat 2>/dev/null) || INPUT=""
+
 PRELUDE=$(dirname "$0")/prelude.sh
 [ -f "$PRELUDE" ] || exit 0
 . "$PRELUDE" || exit 0
 [ "$CLUTCH_STATE" = 1 ] || exit 0
 
+# This session's own state folder when it has one, else the folder-wide
+# files. A turn refreshes the folder's mtime (touch -c never creates), so
+# the startup prune never takes a session that still gets prompts.
+if clutch_session_paths "$INPUT"; then
+  touch -c "$CLUTCH_SDIR" 2>/dev/null || :
+fi
+
 # Emission budget: count of recorded uninvited lines this session (sprint,
 # landing, and safe-landing all record as '^emit '). No file means zero.
-STATE="$CLUTCH_DIR/session-state"
+STATE="$CLUTCH_SDIR/session-state"
 EMITS=0
 if [ -f "$STATE" ]; then
   EMITS=$(grep -c "^emit " "$STATE" 2>/dev/null) || EMITS=0
@@ -31,7 +42,7 @@ esac
 # gap between turns (stop.sh only prunes at turn end), which is exactly the
 # window where the close must be spoken.
 SPRINTLINE=""
-SPRINT="$CLUTCH_DIR/sprint-start"
+SPRINT="$CLUTCH_SDIR/sprint-start"
 if [ -f "$SPRINT" ]; then
   SLINE=$(head -n 1 "$SPRINT" 2>/dev/null) || SLINE=""
   SEPOCH=${SLINE%% *}
@@ -47,7 +58,7 @@ if [ -f "$SPRINT" ]; then
           SPRINTLINE="sprint clock: $REM min left on '$GOAL'.
 "
         elif [ "$AGE" -ge 1200 ]; then
-          SPRINTLINE="sprint clock: time is up on '$GOAL'. Close now: name what shipped, recognition wording (the concrete thing that moved, one smallest next move), then remove .clutch/sprint-start.
+          SPRINTLINE="sprint clock: time is up on '$GOAL'. Close now: name what shipped, recognition wording (the concrete thing that moved, one smallest next move), then remove ${CLUTCH_SREL}sprint-start.
 "
         fi
       fi
@@ -60,7 +71,7 @@ fi
 # gear words (after whitespace-stripping) collapses to silence. Model-facing
 # only, never a user-visible line; no anti-nag budget is spent here.
 TEMPOLINE=""
-TEMPOF="$CLUTCH_DIR/tempo"
+TEMPOF="$CLUTCH_SDIR/tempo"
 if [ -f "$TEMPOF" ]; then
   GEAR=$(head -c 32 "$TEMPOF" 2>/dev/null | tr -d '[:space:]') || GEAR=""
   SHAPE=""
@@ -91,7 +102,7 @@ fi
 # SessionStart and is the place to explain rather than repeat.
 CTX="${TEMPOLINE}${SPRINTLINE}clutch dispatch spine (route on the primary activity, not the first keyword; quoted stalls do not count): spoken stall -> smallest-move; too-big next step WITH hesitation -> offer smallest-move; pre-dread before understood boring work -> ignite (not work already in motion, that is venting); same options circling 3+ turns with no edits -> STATE one smallest move, no yes needed; tangent or leap mid-task -> fomo, BANK ONLY (no background read, no auto-surfacing); undone task with cause unclear -> triage, ask the one question first; explicit timebox -> sprint; sustained shape mismatch (a single tangent is a fomo, a single terse reply is nothing) -> offer one gear shift.
 TERMINAL: anything else, or no established focus -> SILENCE. The default and the safe state.
-clutch-budget: ${EMITS}/2 spent. Before any uninvited line append 'emit model <epoch seconds>' to .clutch/session-state; at 2, stay silent even on a match; a tick from the session's armed watch is invited output too. One carve-out: the session-start intent ask (${CLUTCH_FOCI}), at session start only and only when no gear is declared, asked once, never counted against the budget; ignoring it is a legal answer."
+clutch-budget: ${EMITS}/2 spent. Before any uninvited line append 'emit model <epoch seconds>' to ${CLUTCH_SREL}session-state; at 2, stay silent even on a match; a tick from the session's armed watch is invited output too. One carve-out: the session-start intent ask (${CLUTCH_FOCI}), at session start only and only when no gear is declared, asked once, never counted against the budget; ignoring it is a legal answer."
 
 # JSON-encode the body: drop control chars, escape backslash then double quote,
 # fold newlines to spaces so the value is a single JSON string.

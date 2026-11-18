@@ -8,7 +8,8 @@
 # guessing investigate, the longest focus),
 # which must also keep HEADROOM (61) under BUDGET; (ii) heartbeat with a gear, a live sprint and spent
 # budget; (iv) the plain clutch folder anchor, never above (i); (v) the plain
-# heartbeat, byte-equal to (ii); (iii) negative control: the anchor with a constitution padded to
+# heartbeat, byte-equal to (ii); (vi) the tagged heartbeat over (ii)'s state in
+# this session's own .clutch/s/0123abcd/, exactly 11 bytes longer than (ii); (iii) negative control: the anchor with a constitution padded to
 # 10,000 chars must trip the same check, so the size assert cannot pass
 # vacuously. The real anchor.sh runs beside the real prelude.sh.
 # PLUGIN_ROOT_UNDER_TEST overrides the CLAUDE_PLUGIN_ROOT used for (i), so a
@@ -16,8 +17,9 @@
 set -u
 # An ambient CLUTCH_WATCH=off or CLUTCH_GUESS=off would drop the tag line or
 # the guessed ask and under-measure; CLUTCH_PLAIN=off would silence (iv)/(v);
-# CLUTCH_INVESTIGATE=off would shorten the ask.
-unset CLUTCH_WATCH CLUTCH_GUESS CLUTCH_PLAIN CLUTCH_INVESTIGATE
+# CLUTCH_INVESTIGATE=off would shorten the ask; CLUTCH_PER_SESSION=off
+# would hide (vi)'s per-session path.
+unset CLUTCH_WATCH CLUTCH_GUESS CLUTCH_PLAIN CLUTCH_INVESTIGATE CLUTCH_PER_SESSION
 
 HERE=$(cd "$(dirname "$0")" && pwd)
 ROOT=$(cd "$HERE/.." && pwd)
@@ -88,7 +90,7 @@ mkdir -p "$R/.clutch"
 printf 'craft\n' > "$R/.clutch/tempo"
 printf '%s %s\n' "$(date +%s)" "$(rep 200 g)" > "$R/.clutch/sprint-start"
 printf 'start 100\nbase -\nemit 100\nemit model 101\n' > "$R/.clutch/session-state"
-HOUT=$(cd "$R" && sh "$HB"); rc=$?
+HOUT=$(cd "$R" && sh "$HB" </dev/null); rc=$?
 [ "$rc" = 0 ] || { echo "FAIL: heartbeat exited $rc"; fail=1; }
 case "$HOUT" in *'tempo gear: craft'*'min left on'*'clutch-budget: 2/2'*) ;; *) echo "FAIL: heartbeat -- worst-case lines missing"; fail=1 ;; esac
 N=$(printf '%s\n' "$HOUT" | wc -c | tr -d ' ')
@@ -109,11 +111,24 @@ NP=$(printf '%s\n' "$POUT" | wc -c | tr -d ' ')
 # --- (v) plain heartbeat with gear, sprint and 2/2: the same bytes as (ii).
 rm -rf "$P/.clutch"
 cp -pR "$R/.clutch" "$P/.clutch"
-PHOUT=$(cd "$P" && GIT_CEILING_DIRECTORIES=$T sh "$HB"); rc=$?
+PHOUT=$(cd "$P" && GIT_CEILING_DIRECTORIES=$T sh "$HB" </dev/null); rc=$?
 [ "$rc" = 0 ] || { echo "FAIL: plain heartbeat exited $rc"; fail=1; }
 [ "$PHOUT" = "$HOUT" ] || { echo "FAIL: plain heartbeat differs from the git heartbeat (ii)"; fail=1; }
 N=$(printf '%s\n' "$PHOUT" | wc -c | tr -d ' ')
 [ "$N" -lt "$BUDGET" ] || { echo "FAIL: plain heartbeat -- $N chars >= $BUDGET"; fail=1; }
+
+# --- (vi) per-session heartbeat: (ii)'s state in s/0123abcd/; the budget
+# line names .clutch/s/0123abcd/session-state, 11 bytes more than (ii).
+mkdir -p "$R/.clutch/s/0123abcd"
+cp -p "$R/.clutch/tempo" "$R/.clutch/sprint-start" "$R/.clutch/session-state" "$R/.clutch/s/0123abcd/"
+SOUT=$(cd "$R" && printf '%s' '{"session_id":"0123abcd-4567-89ab-cdef-0123456789ab","prompt":"hi"}' | sh "$HB"); rc=$?
+rm -rf "$R/.clutch/s"
+[ "$rc" = 0 ] || { echo "FAIL: per-session heartbeat exited $rc"; fail=1; }
+case "$SOUT" in *'to .clutch/s/0123abcd/session-state;'*) ;; *) echo "FAIL: per-session heartbeat -- no per-session budget path"; fail=1 ;; esac
+NS=$(printf '%s\n' "$SOUT" | wc -c | tr -d ' ')
+NH=$(printf '%s\n' "$HOUT" | wc -c | tr -d ' ')
+[ "$NS" = $((NH + 11)) ] || { echo "FAIL: per-session heartbeat -- $NS chars, (ii) + 11 = $((NH + 11)) expected"; fail=1; }
+[ "$NS" -lt "$BUDGET" ] || { echo "FAIL: per-session heartbeat -- $NS chars >= $BUDGET"; fail=1; }
 
 # --- (iii) negative control: a 10,000-char constitution must trip the check
 mkdir "$T/padroot"

@@ -474,7 +474,7 @@ Q='build, ideate, ops, review, or investigate?'
 
 # heartbeat: espresso -> tempo line names the gear and its shape
 printf 'espresso\n' > "$T/repo/.clutch/tempo"
-OUT=$(cd "$T/repo" && sh "$HB"); RC=$?
+OUT=$(cd "$T/repo" && sh "$HB" </dev/null); RC=$?
 [ "$RC" = 0 ] || { echo "FAIL: heartbeat exited $RC with espresso"; exit 1; }
 printf '%s\n' "$OUT" | grep -q 'tempo gear: espresso (tight convergence, one divergent pulse)' \
   || { echo "FAIL: heartbeat missing the espresso tempo line: $OUT"; exit 1; }

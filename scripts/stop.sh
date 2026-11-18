@@ -86,6 +86,8 @@ fi
 
 [ "$CLUTCH_GIT" = 1 ] || exit 0
 clutch_ensure_dir || exit 0
+# This session's own state folder when it has one, else the folder-wide files.
+clutch_session_paths "$INPUT"
 
 # --- thread: breadcrumb + Stop timestamp + worklog. Emits nothing, ever. ---
 {
@@ -121,7 +123,7 @@ clutch_ensure_dir || exit 0
 
   printf '%s\n' "$LINE" > "$CLUTCH_DIR/breadcrumb"
   NOW=$(date +%s)
-  printf 'stop %s\n' "$NOW" >> "$CLUTCH_DIR/session-state"
+  printf 'stop %s\n' "$NOW" >> "$CLUTCH_SDIR/session-state"
 
   # Worklog: log a landed authored commit once for peer sessions. The head and
   # this stop's epoch are recorded first, on every stop, then the line
@@ -167,7 +169,7 @@ clutch_ensure_dir || exit 0
 # (c) it has spoken fewer than 2 times this session. During a live sprint it
 # instead surfaces the remaining minutes, once, under the same cap.
 
-STATE="$CLUTCH_DIR/session-state"
+STATE="$CLUTCH_SDIR/session-state"
 [ -f "$STATE" ] || exit 0
 
 NOW=$(date +%s) || exit 0
@@ -190,7 +192,7 @@ clutch_say() {
 # Live sprint: surface the countdown once, instead of the recognition line.
 # A malformed, goal-less, future-dated, or expired marker is deleted and the
 # recognition logic proceeds; a sprint never outlives its 20 minutes.
-SPRINT="$CLUTCH_DIR/sprint-start"
+SPRINT="$CLUTCH_SDIR/sprint-start"
 if [ -f "$SPRINT" ]; then
   SLINE=$(head -n 1 "$SPRINT" 2>/dev/null) || SLINE=""
   SEPOCH=${SLINE%% *}

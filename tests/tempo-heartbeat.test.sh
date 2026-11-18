@@ -16,7 +16,7 @@ mkdir "$T/repo/.clutch"
 
 # valid gear -> tempo line, spine and budget still present
 printf 'craft\n' > "$T/repo/.clutch/tempo"
-OUT=$(cd "$T/repo" && sh "$HB"); RC=$?
+OUT=$(cd "$T/repo" && sh "$HB" </dev/null); RC=$?
 [ "$RC" = 0 ] || { echo "FAIL: heartbeat exited $RC with valid gear"; exit 1; }
 echo "$OUT" | grep -q "tempo gear: craft" || { echo "FAIL: valid gear missing tempo line: $OUT"; exit 1; }
 echo "$OUT" | grep -q "dispatch spine" || { echo "FAIL: spine missing with tempo file: $OUT"; exit 1; }
@@ -24,26 +24,26 @@ echo "$OUT" | grep -q "clutch-budget" || { echo "FAIL: budget line missing with 
 
 # no tempo file -> no tempo line, spine still present
 rm "$T/repo/.clutch/tempo"
-OUT=$(cd "$T/repo" && sh "$HB"); RC=$?
+OUT=$(cd "$T/repo" && sh "$HB" </dev/null); RC=$?
 [ "$RC" = 0 ] || { echo "FAIL: heartbeat exited $RC with no tempo file"; exit 1; }
 echo "$OUT" | grep -q "tempo gear" && { echo "FAIL: tempo line with no file"; exit 1; }
 echo "$OUT" | grep -q "dispatch spine" || { echo "FAIL: spine missing without tempo file: $OUT"; exit 1; }
 
 # garbage content -> closed vocabulary collapses it to silence
 printf 'rm -rf /\n' > "$T/repo/.clutch/tempo"
-OUT=$(cd "$T/repo" && sh "$HB"); RC=$?
+OUT=$(cd "$T/repo" && sh "$HB" </dev/null); RC=$?
 [ "$RC" = 0 ] || { echo "FAIL: heartbeat exited $RC on garbage content"; exit 1; }
 echo "$OUT" | grep -q "tempo gear" && { echo "FAIL: garbage content produced a tempo line"; exit 1; }
 
 # multi-word content -> treated as absent
 printf 'craft plus junk\n' > "$T/repo/.clutch/tempo"
-OUT=$(cd "$T/repo" && sh "$HB"); RC=$?
+OUT=$(cd "$T/repo" && sh "$HB" </dev/null); RC=$?
 [ "$RC" = 0 ] || { echo "FAIL: heartbeat exited $RC on multi-word content"; exit 1; }
 echo "$OUT" | grep -q "tempo gear" && { echo "FAIL: multi-word content produced a tempo line"; exit 1; }
 
 # case variant -> closed vocabulary stays fail-closed
 printf 'Craft\n' > "$T/repo/.clutch/tempo"
-OUT=$(cd "$T/repo" && sh "$HB"); RC=$?
+OUT=$(cd "$T/repo" && sh "$HB" </dev/null); RC=$?
 [ "$RC" = 0 ] || { echo "FAIL: heartbeat exited $RC on case-variant content"; exit 1; }
 echo "$OUT" | grep -q "tempo gear" && { echo "FAIL: case-variant content produced a tempo line"; exit 1; }
 
@@ -51,7 +51,7 @@ echo "$OUT" | grep -q "tempo gear" && { echo "FAIL: case-variant content produce
 printf 'ballmer\n' > "$T/repo/.clutch/tempo"
 NOW=$(date +%s)
 printf '%s test goal\n' "$((NOW - 300))" > "$T/repo/.clutch/sprint-start"
-OUT=$(cd "$T/repo" && sh "$HB"); RC=$?
+OUT=$(cd "$T/repo" && sh "$HB" </dev/null); RC=$?
 [ "$RC" = 0 ] || { echo "FAIL: heartbeat exited $RC with tempo + sprint"; exit 1; }
 echo "$OUT" | grep -q "tempo gear: ballmer" || { echo "FAIL: tempo line missing beside sprint: $OUT"; exit 1; }
 echo "$OUT" | grep -q "min left on 'test goal'" || { echo "FAIL: sprint clock missing beside tempo: $OUT"; exit 1; }

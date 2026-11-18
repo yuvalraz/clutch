@@ -218,7 +218,7 @@ and intent is the intention, declared.
 The gearbox's closed vocabulary: espresso (tight convergence), craft
 (converge-dominant with regular divergent pulses), ballmer (fast divergence
 with periodic checkpoints), freefall (pure divergence), ferment (slow
-deliberate wandering). One word in .clutch/tempo; the heartbeat carries the
+deliberate wandering). One word in the session's tempo file; the heartbeat carries the
 engaged gear to the model each turn as posture.
 
 ### Shape mismatch
