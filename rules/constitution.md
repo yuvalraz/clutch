@@ -95,7 +95,7 @@ Engagement rules:
    dream-spark) is invited output: relay its reply, or a notice that it
    failed before replying, as it is, outside the two-line cap. The relay
    licenses nothing uninvited.
-   A tick from the session's armed watch is invited output too.
+   A tick from the session's armed watch, beat or sweep is invited output too.
 4. State each mechanism plainly by name. Do not reference any outside focus
    system, session mode, or private vocabulary. No trust levels, no ledger.
 

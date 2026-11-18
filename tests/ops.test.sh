@@ -93,17 +93,26 @@ fpin "$O" "ops: never re-sweep alone"   '- Fire on its own, re-sweep on its own 
 pin  "$O" "AS section"                  '^### Armed sweep$'
 fpin "$O" "AS writes nothing"           '`/clutch:ops re-sweep armed` comes from the session'"'"'s armed sweep, not from you, so it reads and speaks and writes nothing.'
 fpin "$O" "AS skips Step 0"             'It skips Step 0: no gear change and no record.'
-fpin "$O" "AS outside ops"              'Skip it only when a `tempo gear:` line in view names a gear other than espresso: reply with exactly `Not in ops; the sweep skipped.` and nothing else.'
+fpin "$O" "AS outside ops"              'Skip it only when the latest `tempo gear:` line in view names a gear other than espresso: reply with exactly `Not in ops; the sweep skipped.` and nothing else.'
+fpin "$O" "AS latest gear line"         'An earlier gear line is context, never a reason to skip.'
 fpin "$O" "AS no gear line reads"       'With no gear line in view, run the read-only sweep anyway: it writes nothing, so a read is the safe default.'
 # The skip never claims a read: no `No change.` and no gear-only skip in the
 # Armed sweep section (joined so a wrap cannot hide it).
 ASEC=$(awk '/^### Armed sweep$/{f=1;next} /^### /{f=0} f' "$O" | tr -s '[:space:]' ' ')
 case $ASEC in *'No change.'*) echo "FAIL: AS skip -- the armed sweep section still says No change."; fail=1 ;; esac
 case $ASEC in *"session's gear is not espresso"*) echo "FAIL: AS skip -- still skips on gear alone, with no gear line in view"; fail=1 ;; esac
+# An added sentence cannot widen the section: one skip sentence only, no
+# moved: write outside the sentence that lists what it skips, no hand-off.
+AS_SKIPS='It skips the L2 actions and Auto posts, the day brief and approval window checks and their drafts, the tablet inbox fold, claim and route, and every worklog or wait-loop write, `moved:` lines included.'
+n_nio=$(printf '%s\n' "$ASEC" | grep -o 'Not in ops' | wc -l | tr -d ' ')
+[ "$n_nio" -le 1 ] || { echo "FAIL: AS skip -- $n_nio Not in ops sentences, want one"; fail=1; }
+AS_REST=${ASEC%%"$AS_SKIPS"*}${ASEC#*"$AS_SKIPS"}
+case $AS_REST in *'moved:'*) echo "FAIL: AS writes -- a moved: line outside the skip sentence"; fail=1 ;; esac
+case $ASEC in *'/clutch:rituals'*) echo "FAIL: AS hand-off -- the armed sweep hands off to /clutch:rituals"; fail=1 ;; esac
 fpin "$O" "AS reads only"               'Otherwise it runs Steps 1-4 with reads only: the config read, the Step 2 sweep reads, the tick pass'"'"'s read of each wait loop, then the situation and one smallest move.'
 fpin "$O" "AS no writes list"           'It skips the L2 actions and Auto posts, the day brief and approval window checks and their drafts, the tablet inbox fold, claim and route, and every worklog or wait-loop write, `moved:` lines included.'
-fpin "$O" "AS no question"              'A missing config, key or state dir gets one line, never a question or a persisted answer.'
-fpin "$O" "AS waits for typed"          'What an L2 action or Auto post would do, and a wait loop that moved, are named in the situation as what waits for a sweep you type.'
+fpin "$O" "AS no question"              'A missing config, key or state dir gets one line, never a question, a persisted answer or a hand-off.'
+fpin "$O" "AS waits for typed"          'What an L2 action or Auto post would do, an L1 draft, and a wait loop that moved, are named in the situation as what waits for a sweep you type.'
 # The hand-typed re-sweep keeps its 2.15.0 bullet, word for word.
 fpin "$O" "ops: hand re-sweep unchanged" '- `/clutch:ops re-sweep` runs a fresh sweep mid-day with the same bounds and'
 # The old claim that the armed sweep sends the hand-typed line is gone.
@@ -372,7 +381,7 @@ if grep -qF '<kind>:<ref> @<tag>' "$BS"; then
   echo "FAIL: BT-moved-untagged -- the beat skill writes a tagged moved: or wait: text"; fail=1
 fi
 fpin "$BS" "BT11 never held, stays"     'A beat never holds a wait again and never removes itself: it ends with the session.'
-fpin "$BS" "BT12 reply shape"           'Then reply in at most two lines: what moved, naming at most two movements, the ones nearest the day'"'"'s work, and one smallest move. An outward action waits for its usual yes.'
+fpin "$BS" "BT12 reply shape"           'Then reply in at most two lines, plus the drift line when it applies: what moved, naming at most two movements, the ones nearest the day'"'"'s work, and one smallest move. An outward action waits for its usual yes.'
 fpin "$BS" "BT13 fixed line"            'When nothing moved, reply with exactly `No change.` and nothing more: an empty reply gets prompted for one.'
 fpin "$BS" "BT14 invited"               'The reply answers the beat'"'"'s prompt, so it is not an uninvited line.'
 fpin "$BS" "BT15 unreachable"           'A tool that is not reachable keeps its wait open: name it once, then stay silent about it.'

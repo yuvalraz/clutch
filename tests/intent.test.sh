@@ -81,7 +81,7 @@ for f in "$C" "$H"; do
   pin "$f" "carve-out gear bound ($f)" 'only when no gear is declared'
   pin "$f" "carve-out not counted ($f)" 'never counted against the budget'
   pin "$f" "carve-out ignore legal ($f)" 'ignoring it is a legal answer'
-  pin "$f" "watch tick invited ($f)" "the session's armed watch is invited output too"
+  pin "$f" "watch tick invited ($f)" "the session's armed watch, beat or sweep is invited output too"
 done
 # The five focuses: literal in the constitution and in the prelude's default
 # enumeration, which the heartbeat carve-out prints through CLUTCH_FOCI.

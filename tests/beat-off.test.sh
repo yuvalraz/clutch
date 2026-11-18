@@ -142,6 +142,12 @@ same F3 fx_owned w "$OFF"
 same F4 fx_owned_ops w "$OFF"
 same F5 fx_ops_git w "$OFF"
 same F6 fx_ops_plain w "$OFF"
+# W1/W2: CLUTCH_WATCH=off silences the beat and the sweep too, so a stale
+# ops record asks nothing and is left untouched.
+same W1 fx_ops_git w CLUTCH_WATCH=off
+case "$OUT" in *'no beat'* | *'no sweep'*) echo "FAIL: W1 -- a stale ops record asks under CLUTCH_WATCH=off"; fail=1 ;; esac
+same W2 fx_ops_plain w CLUTCH_WATCH=off
+[ -z "$OUT" ] || { echo "FAIL: W2 -- a stale ops record is not quiet under CLUTCH_WATCH=off: [$OUT]"; fail=1; }
 
 # --- positive controls, switch unset: the ops fixtures block where base does not.
 for fx in fx_ops_git fx_ops_plain; do

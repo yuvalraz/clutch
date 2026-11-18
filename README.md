@@ -102,7 +102,7 @@ only at one of those moments.
   The armed sweep only reads and speaks: it keeps the session's mode, and the actions
   and posts your delegation policy pre-approves wait for a sweep you type.
   `CLUTCH_BEAT=off` turns off both asks;
-  `CLUTCH_WATCH=off` also turns off the beat, since the session has no tag.
+  `CLUTCH_WATCH=off` also turns off both the beat and sweep asks.
 - The next session start shows them in its `Worklog:` block.
   Claims age out after 4 h and moves after 24 h.
   At most eight lines show, and a burst of moves never pushes a claim out.

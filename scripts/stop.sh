@@ -58,12 +58,12 @@ fi
 # is possible and a repeated one is not; an unreadable record (grep rc 2)
 # never blocks. Runs after the watch gate, whose block wins the stop, and
 # outside git too. Never creates the record. Every failure falls through.
-# CLUTCH_BEAT=off skips it. Same linear matches and armed-prompt rule as the
+# CLUTCH_BEAT=off or CLUTCH_WATCH=off skips it. Same linear matches and armed-prompt rule as the
 # watch gate. When the beat does not block, the same record asks the sweep
 # (`/clutch:ops re-sweep armed`, no tag) the same way, once a local day, with
 # its own "sweep asked <YYYY-MM-DD>" line. A cron whose whole prompt is the
 # hand-typed `/clutch:ops re-sweep` counts as armed too: never armed twice.
-if [ "${CLUTCH_BEAT:-}" != off ]; then
+if [ "${CLUTCH_BEAT:-}" != off ] && [ "${CLUTCH_WATCH:-}" != off ]; then
   case $INPUT in
     *'"stop_hook_active":true'* | *'"stop_hook_active": true'*) ;;
     *'"session_crons":'*)
@@ -84,6 +84,7 @@ if [ "${CLUTCH_BEAT:-}" != off ]; then
         fi
         grep -qx "sweep asked $BEAT_DAY" "$BEAT_FILE" 2>/dev/null
         if [ "$?" = 1 ]; then
+          # shortcut: an exact old-prompt `/clutch:ops re-sweep` cron (only from pre-release 323c0ed installs) counts as armed but runs the acting sweep; it dies with its session.
           case $INPUT in
             *'"prompt":"/clutch:ops re-sweep armed"'* | *'"prompt": "/clutch:ops re-sweep armed"'* | \
               *'"prompt":"/clutch:ops re-sweep"'* | *'"prompt": "/clutch:ops re-sweep"'*) ;;

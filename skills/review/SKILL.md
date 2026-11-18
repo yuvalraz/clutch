@@ -39,6 +39,15 @@ This is the existing tempo mechanism; the heartbeat carries the gear to the
 model next turn, no new state. If the write fails, the declaration still
 governs the live session; only the re-injection is lost.
 
+If this session was an ops session, it is not one now: remove its record, so its turn end stops asking for the beat and the sweep.
+Replace `@<tag>` with the latest `Session tag:` line; with no `Session tag:` line, skip this. Silent on any failure:
+
+```sh
+T='@<tag>'; case $T in '' | @ | *[./]*) ;; *) { rm -f "$HOME/.clutch/watch/${T#@}.beat"; } 2>/dev/null ;; esac
+```
+
+Then cancel the recurring tasks in this session's own task list whose prompt is exactly `/clutch:beat @<tag>` or `/clutch:ops re-sweep armed`, silently, and only those.
+
 Moving from one PR to the next is the gait in this gear, not a shape mismatch.
 The dispatch spine's gear-shift row reads a sustained change in the shape of
 the work; the review rhythm of close, next, close is the shape holding.
