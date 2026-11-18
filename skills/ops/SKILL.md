@@ -261,10 +261,11 @@ An ops session's beat does not send a tick either: it sends `/clutch:beat @<tag>
 
 `/clutch:ops re-sweep armed` comes from the session's armed sweep, not from you, so it reads and speaks and writes nothing.
 It skips Step 0: no gear change and no record.
-When the session's gear is not espresso, reply with exactly `No change.` and nothing else.
-In espresso it runs Steps 1-4 with reads only: the config read, the Step 2 sweep reads, the tick pass's read of each wait loop, then the situation and one smallest move.
+Skip it only when a `tempo gear:` line in view names a gear other than espresso: reply with exactly `Not in ops; the sweep skipped.` and nothing else.
+With no gear line in view, run the read-only sweep anyway: it writes nothing, so a read is the safe default.
+Otherwise it runs Steps 1-4 with reads only: the config read, the Step 2 sweep reads, the tick pass's read of each wait loop, then the situation and one smallest move.
 It skips the L2 actions and Auto posts, the day brief and approval window checks and their drafts, the tablet inbox fold, claim and route, and every worklog or wait-loop write, `moved:` lines included.
-A missing config or key gets one line, never a question or a persisted answer.
+A missing config, key or state dir gets one line, never a question or a persisted answer.
 What an L2 action or Auto post would do, and a wait loop that moved, are named in the situation as what waits for a sweep you type.
 
 ### Delegation

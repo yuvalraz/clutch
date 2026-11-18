@@ -93,10 +93,16 @@ fpin "$O" "ops: never re-sweep alone"   '- Fire on its own, re-sweep on its own 
 pin  "$O" "AS section"                  '^### Armed sweep$'
 fpin "$O" "AS writes nothing"           '`/clutch:ops re-sweep armed` comes from the session'"'"'s armed sweep, not from you, so it reads and speaks and writes nothing.'
 fpin "$O" "AS skips Step 0"             'It skips Step 0: no gear change and no record.'
-fpin "$O" "AS outside ops"              'When the session'"'"'s gear is not espresso, reply with exactly `No change.` and nothing else.'
-fpin "$O" "AS reads only"               'In espresso it runs Steps 1-4 with reads only: the config read, the Step 2 sweep reads, the tick pass'"'"'s read of each wait loop, then the situation and one smallest move.'
+fpin "$O" "AS outside ops"              'Skip it only when a `tempo gear:` line in view names a gear other than espresso: reply with exactly `Not in ops; the sweep skipped.` and nothing else.'
+fpin "$O" "AS no gear line reads"       'With no gear line in view, run the read-only sweep anyway: it writes nothing, so a read is the safe default.'
+# The skip never claims a read: no `No change.` and no gear-only skip in the
+# Armed sweep section (joined so a wrap cannot hide it).
+ASEC=$(awk '/^### Armed sweep$/{f=1;next} /^### /{f=0} f' "$O" | tr -s '[:space:]' ' ')
+case $ASEC in *'No change.'*) echo "FAIL: AS skip -- the armed sweep section still says No change."; fail=1 ;; esac
+case $ASEC in *"session's gear is not espresso"*) echo "FAIL: AS skip -- still skips on gear alone, with no gear line in view"; fail=1 ;; esac
+fpin "$O" "AS reads only"               'Otherwise it runs Steps 1-4 with reads only: the config read, the Step 2 sweep reads, the tick pass'"'"'s read of each wait loop, then the situation and one smallest move.'
 fpin "$O" "AS no writes list"           'It skips the L2 actions and Auto posts, the day brief and approval window checks and their drafts, the tablet inbox fold, claim and route, and every worklog or wait-loop write, `moved:` lines included.'
-fpin "$O" "AS no question"              'A missing config or key gets one line, never a question or a persisted answer.'
+fpin "$O" "AS no question"              'A missing config, key or state dir gets one line, never a question or a persisted answer.'
 fpin "$O" "AS waits for typed"          'What an L2 action or Auto post would do, and a wait loop that moved, are named in the situation as what waits for a sweep you type.'
 # The hand-typed re-sweep keeps its 2.15.0 bullet, word for word.
 fpin "$O" "ops: hand re-sweep unchanged" '- `/clutch:ops re-sweep` runs a fresh sweep mid-day with the same bounds and'
