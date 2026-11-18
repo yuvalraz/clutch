@@ -287,7 +287,7 @@ kpin() {
 }
 kpin "K1 wait verb" "wait: when an outward action leaves you waiting on someone else's move"
 kpin "K1 wait text" '<kind>:<ref> <baseline> <session tag> <what you wait for>'
-kpin "K2 watch tick invited" "A tick from the session's armed watch is invited output too."
+kpin "K2 watch tick invited" "A tick from the session's armed watch, beat or sweep is invited output too."
 kpin "K3 untagged wait" "No Session tag line: omit the tag, never a peer's."
 kpin "K4 one-token baseline" "The baseline is one token: hyphens, no spaces."
 

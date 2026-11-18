@@ -37,7 +37,7 @@ Read each wait once, by its kind, against its baseline. Only this counts as move
 A wait that moved: append its `moved:` line first, with the constitution's worklog snippet, verb `moved:` and text `<kind>:<ref> <what moved>`. Copy the ref exactly from its `wait:` line, as its own token followed by a space, with no tag after it.
 A beat never holds a wait again and never removes itself: it ends with the session.
 
-Then reply in at most two lines: what moved, naming at most two movements, the ones nearest the day's work, and one smallest move. An outward action waits for its usual yes.
+Then reply in at most two lines, plus the drift line when it applies: what moved, naming at most two movements, the ones nearest the day's work, and one smallest move. An outward action waits for its usual yes.
 When what moved sits off the day's focuses, one more line names what moved and the focus it sits beside, such as `<what moved> sits beside <focus>.` When what moved converges with the focuses, nothing more.
 The focuses are the ones this ops session's sweep read from today's focus file; with none in view, nothing more.
 With nothing moved there is no drift line: `No change.` stays the whole reply.

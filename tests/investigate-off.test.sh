@@ -33,6 +33,13 @@ for f in anchor heartbeat stop red-moment prelude; do
 done
 cp "$ROOT/rules/constitution.md" "$T/base/rules/constitution.md" \
   || { echo "FAIL: could not stage the working-tree constitution for the base side"; exit 1; }
+# 2.16.1 widens the heartbeat's invited-output clause to the beat and the
+# sweep on purpose; the base heartbeat takes the new wording so the rest
+# still compares byte for byte.
+sed "s/the session's armed watch is invited output too/the session's armed watch, beat or sweep is invited output too/" \
+  "$T/base/scripts/heartbeat.sh" > "$T/base/hb.tmp" && mv "$T/base/hb.tmp" "$T/base/scripts/heartbeat.sh" &&
+  grep -qF "the session's armed watch, beat or sweep is invited output too" "$T/base/scripts/heartbeat.sh" \
+  || { echo "FAIL: the base heartbeat did not take the widened invited-output clause"; exit 1; }
 
 SID='"session_id":"0123abcd-4567-89ab-cdef-0123456789ab"'
 src() { printf '{%s,"source":"%s"%s}' "$SID" "$1" "${2:-}"; }

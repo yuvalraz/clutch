@@ -224,6 +224,47 @@ for probe in 'x >/dev/null' 'x >"/dev/null"' 'x >> "$ROOT/.clutch/session-state"
     && { echo "FAIL: self-check flagged allowed form: $probe"; fail=1; }
 done
 
+# --- review drops the ops record: an ops session that turns to review stops
+# its turn end asking for the beat and the sweep. The one review sh block
+# naming .beat runs with @<tag> filled, under sh and zsh -f, against the
+# real stop.sh: it asks before and is quiet after; a peer's record stays.
+grep -qF 'If this session was an ops session, it is not one now: remove its record, so its turn end stops asking for the beat and the sweep.' "$RV" \
+  || { echo "FAIL: review drops ops record -- the prose is gone"; fail=1; }
+nrb=$(awk '/^```sh/{n++; f=1; b[n] = ""; next} /^```/{f=0} f{b[n] = b[n] $0 "\n"}
+  END {k = 0; for (i = 1; i <= n; i++) if (index(b[i], ".beat")) {k++; s = b[i]}
+       printf "%s", s > out; print k}' out="$T/rv-raw.sh" "$RV")
+if [ "$nrb" != 1 ]; then
+  echo "FAIL: review drops ops record -- want exactly one review sh block naming .beat, got $nrb"; fail=1
+else
+  sed "s/@<tag>/@0123abcd/" "$T/rv-raw.sh" > "$T/rv.sh"
+  cmp -s "$T/rv-raw.sh" "$T/rv.sh" && { echo "FAIL: review drops ops record -- no @<tag> to fill in"; fail=1; }
+  STOP_IN='{"session_id":"0123abcd-4567-89ab-cdef-0123456789ab","stop_hook_active":false,"session_crons":[]}'
+  mkdir -p "$T/plain"
+  stop_out() { (cd "$T/plain" && printf '%s' "$STOP_IN" | GIT_CEILING_DIRECTORIES=$T sh "$HERE/../scripts/stop.sh" 2>&1); }
+  SHELLS=sh
+  command -v zsh >/dev/null 2>&1 && SHELLS="sh zsh"
+  for sh in $SHELLS; do
+    [ "$sh" = zsh ] && run="zsh -f" || run=sh
+    mkdir -p "$HOME/.clutch/watch"
+    printf 'last 1\n' > "$HOME/.clutch/watch/0123abcd.beat"
+    printf 'last 1\n' > "$HOME/.clutch/watch/89abcdef.beat"
+    case $(stop_out) in *'no beat'*) ;; *) echo "FAIL: review drops ops record ($sh) -- the ops record does not ask, the check is vacuous"; fail=1 ;; esac
+    OUT=$(cd "$T/plain" && $run "$T/rv.sh" 2>&1)
+    [ -z "$OUT" ] && [ ! -e "$HOME/.clutch/watch/0123abcd.beat" ] && [ -f "$HOME/.clutch/watch/89abcdef.beat" ] \
+      || { echo "FAIL: review drops ops record ($sh) -- out [$OUT], watch [$(ls "$HOME/.clutch/watch" 2>/dev/null)]"; fail=1; }
+    [ -z "$(stop_out)" ] || { echo "FAIL: review drops ops record ($sh) -- the turn end still asks: $(stop_out)"; fail=1; }
+    # No ~/.clutch, or the tag left unfilled: silent, nothing created or removed.
+    rm -rf "$HOME/.clutch"
+    OUT=$(cd "$T/plain" && $run "$T/rv.sh" 2>&1)
+    [ -z "$OUT" ] && [ ! -e "$HOME/.clutch" ] || { echo "FAIL: review drops ops record ($sh) -- no ~/.clutch: out [$OUT]"; fail=1; }
+    mkdir -p "$HOME/.clutch/watch"
+    printf 'last 1\n' > "$HOME/.clutch/watch/89abcdef.beat"
+    OUT=$(cd "$T/plain" && $run "$T/rv-raw.sh" 2>&1)
+    [ -z "$OUT" ] && [ -f "$HOME/.clutch/watch/89abcdef.beat" ] || { echo "FAIL: review drops ops record ($sh) -- unfilled tag: out [$OUT]"; fail=1; }
+    rm -rf "$HOME/.clutch"
+  done
+fi
+
 [ "$fail" -eq 0 ] || exit 1
 
 # --- behavior (guard): a declared espresso gear rides every turn.
