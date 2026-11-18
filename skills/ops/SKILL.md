@@ -2,7 +2,7 @@
 name: ops
 description: Put the session in operations mode. Engage espresso, sweep the reachable integrations once for the live situation, then close loops one at a time with the day's focuses in view.
 when_to_use: Use ONLY when the user explicitly asks for operations mode ("ops", "operations mode", "run the day", "re-sweep", "tick") or when /clutch:intent hands off after an "ops" answer. A passing mention of meetings, people, or tasks mid-conversation is not a trigger.
-argument-hint: "[re-sweep|tick]"
+argument-hint: "[re-sweep|re-sweep armed|tick]"
 ---
 
 # Ops
@@ -21,7 +21,8 @@ Ops fires when you fire it. Nothing here runs on its own.
 - `/clutch:ops re-sweep` runs a fresh sweep mid-day with the same bounds and
   the same close. A re-sweep happens on request only, never on your own read
   that the situation may have moved.
-  The session's armed sweep, which an ops session's turn end asks once a day to arm, sends this same line at 08:37, 12:37 and 16:37; that arrival is a request, with the same bounds and the same close.
+- `/clutch:ops re-sweep armed` is the line the session's armed sweep sends at 08:37, 12:37 and 16:37, after an ops session's turn end asks once a day to arm it.
+  It is a read-only sweep with its own rules (see Armed sweep), never a hand-typed re-sweep.
 - `/clutch:ops tick` checks only the wait loops, once each, and speaks only
   when one moved. "Anything move?" in an ops session is the same request.
   A tick happens on request only, never on your own read that a loop moved.
@@ -48,7 +49,7 @@ This is the existing tempo mechanism; the heartbeat carries the gear to the
 model next turn, no new state. If the write fails, the declaration still
 governs the live session; only the re-injection is lost.
 
-Then record this session as an ops session, so its turn end asks once a day for the beat (`/clutch:beat`).
+Then record this session as an ops session, so its turn end asks once a day for the beat (`/clutch:beat`) and the sweep (`/clutch:ops re-sweep armed`).
 Replace `@<tag>` with the `Session tag:` from the session start; with no `Session tag:` line, skip this. Silent on any failure:
 
 ```sh
@@ -209,7 +210,7 @@ behavior:
   flinch at the wall versus never entering awareness, before anything else
   engages. **A loop that wants a clock** gets `/clutch:sprint`.
 - **Re-sweep on request only.**
-  `/clutch:ops re-sweep` is the only path to a second sweep, whether you type it or the session's armed sweep sends it.
+  `/clutch:ops re-sweep` is the only path to a second sweep that acts, and only you type it; the session's armed sweep sends `/clutch:ops re-sweep armed`, which only reads (see Armed sweep).
 - **A closed loop logs one line.** Append its `moved:` line with the
   constitution's worklog snippet, silently; speak on MISS or an error.
   That line is the only thing a closed loop writes; the sweep itself still writes nothing beyond its L2 and Auto lines and the tablet inbox items.
@@ -255,6 +256,16 @@ A tick never re-arms a loop, never names one that did not move, and never says h
 In the sweep's tick pass, moved loops fold into the situation instead of their own lines.
 A session's armed watch does not send a tick: it sends `/clutch:watch @<tag>`, which reads only the waits that tag owns.
 An ops session's beat does not send a tick either: it sends `/clutch:beat @<tag>`, which reads what other sessions moved and the waits no session's tag owns.
+
+### Armed sweep
+
+`/clutch:ops re-sweep armed` comes from the session's armed sweep, not from you, so it reads and speaks and writes nothing.
+It skips Step 0: no gear change and no record.
+When the session's gear is not espresso, reply with exactly `No change.` and nothing else.
+In espresso it runs Steps 1-4 with reads only: the config read, the Step 2 sweep reads, the tick pass's read of each wait loop, then the situation and one smallest move.
+It skips the L2 actions and Auto posts, the day brief and approval window checks and their drafts, the tablet inbox fold, claim and route, and every worklog or wait-loop write, `moved:` lines included.
+A missing config or key gets one line, never a question or a persisted answer.
+What an L2 action or Auto post would do, and a wait loop that moved, are named in the situation as what waits for a sweep you type.
 
 ### Delegation
 
@@ -410,7 +421,7 @@ and the one open loop with its next move. Nothing else is written.
 
 ## What this skill does NOT do
 
-- Fire on its own, re-sweep on its own (the session's armed sweep is a request), or watch anything in the background
+- Fire on its own, re-sweep on its own (the session's armed sweep is a request that only reads), or watch anything in the background
 - Send anything without a yes, or write to any integration without one beyond the L2 actions and Auto posts your policy lists
 - Produce a dashboard, a report, or a list for later
 - Count unread, waiting, overdue, or missed anything

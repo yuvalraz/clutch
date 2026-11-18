@@ -98,8 +98,10 @@ only at one of those moments.
   other sessions logged since the last beat and the waits no session's tag owns, and
   says `No change.` unless something moved. When what moved sits off the day's
   focuses, it names the focus it sits beside. After the beat's ask, the session is
-  told, once a day, to arm a sweep: `/clutch:ops re-sweep` at 08:37, 12:37 and 16:37,
-  the same read-only sweep you can ask for. `CLUTCH_BEAT=off` turns off both asks;
+  told, once a day, to arm a sweep: `/clutch:ops re-sweep armed` at 08:37, 12:37 and 16:37.
+  The armed sweep only reads and speaks: it keeps the session's mode, and the actions
+  and posts your delegation policy pre-approves wait for a sweep you type.
+  `CLUTCH_BEAT=off` turns off both asks;
   `CLUTCH_WATCH=off` also turns off the beat, since the session has no tag.
 - The next session start shows them in its `Worklog:` block.
   Claims age out after 4 h and moves after 24 h.
@@ -334,7 +336,7 @@ extra and close-out steps you wrote can use your integrations.
 `/clutch:watch` checks the integrations its session's waits name, every 10
 minutes until none is left.
 `/clutch:beat` checks the integrations its waits name, every hour while an ops session is open.
-An ops session's armed sweep runs the same `/clutch:ops re-sweep` at 08:37, 12:37 and 16:37.
+An ops session's armed sweep sends `/clutch:ops re-sweep armed` at 08:37, 12:37 and 16:37, and only reads.
 No hook script here touches the network, and you
 can verify it:
 

@@ -88,7 +88,7 @@ mkrepo "$SF" || exit 1
 
 BLOCK='{"decision":"block","reason":"This ops session has no beat. Arm one now with CronCreate, schedule `7 8-20 * * *`, recurring, prompt `/clutch:beat @0123abcd`, then end the turn. If the user said not to arm a beat, just end the turn."}'
 WBLOCK='{"decision":"block","reason":"This session holds open wait loops and no watch. Arm one now with CronCreate, schedule `*/10 8-21 * * *`, recurring, prompt `/clutch:watch @0123abcd`, then end the turn. If the user said not to watch them, just end the turn."}'
-SBLOCK='{"decision":"block","reason":"This ops session has no sweep. Arm one now with CronCreate, schedule `37 8,12,16 * * *`, recurring, prompt `/clutch:ops re-sweep`, then end the turn. If the user said not to arm a sweep, just end the turn."}'
+SBLOCK='{"decision":"block","reason":"This ops session has no sweep. Arm one now with CronCreate, schedule `37 8,12,16 * * *`, recurring, prompt `/clutch:ops re-sweep armed`, then end the turn. If the user said not to arm a sweep, just end the turn."}'
 IN="{\"session_id\":\"$ID\",\"stop_hook_active\":false,\"session_crons\":[]}"
 blocked() {
   [ "$RC" = 0 ] && [ "$OUT" = "$BLOCK" ] \
@@ -112,7 +112,7 @@ sblocked() {
 # crons <prompt>: the session's crons, <prompt> plus an armed sweep. The beat
 # keeps the pre-2.16.0 two-hour schedule on purpose: a live session's older
 # beat is matched by its prompt and never asked again.
-SWC='{"id":"c2","cron":"37 8,12,16 * * *","prompt":"/clutch:ops re-sweep","recurring":true}'
+SWC='{"id":"c2","cron":"37 8,12,16 * * *","prompt":"/clutch:ops re-sweep armed","recurring":true}'
 crons() {
   printf '{"session_id":"%s","stop_hook_active":false,"session_crons":[{"id":"c1","cron":"7 8-20/2 * * *","prompt":"%s","recurring":true},%s]}' "$ID" "$1" "$SWC"
 }
@@ -286,7 +286,7 @@ blocked B12
 # well inside the hook timeout (whole seconds: a diff of 1 or less is < 2 s).
 FILL=$(i=0; while [ $i -lt 2200 ]; do printf 'lorem \\"session_crons\\":[ \\"prompt\\":\\"/clutch:beat @0123abcd\\" ] \\"prompt\\":\\"/clutch:ops re-sweep\\" ipsum '; i=$((i + 1)); done)
 BCRON='{"id":"c9","schedule":"7 8-20/2 * * *","recurring":true,"prompt":"/clutch:beat @0123abcd"}'
-SCRON='{"id":"c8","schedule":"37 8,12,16 * * *","recurring":true,"prompt":"/clutch:ops re-sweep"}'
+SCRON='{"id":"c8","schedule":"37 8,12,16 * * *","recurring":true,"prompt":"/clutch:ops re-sweep armed"}'
 for c in '[]' "[$BCRON]" "[$BCRON,$SCRON]"; do
   rec
   fresh "$SF"
@@ -314,7 +314,7 @@ fresh "$SF"
 stp "$T/run" "$(bcrons "$BONLY")"
 sblocked SW1
 if [ -x /usr/bin/python3 ]; then
-  printf '%s' "$OUT" | /usr/bin/python3 -I -c 'import json,sys; d=json.load(sys.stdin); assert d["decision"] == "block"; r=d["reason"]; assert "37 8,12,16 * * *" in r; assert "prompt `/clutch:ops re-sweep`" in r; assert "recurring" in r; assert r.endswith("If the user said not to arm a sweep, just end the turn.")' 2>/dev/null \
+  printf '%s' "$OUT" | /usr/bin/python3 -I -c 'import json,sys; d=json.load(sys.stdin); assert d["decision"] == "block"; r=d["reason"]; assert "37 8,12,16 * * *" in r; assert "prompt `/clutch:ops re-sweep armed`" in r; assert "recurring" in r; assert r.endswith("If the user said not to arm a sweep, just end the turn.")' 2>/dev/null \
     || { echo "FAIL: SW1 -- block line is not the JSON sweep block object"; fail=1; }
 fi
 sweepasked SW1 1
@@ -326,8 +326,11 @@ stp "$T/run" "$(bcrons "$BONLY")"
 quiet SW2
 sweepasked SW2 1
 
-# SW3, SW3s: an armed sweep, either spacing: quiet, breadcrumb, no ask.
-for sw in "$SWC" '{"id":"c2","prompt": "/clutch:ops re-sweep","recurring":true}'; do
+# SW3, SW3s: an armed sweep, either spacing: quiet, breadcrumb, no ask. A
+# cron whose whole prompt is the hand-typed /clutch:ops re-sweep also counts,
+# so a sweep armed before the armed form is never armed twice.
+for sw in "$SWC" '{"id":"c2","prompt": "/clutch:ops re-sweep armed","recurring":true}' \
+  '{"id":"c2","prompt":"/clutch:ops re-sweep","recurring":true}' '{"id":"c2","prompt": "/clutch:ops re-sweep","recurring":true}'; do
   rec
   fresh "$SF"
   stp "$T/run" "$(bcrons "$BONLY,$sw")"
@@ -361,12 +364,16 @@ stp "$T/run" "$IN"
 sblocked SW6
 
 # SW7: a mention of the sweep prompt, a /loop prompt naming it, or a
-# re-sweep with more after it is not an armed sweep.
+# re-sweep with more after it is not an armed sweep, in either form.
 # Built outside $(...): bash 3.2 brace-expands a {a,b} there despite the quotes.
 LOOPC='{"id":"c2","prompt":"/loop 4h /clutch:ops re-sweep"}'
 MOREC='{"id":"c2","prompt":"/clutch:ops re-sweep now"}'
+LOOPA='{"id":"c2","prompt":"/loop 4h /clutch:ops re-sweep armed"}'
+MOREA='{"id":"c2","prompt":"/clutch:ops re-sweep armed now"}'
 for c in "$(docin 'Armed: \"prompt\":\"/clutch:ops re-sweep\" now' "[$BONLY]")" \
-  "$(bcrons "$BONLY,$LOOPC")" "$(bcrons "$BONLY,$MOREC")"; do
+  "$(docin 'Armed: \"prompt\":\"/clutch:ops re-sweep armed\" now' "[$BONLY]")" \
+  "$(bcrons "$BONLY,$LOOPC")" "$(bcrons "$BONLY,$MOREC")" \
+  "$(bcrons "$BONLY,$LOOPA")" "$(bcrons "$BONLY,$MOREA")"; do
   rec
   fresh "$SF"
   stp "$T/run" "$c"
@@ -416,7 +423,7 @@ awk '/^- An ops session is told at turn end/{f=1} f && /^- / && !/^- An ops/{f=0
 
 # B-readme-sweep: the README beat bullet names the armed sweep, its times and the switch.
 awk '/^- An ops session is told at turn end/{f=1} f && /^- / && !/^- An ops/{f=0} f' "$HERE/../README.md" |
-  tr -s '[:space:]' ' ' | grep -q '`/clutch:ops re-sweep` at 08:37, 12:37 and 16:37.*CLUTCH_BEAT=off. turns off both asks' \
+  tr -s '[:space:]' ' ' | grep -q '`/clutch:ops re-sweep armed` at 08:37, 12:37 and 16:37.*CLUTCH_BEAT=off. turns off both asks' \
   || { echo "FAIL: B-readme-sweep -- the beat bullet does not name the armed sweep and its switch"; fail=1; }
 
 # --- H1-H10: clutch_beat_window. bw <tag>: the helper sourced from the

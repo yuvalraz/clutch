@@ -60,8 +60,9 @@ fi
 # outside git too. Never creates the record. Every failure falls through.
 # CLUTCH_BEAT=off skips it. Same linear matches and armed-prompt rule as the
 # watch gate. When the beat does not block, the same record asks the sweep
-# (`/clutch:ops re-sweep`, no tag) the same way, once a local day, with its
-# own "sweep asked <YYYY-MM-DD>" line.
+# (`/clutch:ops re-sweep armed`, no tag) the same way, once a local day, with
+# its own "sweep asked <YYYY-MM-DD>" line. A cron whose whole prompt is the
+# hand-typed `/clutch:ops re-sweep` counts as armed too: never armed twice.
 if [ "${CLUTCH_BEAT:-}" != off ]; then
   case $INPUT in
     *'"stop_hook_active":true'* | *'"stop_hook_active": true'*) ;;
@@ -84,10 +85,11 @@ if [ "${CLUTCH_BEAT:-}" != off ]; then
         grep -qx "sweep asked $BEAT_DAY" "$BEAT_FILE" 2>/dev/null
         if [ "$?" = 1 ]; then
           case $INPUT in
-            *'"prompt":"/clutch:ops re-sweep"'* | *'"prompt": "/clutch:ops re-sweep"'*) ;;
+            *'"prompt":"/clutch:ops re-sweep armed"'* | *'"prompt": "/clutch:ops re-sweep armed"'* | \
+              *'"prompt":"/clutch:ops re-sweep"'* | *'"prompt": "/clutch:ops re-sweep"'*) ;;
             *)
               { printf 'sweep asked %s\n' "$BEAT_DAY" >> "$BEAT_FILE"; } 2>/dev/null &&
-                printf '%s\n' '{"decision":"block","reason":"This ops session has no sweep. Arm one now with CronCreate, schedule `37 8,12,16 * * *`, recurring, prompt `/clutch:ops re-sweep`, then end the turn. If the user said not to arm a sweep, just end the turn."}' &&
+                printf '%s\n' '{"decision":"block","reason":"This ops session has no sweep. Arm one now with CronCreate, schedule `37 8,12,16 * * *`, recurring, prompt `/clutch:ops re-sweep armed`, then end the turn. If the user said not to arm a sweep, just end the turn."}' &&
                 exit 0
               ;;
           esac
