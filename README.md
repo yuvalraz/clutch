@@ -101,6 +101,8 @@ only at one of those moments.
   told, once a day, to arm a sweep: `/clutch:ops re-sweep armed` at 08:37, 12:37 and 16:37.
   The armed sweep only reads and speaks: it keeps the session's mode, and the actions
   and posts your delegation policy pre-approves wait for a sweep you type.
+  The beat and the armed sweep stop themselves once the session's ops record is gone,
+  such as when the session turns to review.
   `CLUTCH_BEAT=off` turns off both asks;
   `CLUTCH_WATCH=off` also turns off both the beat and sweep asks.
 - The next session start shows them in its `Worklog:` block.
@@ -336,7 +338,7 @@ extra and close-out steps you wrote can use your integrations.
 `/clutch:watch` checks the integrations its session's waits name, every 10
 minutes until none is left.
 `/clutch:beat` checks the integrations its waits name, every hour while an ops session is open.
-An ops session's armed sweep sends `/clutch:ops re-sweep armed` at 08:37, 12:37 and 16:37, and only reads.
+An ops session's armed sweep sends `/clutch:ops re-sweep armed` at 08:37, 12:37 and 16:37, and only reads, until the session's ops record is gone.
 No hook script here touches the network, and you
 can verify it:
 

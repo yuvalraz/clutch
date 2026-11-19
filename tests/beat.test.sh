@@ -12,7 +12,7 @@
 # beat skill's read line, R2 the ops Step 0 record snippet under sh and
 # zsh -f (its tag guard against '@', '@../x', '@a/b' and an unguarded
 # mutant), R3 the beat skill's moved: text through the constitution snippet.
-# C1-C7 cover clutch_ops_record (0 record there, 1 surely gone, 2 cannot
+# C1-C9 cover clutch_ops_record (0 record there, 1 surely gone, 2 cannot
 # tell; never writes). R4/R5 run the beat's and the armed sweep's record
 # check line under sh and zsh -f.
 # prelude.sh and stop.sh are staged into a scratch tree and run from a scratch
@@ -430,6 +430,15 @@ awk '/^- An ops session is told at turn end/{f=1} f && /^- / && !/^- An ops/{f=0
   tr -s '[:space:]' ' ' | grep -q '`/clutch:ops re-sweep armed` at 08:37, 12:37 and 16:37.*CLUTCH_BEAT=off. turns off both asks' \
   || { echo "FAIL: B-readme-sweep -- the beat bullet does not name the armed sweep and its switch"; fail=1; }
 
+# B-readme-stop: the beat bullet and the network paragraph say the beat and
+# the armed sweep stop themselves once the session's ops record is gone.
+awk '/^- An ops session is told at turn end/{f=1} f && /^- / && !/^- An ops/{f=0} f' "$HERE/../README.md" |
+  tr -s '[:space:]' ' ' | grep -q 'The beat and the armed sweep stop themselves once the session.s ops record is gone' \
+  || { echo "FAIL: B-readme-stop -- the beat bullet does not say the beat and sweep stop once the ops record is gone"; fail=1; }
+tr -s '[:space:]' ' ' < "$HERE/../README.md" |
+  grep -q 'and only reads, until the session.s ops record is gone' \
+  || { echo "FAIL: B-readme-stop -- the armed sweep line does not say it runs until the ops record is gone"; fail=1; }
+
 # --- H1-H10: clutch_beat_window. bw <tag>: the helper sourced from the
 # staged prelude in a plain dir; sets OUT, RC and ERR. mkrec <line>...: a
 # record holding exactly those lines.
@@ -735,7 +744,7 @@ else
   done
 fi
 
-# --- C1-C7: clutch_ops_record <@tag>: 0 the record is there, 1 it surely is
+# --- C1-C9: clutch_ops_record <@tag>: 0 the record is there, 1 it surely is
 # not, 2 cannot tell. It never creates or changes anything.
 cr() { OUT=$(cd "$T/plain" && . "$T/scripts/prelude.sh" && clutch_ops_record "$1" 2>&1); RC=$?; }
 rec; R_B=$(cat "$BF")
@@ -749,9 +758,23 @@ mkdir -p "$HOME/.clutch"
 cr '@0123abcd'; is "C4 no watch dir" 1 ''
 [ ! -e "$HOME/.clutch/watch" ] || { echo "FAIL: C4 -- watch dir created"; fail=1; }
 rec
-for tg in '' '@' '@../0123abcd' '@a/b' '0123abcd'; do cr "$tg"; is "C5 bad tag [$tg]" 2 ''; done
+# The record 0123abcd.beat is there, so a wrong 1 on a near-miss tag shows.
+for tg in '' '@' '@../0123abcd' '@a/b' '0123abcd' '@<tag>' '@0123abc' '@0123abcd ' '@0123abcd-4567'; do
+  cr "$tg"; is "C5 bad tag [$tg]" 2 ''
+done
 OUT=$(cd "$T/plain" && HOME='' && . "$T/scripts/prelude.sh" && clutch_ops_record '@0123abcd' 2>&1); RC=$?
 is "C6 empty HOME" 2 ''
+OUT=$(cd "$T/plain" && HOME="$T/nohome" && . "$T/scripts/prelude.sh" && clutch_ops_record '@0123abcd' 2>&1); RC=$?
+is "C6 missing HOME" 2 ''
+if [ "$(id -u)" = 0 ]; then
+  echo "SKIP: C6 unsearchable HOME parent (root reads through chmod)"
+else
+  # The EXIT trap restores the mode if this run dies before the chmod back.
+  mkdir -p "$T/lk/home"; chmod 000 "$T/lk"
+  OUT=$(cd "$T/plain" && HOME="$T/lk/home" && . "$T/scripts/prelude.sh" && clutch_ops_record '@0123abcd' 2>&1); RC=$?
+  chmod 755 "$T/lk"
+  is "C6 unsearchable HOME parent" 2 ''
+fi
 if [ "$(id -u)" = 0 ]; then
   echo "SKIP: C7 modes (root reads through chmod)"
 else
@@ -760,6 +783,13 @@ else
 fi
 rm -rf "$HOME/.clutch"; mkdir -p "$HOME/.clutch"; : > "$HOME/.clutch/watch"
 cr '@0123abcd'; is "C7 watch not a dir" 2 ''
+# C8 a dangling record symlink still counts as there; C9 a dangling
+# ~/.clutch symlink cannot be told apart from a broken mount.
+rec; rm -f "$BF"; ln -s "$T/nowhere" "$BF"
+cr '@0123abcd'; is "C8 dangling record symlink" 0 ''
+rm -rf "$HOME/.clutch"; ln -s "$T/nowhere" "$HOME/.clutch"
+cr '@0123abcd'; is "C9 dangling ~/.clutch symlink" 2 ''
+rm -f "$HOME/.clutch"
 
 # --- R4/R5: the beat skill's and the armed sweep's record check line, the
 # plugin root replaced by the staged tree and @<tag> filled, under sh and

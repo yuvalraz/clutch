@@ -262,7 +262,9 @@ clutch_beat_window() {
 # Is <@tag>'s ops record (~/.clutch/watch/<tag8>.beat) there? 0 yes, 1 surely
 # not (the armed beat and sweep stop), 2 cannot tell (they go on). Writes nothing.
 clutch_ops_record() {
-  case $1 in '' | @ | *[./]* | [!@]*) return 2 ;; esac
+  # Spelled-out class, the same guard as clutch_beat_window.
+  case $1 in @????????) ;; *) return 2 ;; esac
+  case $1 in @*[!0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz-]*) return 2 ;; esac
   [ -n "$HOME" ] || return 2
   COR_F="$HOME/.clutch/watch/${1#@}.beat"
   if [ -e "$COR_F" ] || [ -L "$COR_F" ]; then return 0; fi
@@ -272,6 +274,7 @@ clutch_ops_record() {
       return 2
     fi
   done
+  [ -d "$HOME" ] && [ -x "$HOME" ] || return 2
   return 1
 }
 
