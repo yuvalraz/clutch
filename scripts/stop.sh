@@ -23,6 +23,16 @@ PRELUDE=$(dirname "$0")/prelude.sh
 # every " is escaped, so a mention in a message cannot match. A key is the
 # only string followed by ':', so "session_crons": is the key itself; no key
 # means the registry was unreachable, so no block.
+# The silent check (scripts/poll.sh, beside this script): when every owned
+# wait parses as gh:<owner>/<repo>#<n>, as poll.sh reads it, a live poller
+# (clutch_poll_alive 0) or a cannot-tell (2) arms the set; otherwise the ask
+# is to start the poller, once per line recorded in neither <tag8> nor
+# <tag8>.polled (the ask records in .polled, which 2.16.2 never reads), and
+# once more after a poller that ran has ended (3: its .poll removed first).
+# A set with any other wait is asked the 30-minute watch through <tag8> and
+# leaves .poll alone. CLUTCH_POLL=off, or a scripts dir that is not absolute,
+# holds a byte outside the spelled-out class, or has no poll.sh, keeps the
+# 2.16.2 */10 ask byte for byte.
 if [ "${CLUTCH_WATCH:-}" != off ]; then
   case $INPUT in
     *'"stop_hook_active":true'* | *'"stop_hook_active": true'*) ;;
@@ -30,20 +40,58 @@ if [ "${CLUTCH_WATCH:-}" != off ]; then
       if WATCH_TAG=$(clutch_session_tag "$INPUT") &&
         WATCH_OWN=$(clutch_owned_loops "$WATCH_TAG" 2>/dev/null) &&
         [ -n "$WATCH_OWN" ]; then
+        WATCH_KIND=old
+        WATCH_DIR=$(dirname "$0")
+        if [ "${CLUTCH_POLL:-}" != off ] && [ -f "$WATCH_DIR/poll.sh" ]; then
+          case $WATCH_DIR in
+            /*[!ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789._/~+-]*) ;;
+            /*)
+              if printf '%s\n' "$WATCH_OWN" | LC_ALL=C awk '{ r = $4; sub(/[,;:.\r]+$/, "", r) }
+                r !~ /^gh:[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+#[0-9]+$/ { f = 1 } END { exit f }'; then
+                WATCH_KIND=poll
+              else
+                WATCH_KIND=cron30
+              fi
+              ;;
+          esac
+        fi
         case $INPUT in
           *"\"prompt\":\"/clutch:watch $WATCH_TAG\""* | *"\"prompt\": \"/clutch:watch $WATCH_TAG\""*) ;;
           *)
             WATCH_FILE="$HOME/.clutch/watch/${WATCH_TAG#@}"
-            if [ -e "$WATCH_FILE" ]; then
-              WATCH_NEW=$(printf '%s\n' "$WATCH_OWN" | grep -vxF -f "$WATCH_FILE" 2>/dev/null)
-            else
+            if [ "$WATCH_KIND" = poll ]; then
+              clutch_poll_alive "$WATCH_TAG"
+              WATCH_RC=$?
+              # 3: a poller ran and ended; ask again only once its .poll is gone.
+              [ "$WATCH_RC" != 3 ] || rm -f "$WATCH_FILE.poll" 2>/dev/null || WATCH_RC=2
+              case $WATCH_RC in 1 | 3) ;; *) WATCH_RC=0 ;; esac
               WATCH_NEW=$WATCH_OWN
-            fi &&
-              [ -n "$WATCH_NEW" ] &&
-              mkdir -p "$HOME/.clutch/watch" 2>/dev/null &&
-              printf '%s\n' "$WATCH_NEW" 2>/dev/null >> "$WATCH_FILE" &&
-              printf '{"decision":"block","reason":"This session holds open wait loops and no watch. Arm one now with CronCreate, schedule `*/10 8-21 * * *`, recurring, prompt `/clutch:watch %s`, then end the turn. If the user said not to watch them, just end the turn."}\n' "$WATCH_TAG" &&
-              exit 0
+              for WATCH_REC in "$WATCH_FILE" "$WATCH_FILE.polled"; do
+                [ "$WATCH_RC" != 0 ] && [ -n "$WATCH_NEW" ] && [ -e "$WATCH_REC" ] || continue
+                WATCH_NEW=$(printf '%s\n' "$WATCH_NEW" | grep -vxF -f "$WATCH_REC" 2>/dev/null)
+                [ "$?" -le 1 ] || WATCH_RC=0
+              done
+              [ "$WATCH_RC" = 3 ] || [ -n "$WATCH_NEW" ] || WATCH_RC=0
+              if [ "$WATCH_RC" != 0 ]; then
+                mkdir -p "$HOME/.clutch/watch" 2>/dev/null &&
+                  { [ -z "$WATCH_NEW" ] || { printf '%s\n' "$WATCH_NEW" >> "$WATCH_FILE.polled"; } 2>/dev/null; } &&
+                  printf '{"decision":"block","reason":"This session holds open wait loops and no watch. Start `sh %s/poll.sh %s` with the Bash tool'\''s run_in_background, then end the turn: it stays silent until a wait moves. If the user said not to watch them, just end the turn."}\n' "$WATCH_DIR" "$WATCH_TAG" &&
+                  exit 0
+              fi
+            else
+              WATCH_CRON='*/10 8-21 * * *'
+              [ "$WATCH_KIND" = old ] || WATCH_CRON='7,37 8-21 * * *'
+              if [ -e "$WATCH_FILE" ]; then
+                WATCH_NEW=$(printf '%s\n' "$WATCH_OWN" | grep -vxF -f "$WATCH_FILE" 2>/dev/null)
+              else
+                WATCH_NEW=$WATCH_OWN
+              fi &&
+                [ -n "$WATCH_NEW" ] &&
+                mkdir -p "$HOME/.clutch/watch" 2>/dev/null &&
+                printf '%s\n' "$WATCH_NEW" 2>/dev/null >> "$WATCH_FILE" &&
+                printf '{"decision":"block","reason":"This session holds open wait loops and no watch. Arm one now with CronCreate, schedule `%s`, recurring, prompt `/clutch:watch %s`, then end the turn. If the user said not to watch them, just end the turn."}\n' "$WATCH_CRON" "$WATCH_TAG" &&
+                exit 0
+            fi
             ;;
         esac
       fi

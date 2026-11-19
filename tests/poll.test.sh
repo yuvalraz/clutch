@@ -4,7 +4,7 @@
 # third field): 0 alive (kill -0 passes and ps -ww names poll.sh @<tag8> at
 # the end), 1 no record (proven absent), 2 cannot tell, 3 ended (dead or
 # reused pid, another tag's poller, malformed line). It never writes.
-# M1-M25 with M5b, M11b, M12b, M12c, M20b, M20c, M22b and M24b run
+# M1-M25 with M5b, M11b, M12b, M12c, M20b, M20c, M22b and M24b-M24e run
 # scripts/poll.sh @<tag> (the silent check) against a fake gh that applies the
 # real --jq filter to a per-PR GraphQL fixture through /usr/bin/jq, a fake
 # date for +%H and +%s and a fake sleep: quiet rounds print nothing, a move
@@ -157,10 +157,15 @@ done
 [ -f "$F/${o}_${r}_${n}.json" ] || exit 1
 /usr/bin/jq -r "$q" "$F/${o}_${r}_${n}.json"
 EOF
-# Fake date: +%H reads $FIX/hour (default 12, inside the window).
+# Fake date: +%H pops the first line of $FIX/hseq when it holds one, else
+# reads $FIX/hour (default 12, inside the window).
 cat > "$T/mbin/date" <<'EOF'
 #!/bin/sh
-if [ "$*" = '+%H' ]; then cat "$HOME/../fix/hour" 2>/dev/null || echo 12; exit 0; fi
+F=$HOME/../fix
+if [ "$*" = '+%H' ]; then
+  if [ -s "$F/hseq" ]; then head -n 1 "$F/hseq"; sed 1d "$F/hseq" > "$F/hseq.t"; mv "$F/hseq.t" "$F/hseq"; exit 0; fi
+  cat "$F/hour" 2>/dev/null || echo 12; exit 0
+fi
 [ "$*" = '+%s' ] && [ -f "$HOME/../fix/datefail" ] && exit 1
 exec /bin/date "$@"
 EOF
@@ -278,6 +283,18 @@ own1; fx o_r_1 OPEN "$B0" '' ''; nl 1 1 0 1 1 > "$FIX/fseq"
 pr 5 @0123abcd; ok "M24b fails twice, answers, fails twice" 0 "$ENDED" 5
 own1; fx o_r_1 MERGED "$NEW" '' ''; nl 1 1 > "$FIX/fseq"
 pr 4 @0123abcd; ok "M24b fails twice then moves" 0 "$(nl 'gh:o/r#1 merged' "$CLOSE")" 3
+# M24c: the count is per ref: o/r#2 answering never resets o/r#1's failures.
+own1; madd 50 "proj wait: gh:o/r#2 $B0 @0123abcd pr two"; fx o_r_2 OPEN "$B0" '' ''
+pr 4 @0123abcd; ok "M24c one ref fails, the other answers" 0 "$(nl 'gh:o/r#1 unreadable' "$CLOSE")" 6
+# M24d: an unreadable mark holds back only its own wait line; a new wait line
+# on the same ref (another epoch) wakes unreadable again.
+own1; mkdir -p "$HOME/.clutch/watch"; printf 'unreadable gh:o/r#1 %s\n' "$((NOW - 5000))" > "$WF"
+pr 4 @0123abcd; ok "M24d new wait line wakes unreadable again" 0 "$(nl 'gh:o/r#1 unreadable' "$CLOSE")" 3
+grep -qx "unreadable gh:o/r#1 $((NOW - 100))" "$WF" || { echo "FAIL: M24d -- no mark for the new wait line: [$(cat "$WF")]"; fail=1; }
+# M24e: a round outside the window neither counts a failure nor resets the
+# count: hours 12 12 03 12 wake unreadable in round 4 after 3 gh calls.
+own1; nl 12 12 03 12 > "$FIX/hseq"
+pr 4 @0123abcd; ok "M24e outside-window round neither counts nor resets" 0 "$(nl 'gh:o/r#1 unreadable' "$CLOSE")" 3
 own1; fx o_r_1 OPEN "$B0" '' ''; : > "$FIX/repoll"
 pr 3 @0123abcd; ok "M15 superseded" 0 "$ENDED" 1
 own1; fx o_r_1 MERGED "$NEW" '' ''; : > "$FIX/log"

@@ -14,20 +14,25 @@
 # S2b, S2c and S10b cover the stop.sh watch gate (one block line while the
 # session holds an owned open wait not yet recorded in ~/.clutch/watch/<tag8>
 # and no "prompt" whose whole value is /clutch:watch @<tag8>; S19 bounds the
-# time on a ~160 KB message).
+# time on a ~160 KB message), all under CLUTCH_POLL=off, the 2.16.2 asks.
+# P1-P16 with P3b, P6b-P6e and P10b cover the silent-check gate with
+# CLUTCH_POLL unset (WPOLL, WCRON30, the stale .poll restart, the path rule,
+# the 2.16.2 record read on upgrade and 75ddf0e's ask after a revert); PZ
+# proves the off mode matches 75ddf0e byte for byte, files included.
 # prelude.sh, anchor.sh, stop.sh and the constitution are staged into a
 # scratch tree and run from a scratch repo or a non-git dir under a scratch
 # HOME. PRELUDE_SH, ANCHOR_SH, STOP_SH and CONST_FILE override the targets
 # for replay against a historical version. Silent on pass apart from PASS.
 set -u
-unset CLUTCH_WATCH CLUTCH_INVESTIGATE CLAUDE_PLUGIN_ROOT
+unset CLUTCH_WATCH CLUTCH_POLL CLUTCH_INVESTIGATE CLAUDE_PLUGIN_ROOT
 
 HERE=$(cd "$(dirname "$0")" && pwd)
 P=${PRELUDE_SH:-$HERE/../scripts/prelude.sh}
 A=${ANCHOR_SH:-$HERE/../scripts/anchor.sh}
 K=${CONST_FILE:-$HERE/../rules/constitution.md}
 S=${STOP_SH:-$HERE/../scripts/stop.sh}
-for f in "$P" "$A" "$K" "$S"; do
+PL=${POLL_SH:-$HERE/../scripts/poll.sh}
+for f in "$P" "$A" "$K" "$S" "$PL"; do
   [ -f "$f" ] || { echo "FAIL: missing $f"; exit 1; }
 done
 
@@ -39,6 +44,7 @@ mkdir -p "$HOME" "$T/scripts" "$T/plain" "$T/rules"
 cp "$P" "$T/scripts/prelude.sh"
 cp "$A" "$T/scripts/anchor.sh"
 cp "$S" "$T/scripts/stop.sh"
+cp "$PL" "$T/scripts/poll.sh"
 cp "$K" "$T/rules/constitution.md"
 W="$HOME/.clutch/worklog.md"
 NOW=$(date +%s)
@@ -298,8 +304,10 @@ kpin "K4 one-token baseline" "The baseline is one token: hyphens, no spaces."
 unset XDG_CONFIG_HOME
 GIT_CONFIG_NOSYSTEM=1
 export GIT_CONFIG_NOSYSTEM
+# The S series keeps the 2.16.2 asks: CLUTCH_POLL=$POLL, off until the P series.
+POLL=off
 stp() {
-  OUT=$(cd "$1" && printf '%s' "$2" | CLUTCH_WATCH=$WATCH GIT_CEILING_DIRECTORIES=$T sh "$T/scripts/stop.sh" 2>/dev/null); RC=$?
+  OUT=$(cd "$1" && printf '%s' "$2" | CLUTCH_WATCH=$WATCH CLUTCH_POLL=$POLL GIT_CEILING_DIRECTORIES=$T sh "$T/scripts/stop.sh" 2>/dev/null); RC=$?
 }
 fresh() { rm -rf "$T/run" && cp -R "$1" "$T/run"; }
 mkrepo() {
@@ -512,6 +520,235 @@ for c in '[]' "[$WCRON]"; do
   [ "$S19_DT" -le 1 ] || { echo "FAIL: S19 [$c] -- ${S19_DT}s for a ${#FILL}-byte message"; fail=1; }
   if [ "$c" = '[]' ]; then blocked "S19 unarmed"; else quiet "S19 armed"; fi
 done
+
+# --- P1-P16: the silent-check gate, CLUTCH_POLL unset. An all-gh owned set
+# (every ref parses as gh:<owner>/<repo>#<n>, as poll.sh reads it) is armed
+# by a live poller, asked WPOLL once per line recorded in neither
+# ~/.clutch/watch/<tag8> nor <tag8>.polled (the ask records in .polled), and
+# asked again after a poller that ran has ended (its stale .poll removed
+# first). A set with any other wait gets WCRON30 through <tag8> by the 2.16.2
+# rule and never reads or removes .poll. A scripts dir that is not absolute,
+# holds a byte outside [A-Za-z0-9._/~+-], or has no poll.sh gives the 2.16.2
+# ask. PZ: under CLUTCH_POLL=off, stdout, rc and ~/.clutch match 75ddf0e's own
+# stop.sh and prelude.sh (FAIL when unreachable).
+POLL=''
+wpoll() { printf '{"decision":"block","reason":"This session holds open wait loops and no watch. Start `sh %s/poll.sh @0123abcd` with the Bash tool'"'"'s run_in_background, then end the turn: it stays silent until a wait moves. If the user said not to watch them, just end the turn."}' "$1"; }
+WPOLL=$(wpoll "$T/scripts")
+WCRON30='{"decision":"block","reason":"This session holds open wait loops and no watch. Arm one now with CronCreate, schedule `7,37 8-21 * * *`, recurring, prompt `/clutch:watch @0123abcd`, then end the turn. If the user said not to watch them, just end the turn."}'
+PP="$FP.poll"
+PD="$FP.polled"
+L1="$((NOW - 100)) proj wait: gh:o/r#1 b1 @0123abcd pr one"
+# Stub pollers: live pids whose command line ends with poll.sh @<tag>.
+mkdir -p "$T/stub"
+printf 'sleep 60\n' > "$T/stub/poll.sh"
+bg() { ( "$@" </dev/null >/dev/null 2>&1 & echo $! ); }
+LIVE=$(bg sh "$T/stub/poll.sh" @0123abcd)
+NOTPOLL=$(bg sleep 60)
+DEAD=$(bg true)
+trap 'kill $LIVE $NOTPOLL 2>/dev/null; chmod -R u+rwx "$T" 2>/dev/null; rm -rf "$T"' EXIT
+sleep 1
+# prec <pid>: a .poll naming that pid.
+prec() { mkdir -p "$HOME/.clutch/watch" && printf '%s %s\n' "$1" "$NOW" > "$PP"; }
+# snap: the ~/.clutch tree, modes and contents, to prove a stop wrote nothing.
+snap() { ls -lRa "$HOME" 2>/dev/null | grep -v '^total'; cat "$HOME"/.clutch/watch/* 2>/dev/null; }
+same_tree() { [ "$(snap)" = "$1" ] || { echo "FAIL: $2 -- the stop changed ~/.clutch"; fail=1; }; }
+mixed() { owned1; add 90 'proj wait: slack:C1/1.2 1.2 @0123abcd thread'; }
+cronsch() {
+  printf '{"session_id":"%s","stop_hook_active":false,"session_crons":[{"id":"c1","cron":"%s","prompt":"/clutch:watch @0123abcd","recurring":true}]}' "$ID" "$1"
+}
+PL1="$T/plain"
+
+# P1: an all-gh set, no .poll, no cron: WPOLL naming the staged scripts dir;
+# the line lands in .polled, never in <tag8>; the next stop is quiet.
+owned1
+stp "$PL1" "$IN"
+is P1 0 "$WPOLL"
+[ "$(cat "$PD" 2>/dev/null)" = "$L1" ] || { echo "FAIL: P1 -- .polled [$(cat "$PD" 2>/dev/null)]"; fail=1; }
+[ ! -e "$FP" ] || { echo "FAIL: P1 -- <tag8> written"; fail=1; }
+stp "$PL1" "$IN"
+quiet "P1 again"
+# P2: a live poller for the tag arms the set: quiet, nothing recorded.
+owned1
+prec "$LIVE"
+B=$(snap); stp "$PL1" "$IN"; quiet P2; same_tree "$B" P2
+# P3: lines in .polled and a dead pid's .poll: .poll removed, WPOLL anyway.
+# P3b: then quiet, a declined restart is not asked again.
+# P4: a reused non-poller pid is the same.
+for pid in "$DEAD" "$NOTPOLL"; do
+  owned1
+  stp "$PL1" "$IN"
+  prec "$pid"
+  stp "$PL1" "$IN"
+  is "P3/P4 restart [$pid]" 0 "$WPOLL"
+  [ ! -e "$PP" ] || { echo "FAIL: P3 [$pid] -- .poll left"; fail=1; }
+  [ "$(cat "$PD" 2>/dev/null)" = "$L1" ] || { echo "FAIL: P3 [$pid] -- .polled [$(cat "$PD" 2>/dev/null)], want one line"; fail=1; }
+  stp "$PL1" "$IN"
+  quiet "P3b after restart [$pid]"
+done
+# P5: any /clutch:watch @tag cron arms the set, a stale .poll included.
+for c in '*/15 8-21 * * *' '*/10 8-21 * * *' '7,37 8-21 * * *'; do
+  owned1
+  prec "$DEAD"
+  B=$(snap); stp "$PL1" "$(cronsch "$c")"; quiet "P5 [$c]"; same_tree "$B" "P5 [$c]"
+done
+# P6: gh and slack waits: WCRON30, recorded in <tag8>, never in .polled.
+mixed
+stp "$PL1" "$IN"
+is P6 0 "$WCRON30"
+[ "$(grep -c '' "$FP" 2>/dev/null)" = 2 ] || { echo "FAIL: P6 -- <tag8> [$(cat "$FP" 2>/dev/null)]"; fail=1; }
+[ ! -e "$PD" ] || { echo "FAIL: P6 -- .polled written"; fail=1; }
+# P6b: a live poller never hides a new non-gh wait; .poll and the poller stay.
+mixed
+prec "$LIVE"
+PB=$(cat "$PP")
+stp "$PL1" "$IN"
+is P6b 0 "$WCRON30"
+[ "$(cat "$PP")" = "$PB" ] || { echo "FAIL: P6b -- .poll changed"; fail=1; }
+kill -0 "$LIVE" 2>/dev/null || { echo "FAIL: P6b -- the stub poller is gone"; fail=1; }
+# P6c: all recorded in <tag8>, stale .poll: quiet, .poll untouched.
+# P6d: the same with a live poller: quiet, nothing written.
+for pid in "$DEAD" "$LIVE"; do
+  mixed
+  stp "$PL1" "$IN"
+  prec "$pid"
+  B=$(snap); stp "$PL1" "$IN"; quiet "P6c/P6d [$pid]"; same_tree "$B" "P6c/P6d [$pid]"
+done
+# P6e: a gh ref poll.sh cannot parse is not gh (WCRON30); a trailing comma
+# parses, as the poller strips it (WPOLL).
+for r in 'gh:o/r#' 'gh:o/r#1x' 'gh:bad#1' 'gh:o/r/s#1'; do
+  seed
+  add 100 "proj wait: $r b1 @0123abcd odd"
+  stp "$PL1" "$IN"
+  is "P6e [$r]" 0 "$WCRON30"
+done
+seed
+add 100 'proj wait: gh:o/r#1, b1 @0123abcd comma'
+stp "$PL1" "$IN"
+is "P6e [gh:o/r#1,]" 0 "$WPOLL"
+# P7: slack only: WCRON30.
+seed
+add 100 'proj wait: slack:C1/1.2 1.2 @0123abcd thread'
+stp "$PL1" "$IN"
+is P7 0 "$WCRON30"
+# P8: CLUTCH_WATCH=off: quiet, nothing written.
+owned1
+WATCH=off
+B=$(snap); stp "$PL1" "$IN"; quiet P8; same_tree "$B" P8
+WATCH=''
+if [ "$(id -u)" = 0 ]; then
+  echo "SKIP: P9, P11, P12, P12b modes (root reads through chmod)"
+else
+  # P9: liveness cannot tell (.poll mode 000): quiet, nothing written.
+  owned1
+  prec "$LIVE"
+  chmod 000 "$PP"
+  B=$(snap); stp "$PL1" "$IN"; quiet P9; same_tree "$B" P9
+  chmod 644 "$PP"
+  # P11: the stale .poll cannot be removed: no ask.
+  owned1
+  stp "$PL1" "$IN"
+  prec "$DEAD"
+  chmod 555 "$HOME/.clutch/watch"
+  stp "$PL1" "$IN"
+  chmod 755 "$HOME/.clutch/watch"
+  quiet P11
+  [ -e "$PP" ] || { echo "FAIL: P11 -- .poll gone"; fail=1; }
+  # P12: .polled cannot be written: no ask.
+  owned1
+  mkdir -p "$HOME/.clutch/watch"
+  : > "$PD"
+  chmod 444 "$PD"
+  stp "$PL1" "$IN"
+  chmod 644 "$PD"
+  quiet P12
+  # P12b: .polled unreadable while <tag8> reads: cannot tell, no ask.
+  owned1
+  mkdir -p "$HOME/.clutch/watch"
+  printf 'other\n' > "$FP"
+  : > "$PD"
+  chmod 000 "$PD"
+  stp "$PL1" "$IN"
+  chmod 644 "$PD"
+  quiet P12b
+  [ "$(cat "$FP")" = other ] || { echo "FAIL: P12b -- <tag8> written"; fail=1; }
+fi
+# P10: a scripts dir with a space, a quote, a $ or an é, or with no poll.sh:
+# the 2.16.2 ask, recorded in <tag8>. A relative path is the same.
+for d in "$T/sp ace" "$T/q\"uote" "$T/d\$ollar" "$T/accé" "$T/nopoll"; do
+  mkdir -p "$d/scripts"
+  cp "$T/scripts/prelude.sh" "$T/scripts/stop.sh" "$d/scripts/"
+  [ "$d" = "$T/nopoll" ] || cp "$T/scripts/poll.sh" "$d/scripts/"
+  owned1
+  OUT=$(cd "$PL1" && printf '%s' "$IN" | LC_ALL=en_US.UTF-8 GIT_CEILING_DIRECTORIES=$T sh "$d/scripts/stop.sh" 2>/dev/null); RC=$?
+  blocked "P10 [$d]"
+  [ "$(cat "$FP" 2>/dev/null)" = "$L1" ] || { echo "FAIL: P10 [$d] -- <tag8> not recorded"; fail=1; }
+done
+owned1
+OUT=$(cd "$T" && printf '%s' "$IN" | GIT_CEILING_DIRECTORIES=$T sh scripts/stop.sh 2>/dev/null); RC=$?
+blocked "P10 relative"
+# P10b: _ and + are allowed (macOS TMPDIR paths hold them).
+d="$T/a_b+c"
+mkdir -p "$d/scripts"
+cp "$T/scripts/prelude.sh" "$T/scripts/stop.sh" "$T/scripts/poll.sh" "$d/scripts/"
+owned1
+OUT=$(cd "$PL1" && printf '%s' "$IN" | LC_ALL=en_US.UTF-8 GIT_CEILING_DIRECTORIES=$T sh "$d/scripts/stop.sh" 2>/dev/null); RC=$?
+is P10b 0 "$(wpoll "$d/scripts")"
+# P13: no session_id: quiet. S3, S10 and S8 in default mode: quiet.
+owned1
+stp "$PL1" '{"stop_hook_active":false,"session_crons":[]}'
+quiet P13
+for j in "{\"session_id\":\"$ID\",\"stop_hook_active\":true,\"session_crons\":[]}" \
+  "{\"session_id\":\"$ID\",\"stop_hook_active\":false}" '' "{\"session_id\":\"$ID\",\"session_cr"; do
+  owned1
+  stp "$PL1" "$j"
+  quiet "P13 S3/S10/S8 default [$j]"
+done
+# P14: S19 in default mode: a ~160 KB message within 1 s; WPOLL or quiet.
+for c in '[]' "[$WCRON]"; do
+  owned1
+  P14_T0=$(date +%s)
+  stp "$PL1" "$(docin "$FILL" "$c")"
+  P14_DT=$(($(date +%s) - P14_T0))
+  [ "$P14_DT" -le 1 ] || { echo "FAIL: P14 [$c] -- ${P14_DT}s"; fail=1; }
+  if [ "$c" = '[]' ]; then is "P14 unarmed" 0 "$WPOLL"; else quiet "P14 armed"; fi
+done
+# P15: upgrade: a gh line 2.16.2 recorded (asked or declined): quiet, nothing written.
+owned1
+mkdir -p "$HOME/.clutch/watch"
+printf '%s\n' "$L1" > "$FP"
+B=$(snap); stp "$PL1" "$IN"; quiet P15; same_tree "$B" P15
+
+# P16 and PZ need 75ddf0e (2.16.2) staged from git history.
+mkdir -p "$T/base/scripts"
+for f in stop prelude; do
+  git -C "$HERE/.." show "75ddf0e:scripts/$f.sh" > "$T/base/scripts/$f.sh" 2>/dev/null \
+    || { echo "FAIL: 75ddf0e not reachable"; exit 1; }
+done
+# P16: revert after a WPOLL ask: 2.16.2's own stop.sh on the same HOME asks */10.
+owned1
+stp "$PL1" "$IN"
+is "P16 ask" 0 "$WPOLL"
+OUT=$(cd "$PL1" && printf '%s' "$IN" | GIT_CEILING_DIRECTORIES=$T sh "$T/base/scripts/stop.sh" 2>/dev/null); RC=$?
+blocked "P16 2.16.2 after the poller ask"
+# pz <label> <json>: from the current HOME, 75ddf0e and the new stop.sh under
+# CLUTCH_POLL=off agree on stdout, rc and the ~/.clutch tree.
+tree() { (cd "$1" && find . -print | LC_ALL=C sort && find . -type f -exec cat {} + 2>/dev/null); }
+pz() {
+  rm -rf "$T/pzh" && cp -pR "$HOME" "$T/pzh"
+  BO=$(cd "$PL1" && printf '%s' "$2" | HOME="$T/pzh" GIT_CEILING_DIRECTORIES=$T sh "$T/base/scripts/stop.sh" 2>&1); BR=$?
+  NO=$(cd "$PL1" && printf '%s' "$2" | CLUTCH_POLL=off GIT_CEILING_DIRECTORIES=$T sh "$T/scripts/stop.sh" 2>&1); NR=$?
+  [ "$NO" = "$BO" ] && [ "$NR" = "$BR" ] || { echo "FAIL: PZ $1 -- rc $NR [$NO] vs 75ddf0e rc $BR [$BO]"; fail=1; }
+  [ "$(tree "$HOME")" = "$(tree "$T/pzh")" ] || { echo "FAIL: PZ $1 -- ~/.clutch differs from 75ddf0e"; fail=1; }
+}
+owned1; pz "gh only" "$IN"
+case $NO in *'*/10 8-21'*) ;; *) echo "FAIL: PZ gh only -- no */10 ask, parity is vacuous"; fail=1 ;; esac
+mixed; pz mixed "$IN"
+seed; add 100 'proj wait: slack:C1/1.2 1.2 @0123abcd thread'; pz "slack only" "$IN"
+owned1; prec "$DEAD"; pz "stale .poll" "$IN"
+owned1; mkdir -p "$HOME/.clutch/watch"; printf '%s\n' "$L1" > "$PD"; pz ".polled only" "$IN"
+owned1; pz "armed" "$(cronsch '*/10 8-21 * * *')"
+owned1; mkdir -p "$HOME/.clutch/watch"; printf 'last %s\n' "$((NOW - 600))" > "$FP.beat"; pz "ops record" "$IN"
+pz "ops record, second stop" "$IN"
 
 [ "$fail" -eq 0 ] || exit 1
 echo PASS

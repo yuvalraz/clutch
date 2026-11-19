@@ -20,15 +20,16 @@
 # BEAT_SKILL, OPS_SKILL and CONST_FILE override the targets for replay
 # against a historical version. Silent on pass apart from PASS.
 set -u
-unset CLUTCH_BEAT CLUTCH_WATCH CLUTCH_INVESTIGATE CLUTCH_PLAIN CLUTCH_GUESS CLAUDE_PLUGIN_ROOT
+unset CLUTCH_BEAT CLUTCH_WATCH CLUTCH_POLL CLUTCH_INVESTIGATE CLUTCH_PLAIN CLUTCH_GUESS CLAUDE_PLUGIN_ROOT
 
 HERE=$(cd "$(dirname "$0")" && pwd)
 P=${PRELUDE_SH:-$HERE/../scripts/prelude.sh}
 S=${STOP_SH:-$HERE/../scripts/stop.sh}
+PL=${POLL_SH:-$HERE/../scripts/poll.sh}
 BS=${BEAT_SKILL:-$HERE/../skills/beat/SKILL.md}
 O=${OPS_SKILL:-$HERE/../skills/ops/SKILL.md}
 K=${CONST_FILE:-$HERE/../rules/constitution.md}
-for f in "$P" "$S" "$O" "$K"; do
+for f in "$P" "$S" "$PL" "$O" "$K"; do
   [ -f "$f" ] || { echo "FAIL: missing $f"; exit 1; }
 done
 # A missing beat skill fails R1 and R3 below, and the rest still runs.
@@ -41,6 +42,7 @@ export HOME
 mkdir -p "$HOME" "$T/scripts" "$T/plain"
 cp "$P" "$T/scripts/prelude.sh"
 cp "$S" "$T/scripts/stop.sh"
+cp "$PL" "$T/scripts/poll.sh"
 W="$HOME/.clutch/worklog.md"
 NOW=$(date +%s)
 TODAY=$(date +%Y-%m-%d)
@@ -194,17 +196,26 @@ blocked B4b
 asked B4b 1
 
 # B5: an owned wait with no watch and an ops record: the watch block first,
-# no ask; the next stop (fingerprint recorded) brings the beat block.
-rec
-: > "$W"
-add 100 'proj wait: gh:o/r#1 b1 @0123abcd pr one'
-fresh "$SF"
-stp "$T/run" "$IN"
-[ "$RC" = 0 ] && [ "$OUT" = "$WBLOCK" ] || { echo "FAIL: B5 -- first stop rc $RC [$OUT], want the watch block"; fail=1; }
-asked "B5 first" 0
-stp "$T/run" "$IN"
-blocked "B5 second"
-asked "B5 second" 1
+# no ask; the next stop (fingerprint recorded) brings the beat block. Under
+# CLUTCH_POLL=off the watch block is the 2.16.2 */10 ask; unset, the
+# silent-check ask (WPOLL) takes its place.
+WPOLL='{"decision":"block","reason":"This session holds open wait loops and no watch. Start `sh '"$T"'/scripts/poll.sh @0123abcd` with the Bash tool'"'"'s run_in_background, then end the turn: it stays silent until a wait moves. If the user said not to watch them, just end the turn."}'
+for pm in off ''; do
+  rec
+  : > "$W"
+  add 100 'proj wait: gh:o/r#1 b1 @0123abcd pr one'
+  fresh "$SF"
+  CLUTCH_POLL=$pm
+  export CLUTCH_POLL
+  if [ "$pm" = off ]; then WANT=$WBLOCK; else WANT=$WPOLL; fi
+  stp "$T/run" "$IN"
+  [ "$RC" = 0 ] && [ "$OUT" = "$WANT" ] || { echo "FAIL: B5 [$pm] -- first stop rc $RC [$OUT], want the watch block"; fail=1; }
+  asked "B5 first [$pm]" 0
+  stp "$T/run" "$IN"
+  blocked "B5 second [$pm]"
+  asked "B5 second [$pm]" 1
+  unset CLUTCH_POLL
+done
 
 # B6: stop_hook_active true, either spacing: quiet, record unchanged.
 for a in '"stop_hook_active":true' '"stop_hook_active": true'; do
