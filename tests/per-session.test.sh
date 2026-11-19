@@ -11,6 +11,8 @@
 # snippet (git show) on fixtures without .clutch/s/.
 # Hermetic: scratch HOME, ambient CLUTCH_* unset. Silent apart from PASS.
 set -u
+# The title has its own suite (session-title.test.sh); this one pins other switches against history.
+export CLUTCH_TITLE=off
 unset CLUTCH_PER_SESSION CLUTCH_WATCH CLUTCH_PLAIN CLUTCH_GUESS CLUTCH_INVESTIGATE CLUTCH_BEAT CLUTCH_STATE CLAUDE_PLUGIN_ROOT
 
 HERE=$(cd "$(dirname "$0")" && pwd)

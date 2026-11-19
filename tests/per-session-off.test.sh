@@ -13,6 +13,8 @@
 #     equals fbb2aa8 under the default.
 # Hermetic: scratch HOME, ambient CLUTCH_* unset. Silent apart from PASS.
 set -u
+# The title has its own suite (session-title.test.sh); this one pins other switches against history.
+export CLUTCH_TITLE=off
 unset CLUTCH_PER_SESSION CLUTCH_PLAIN CLUTCH_STATE CLUTCH_WATCH CLUTCH_GUESS CLUTCH_INVESTIGATE CLUTCH_BEAT CLAUDE_PLUGIN_ROOT
 
 HERE=$(cd "$(dirname "$0")" && pwd)

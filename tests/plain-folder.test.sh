@@ -13,6 +13,8 @@
 # Hermetic: scratch HOME, ambient
 # CLUTCH_* unset. Silent apart from PASS.
 set -u
+# The title has its own suite (session-title.test.sh); this one pins other switches against history.
+export CLUTCH_TITLE=off
 unset CLUTCH_PLAIN CLUTCH_STATE CLUTCH_WATCH CLUTCH_GUESS CLUTCH_PER_SESSION CLAUDE_PLUGIN_ROOT
 # Parity here is against 7201788's four-way ask; the switch itself is proven
 # in investigate-off.test.sh.
