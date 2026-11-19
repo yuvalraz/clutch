@@ -24,7 +24,7 @@
 # HOME. PRELUDE_SH, ANCHOR_SH, STOP_SH and CONST_FILE override the targets
 # for replay against a historical version. Silent on pass apart from PASS.
 set -u
-unset CLUTCH_WATCH CLUTCH_POLL CLUTCH_INVESTIGATE CLAUDE_PLUGIN_ROOT
+unset CLUTCH_WATCH CLUTCH_POLL CLUTCH_POLL_SLEEP CLUTCH_INVESTIGATE CLAUDE_PLUGIN_ROOT
 
 HERE=$(cd "$(dirname "$0")" && pwd)
 P=${PRELUDE_SH:-$HERE/../scripts/prelude.sh}
@@ -547,8 +547,10 @@ NOTPOLL=$(bg sleep 60)
 DEAD=$(bg true)
 trap 'kill $LIVE $NOTPOLL 2>/dev/null; chmod -R u+rwx "$T" 2>/dev/null; rm -rf "$T"' EXIT
 sleep 1
-# prec <pid>: a .poll naming that pid.
-prec() { mkdir -p "$HOME/.clutch/watch" && printf '%s %s\n' "$1" "$NOW" > "$PP"; }
+# prec <pid> [<start epoch>]: a .poll naming that pid, started now by default.
+# OLD is a start more than one round (poll.sh's default 600 s sleep) ago.
+OLD=$((NOW - 700))
+prec() { mkdir -p "$HOME/.clutch/watch" && printf '%s %s\n' "$1" "${2:-$NOW}" > "$PP"; }
 # snap: the ~/.clutch tree, modes and contents, to prove a stop wrote nothing.
 snap() { ls -lRa "$HOME" 2>/dev/null | grep -v '^total'; cat "$HOME"/.clutch/watch/* 2>/dev/null; }
 same_tree() { [ "$(snap)" = "$1" ] || { echo "FAIL: $2 -- the stop changed ~/.clutch"; fail=1; }; }
@@ -571,13 +573,14 @@ quiet "P1 again"
 owned1
 prec "$LIVE"
 B=$(snap); stp "$PL1" "$IN"; quiet P2; same_tree "$B" P2
-# P3: lines in .polled and a dead pid's .poll: .poll removed, WPOLL anyway.
+# P3: lines in .polled and the .poll of a dead pid that ran a full round
+# (started over 600 s ago): .poll removed, WPOLL anyway.
 # P3b: then quiet, a declined restart is not asked again.
 # P4: a reused non-poller pid is the same.
 for pid in "$DEAD" "$NOTPOLL"; do
   owned1
   stp "$PL1" "$IN"
-  prec "$pid"
+  prec "$pid" "$OLD"
   stp "$PL1" "$IN"
   is "P3/P4 restart [$pid]" 0 "$WPOLL"
   [ ! -e "$PP" ] || { echo "FAIL: P3 [$pid] -- .poll left"; fail=1; }
@@ -585,6 +588,48 @@ for pid in "$DEAD" "$NOTPOLL"; do
   stp "$PL1" "$IN"
   quiet "P3b after restart [$pid]"
 done
+# P3c: after that restart ask, a restarted poller that died young (fresh
+# start, no wake) leaves a dead .poll: quiet, .poll removed, and quiet again
+# once it would have aged past a round. Asked once per poller that ran.
+owned1
+stp "$PL1" "$IN"
+prec "$DEAD" "$OLD"
+stp "$PL1" "$IN"
+is "P3c restart ask" 0 "$WPOLL"
+prec "$DEAD"
+stp "$PL1" "$IN"
+quiet "P3c young death"
+[ ! -e "$PP" ] || { echo "FAIL: P3c -- young dead .poll left"; fail=1; }
+stp "$PL1" "$IN"
+quiet "P3c again"
+# P3d: a young dead poller that woke (.woke appended after its .poll): WPOLL
+# once, the restart after a wake whose PR merged; then quiet.
+owned1
+stp "$PL1" "$IN"
+prec "$DEAD"
+touch -t 202001010000 "$PP"
+printf 'gh:o/r#1 2026-01-01T00:00:00Z\n' >> "$FP.woke"
+stp "$PL1" "$IN"
+is "P3d young wake" 0 "$WPOLL"
+stp "$PL1" "$IN"
+quiet "P3d again"
+# P3f: a wake in the same second as the start (equal mtimes) counts as a wake.
+owned1
+stp "$PL1" "$IN"
+prec "$DEAD"
+printf 'gh:o/r#1 2026-01-01T00:00:00Z\n' >> "$FP.woke"
+touch -r "$PP" "$FP.woke"
+stp "$PL1" "$IN"
+is "P3f same-second wake" 0 "$WPOLL"
+# P3e: a round is the poller's own sleep: CLUTCH_POLL_SLEEP=60 and a start
+# 100 s ago is a full round: WPOLL.
+owned1
+stp "$PL1" "$IN"
+prec "$DEAD" "$((NOW - 100))"
+CLUTCH_POLL_SLEEP=60; export CLUTCH_POLL_SLEEP
+stp "$PL1" "$IN"
+unset CLUTCH_POLL_SLEEP
+is "P3e CLUTCH_POLL_SLEEP" 0 "$WPOLL"
 # P5: any /clutch:watch @tag cron arms the set, a stale .poll included.
 for c in '*/15 8-21 * * *' '*/10 8-21 * * *' '7,37 8-21 * * *'; do
   owned1
@@ -636,7 +681,7 @@ WATCH=off
 B=$(snap); stp "$PL1" "$IN"; quiet P8; same_tree "$B" P8
 WATCH=''
 if [ "$(id -u)" = 0 ]; then
-  echo "SKIP: P9, P11, P12, P12b modes (root reads through chmod)"
+  echo "SKIP: P9, P11, P12, P12b, P12c, P12d modes (root reads through chmod)"
 else
   # P9: liveness cannot tell (.poll mode 000): quiet, nothing written.
   owned1
@@ -647,7 +692,7 @@ else
   # P11: the stale .poll cannot be removed: no ask.
   owned1
   stp "$PL1" "$IN"
-  prec "$DEAD"
+  prec "$DEAD" "$OLD"
   chmod 555 "$HOME/.clutch/watch"
   stp "$PL1" "$IN"
   chmod 755 "$HOME/.clutch/watch"
@@ -671,6 +716,26 @@ else
   chmod 644 "$PD"
   quiet P12b
   [ "$(cat "$FP")" = other ] || { echo "FAIL: P12b -- <tag8> written"; fail=1; }
+  # P12c: lines in .polled, .polled mode 000, a dead .poll that ran a round:
+  # cannot tell, no ask (cannot-tell never blocks).
+  owned1
+  stp "$PL1" "$IN"
+  prec "$DEAD" "$OLD"
+  chmod 000 "$PD"
+  stp "$PL1" "$IN"
+  chmod 644 "$PD"
+  quiet P12c
+  # P12d: a dead .poll that ran a round, a new line, .polled not writable:
+  # no ask, and .poll stays for the next stop (removed only when the ask prints).
+  owned1
+  mkdir -p "$HOME/.clutch/watch"
+  : > "$PD"
+  chmod 444 "$PD"
+  prec "$DEAD" "$OLD"
+  stp "$PL1" "$IN"
+  chmod 644 "$PD"
+  quiet P12d
+  [ -e "$PP" ] || { echo "FAIL: P12d -- .poll removed without an ask"; fail=1; }
 fi
 # P10: a scripts dir with a space, a quote, a $ or an é, or with no poll.sh:
 # the 2.16.2 ask, recorded in <tag8>. A relative path is the same.

@@ -23,7 +23,7 @@ Exit status 0 with empty output, or exit status 1 with no error text, means no w
 Any other outcome, error text included, keeps the watch: say once that the waits cannot be read, and stay silent about it on later ticks.
 
 A wake from the session's silent check holds `Run /clutch:watch @<tag> for the moved waits.` after one `<ref> <what>` line per wait, `<what>` being `merged`, `closed`, `review <STATE>`, `comment` or `unreadable` (gh failed on it 3 reads in a row): run this skill once for that tag, reading every owned wait as above.
-On a wake with no recurring task, say that no wait is left in one line and delete nothing.
+On a wake where no wait is left and there is no recurring task, say so in one line and delete nothing.
 The silent check's ended line, `The silent check for @<tag> ended; end the turn.`, needs no reply beyond ending the turn.
 
 Read each wait once, by its kind, against its baseline. Only this counts as movement:

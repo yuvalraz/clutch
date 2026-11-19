@@ -352,7 +352,7 @@ fpin "$WS" "W12 re-hold open thing"     'If the thing is still open after the mo
 fpin "$WS" "W13 merged not held"        'A thing that merged or closed is not held again.'
 # W-poll: the silent check's wake runs one tick; its wake reasons include unreadable.
 fpin "$WS" "W-poll wake"                'A wake from the session'"'"'s silent check holds `Run /clutch:watch @<tag> for the moved waits.` after one `<ref> <what>` line per wait, `<what>` being `merged`, `closed`, `review <STATE>`, `comment` or `unreadable` (gh failed on it 3 reads in a row): run this skill once for that tag, reading every owned wait as above.'
-fpin "$WS" "W-poll no task"             'On a wake with no recurring task, say that no wait is left in one line and delete nothing.'
+fpin "$WS" "W-poll no task"             'On a wake where no wait is left and there is no recurring task, say so in one line and delete nothing.'
 fpin "$WS" "W-poll ended"               'The silent check'"'"'s ended line, `The silent check for @<tag> ended; end the turn.`, needs no reply beyond ending the turn.'
 
 # --- ops: the beat record in Step 0, and the pointer to the beat

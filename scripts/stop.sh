@@ -28,7 +28,13 @@ PRELUDE=$(dirname "$0")/prelude.sh
 # (clutch_poll_alive 0) or a cannot-tell (2) arms the set; otherwise the ask
 # is to start the poller, once per line recorded in neither <tag8> nor
 # <tag8>.polled (the ask records in .polled, which 2.16.2 never reads), and
-# once more after a poller that ran has ended (3: its .poll removed first).
+# once more after a poller that ran has ended (3). Its .poll is removed only
+# once the dedupe read and the .polled append worked, right before the ask
+# prints. A dead poller that started under one round ago (poll.sh's sleep,
+# CLUTCH_POLL_SLEEP or 600 s) and never woke (its .poll newer than .woke)
+# died young, say killed by a Bash timeout or a headless exit: its .poll is
+# dropped quietly and the dedupe applies as with no .poll, so a poller that
+# keeps dying young is asked for once, not at every stop.
 # A set with any other wait is asked the 30-minute watch through <tag8> and
 # leaves .poll alone. CLUTCH_POLL=off, or a scripts dir that is not absolute,
 # holds a byte outside the spelled-out class, or has no poll.sh, keeps the
@@ -62,8 +68,26 @@ if [ "${CLUTCH_WATCH:-}" != off ]; then
             if [ "$WATCH_KIND" = poll ]; then
               clutch_poll_alive "$WATCH_TAG"
               WATCH_RC=$?
-              # 3: a poller ran and ended; ask again only once its .poll is gone.
-              [ "$WATCH_RC" != 3 ] || rm -f "$WATCH_FILE.poll" 2>/dev/null || WATCH_RC=2
+              if [ "$WATCH_RC" = 3 ]; then
+                # A round is poll.sh's own sleep, read the same way.
+                WATCH_NAP=${CLUTCH_POLL_SLEEP:-600}
+                case $WATCH_NAP in '' | *[!0-9]*) WATCH_NAP=600 ;; esac
+                WATCH_START=$(LC_ALL=C awk 'NR == 1 && $2 ~ /^[0-9]+$/ { print $2 }' "$WATCH_FILE.poll" 2>/dev/null)
+                WATCH_NOW=$(date +%s 2>/dev/null)
+                # Died young: started under a round ago and never woke (its
+                # .poll newer than .woke; equal mtimes count as a wake). Drop
+                # its .poll quietly and dedupe as rc 1.
+                case $WATCH_START.$WATCH_NOW in
+                  *[!0-9.]* | .* | *.) ;;
+                  *)
+                    if [ $((WATCH_NOW - WATCH_START)) -lt "$WATCH_NAP" ] &&
+                      [ "$WATCH_FILE.poll" -nt "$WATCH_FILE.woke" ]; then
+                      rm -f "$WATCH_FILE.poll" 2>/dev/null
+                      WATCH_RC=1
+                    fi
+                    ;;
+                esac
+              fi
               case $WATCH_RC in 1 | 3) ;; *) WATCH_RC=0 ;; esac
               WATCH_NEW=$WATCH_OWN
               for WATCH_REC in "$WATCH_FILE" "$WATCH_FILE.polled"; do
@@ -75,6 +99,7 @@ if [ "${CLUTCH_WATCH:-}" != off ]; then
               if [ "$WATCH_RC" != 0 ]; then
                 mkdir -p "$HOME/.clutch/watch" 2>/dev/null &&
                   { [ -z "$WATCH_NEW" ] || { printf '%s\n' "$WATCH_NEW" >> "$WATCH_FILE.polled"; } 2>/dev/null; } &&
+                  { [ "$WATCH_RC" != 3 ] || rm -f "$WATCH_FILE.poll" 2>/dev/null; } &&
                   printf '{"decision":"block","reason":"This session holds open wait loops and no watch. Start `sh %s/poll.sh %s` with the Bash tool'\''s run_in_background, then end the turn: it stays silent until a wait moves. If the user said not to watch them, just end the turn."}\n' "$WATCH_DIR" "$WATCH_TAG" &&
                   exit 0
               fi
