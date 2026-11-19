@@ -308,8 +308,13 @@ fpin "$R" "README: watch code span"    '`watch <thing>`'
 fpin "$R" "README: closing ref"        'A later `moved:` line that starts with the same ref closes it.'
 fpin "$R" "README: three verbs"      '`on:` claim or `wait:` loop'
 # The stop hook blocks the model, not the user: the README says the session
-# is told to arm a watch, once per new wait, never that the user is asked.
-fpin "$R" "README: told once per wait"  'is told to arm a watch once per new wait'
+# is told to arm a watch, once per new wait and once more after its silent
+# check ends (the stale .poll restart), never that the user is asked.
+fpin "$R" "README: told once per wait"  'is told to arm a watch once per new wait, and once more after its silent check ends'
+fpin "$R" "README: unreadable wake"     'or gh failed on one 3 reads in a row (`unreadable`)'
+fpin "$R" "README: poll off"            '`CLUTCH_POLL=off` keeps the 10-minute watch for every kind.'
+fpin "$R" "README: poll allow rule"     '`Bash(sh */clutch/*/scripts/poll.sh*)`'
+fpin "$R" "README: poll network"        '`scripts/poll.sh`, the silent check a session starts in the background while it holds PR waits, calls `gh` and nothing else.'
 if grep -qE 'asked once to arm|one ask to arm' "$R"; then
   echo "FAIL: README says the user is asked to arm a watch"; fail=1
 fi
@@ -345,6 +350,10 @@ nws_l=$(grep -c '' "$WS")
 [ "$nws_l" -lt 60 ] || { echo "FAIL: W11 watch skill is $nws_l lines, want under 60"; fail=1; }
 fpin "$WS" "W12 re-hold open thing"     'If the thing is still open after the move, such as approved, commented or changes requested, append a fresh `wait:` line right after that `moved:` line, with the same snippet and text `<kind>:<ref> <new baseline> @<tag> <text>`: the same ref, the new baseline and the same `@<tag>`, so a later merge stays watched.'
 fpin "$WS" "W13 merged not held"        'A thing that merged or closed is not held again.'
+# W-poll: the silent check's wake runs one tick; its wake reasons include unreadable.
+fpin "$WS" "W-poll wake"                'A wake from the session'"'"'s silent check holds `Run /clutch:watch @<tag> for the moved waits.` after one `<ref> <what>` line per wait, `<what>` being `merged`, `closed`, `review <STATE>`, `comment` or `unreadable` (gh failed on it 3 reads in a row): run this skill once for that tag, reading every owned wait as above.'
+fpin "$WS" "W-poll no task"             'On a wake with no recurring task, say that no wait is left in one line and delete nothing.'
+fpin "$WS" "W-poll ended"               'The silent check'"'"'s ended line, `The silent check for @<tag> ended; end the turn.`, needs no reply beyond ending the turn.'
 
 # --- ops: the beat record in Step 0, and the pointer to the beat
 fpin "$O" "ops: beat record"            'Then record this session as an ops session, so its turn end asks once a day for the beat (`/clutch:beat`) and the sweep (`/clutch:ops re-sweep armed`).'

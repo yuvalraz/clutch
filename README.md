@@ -69,7 +69,7 @@ days. `CLUTCH_PER_SESSION=off` turns per-session state off.
 | Every prompt | `heartbeat.sh` | Nothing, except on the first real prompt of an untitled session, which names it `<focus> · <that prompt> @<tag>` once; a named session (yours or this one) is never touched (`CLUTCH_TITLE=off` turns this off). It reminds the model which command fits which stall, how many uninvited lines are left, and the sprint clock. | nothing |
 | Before a shell command | `hot-pause.sh` | One ask before a force-push, `reset --hard`, `branch -D`, `checkout -- .` or `clean -fd`. Your yes wins in one keypress. | nothing |
 | After a shell command | `red-moment.sh` | Usually nothing. When the same runner command fails again with the tree unchanged, the model may say one line. | `.clutch/s/<tag>/session-state` |
-| Turn end | `stop.sh` | The bell: `Landed: '<subject>'. Smallest next move: one commit.`, only after 25 minutes and real movement. A live sprint shows `Sprint: N min left on '<goal>'` instead. After a long run with unbanked work, one offer to bank it. When this session holds its own open waits and no watch, the session is told to arm a watch once per new wait, first instead. In an ops session with no beat, the session is told to arm one, once a day, and then a sweep. | `.clutch/breadcrumb`, and one `moved:` line in `~/.clutch/worklog.md` naming your latest commit, when the turn landed one, and `~/.clutch/watch/<tag>` when it asks, and `~/.clutch/watch/<tag>.beat` when it asks the beat or the sweep |
+| Turn end | `stop.sh` | The bell: `Landed: '<subject>'. Smallest next move: one commit.`, only after 25 minutes and real movement. A live sprint shows `Sprint: N min left on '<goal>'` instead. After a long run with unbanked work, one offer to bank it. When this session holds its own open waits and no watch, the session is told to arm a watch once per new wait, first instead. In an ops session with no beat, the session is told to arm one, once a day, and then a sweep. | `.clutch/breadcrumb`, and one `moved:` line in `~/.clutch/worklog.md` naming your latest commit, when the turn landed one, and `~/.clutch/watch/<tag>` or `~/.clutch/watch/<tag>.polled` when it asks the watch, and `~/.clutch/watch/<tag>.beat` when it asks the beat or the sweep |
 | On a command | the skill you named | What that command does (see Commands at a glance) | Depends on the command: the pool, the brain, `~/.clutch/rituals.md`, your review conventions file, or the auto-memory directory |
 
 ### Sessions see each other
@@ -90,9 +90,15 @@ only at one of those moments.
   Open waits show first in the `Worklog:` block and age out after 5 days.
 - Any session that hands off an outward step, such as a PR or an ask, logs a
   `wait:` line that starts with its session tag. At turn end, a session that
-  holds such waits and no watch is told to arm a watch once per new wait: `/clutch:watch @<tag>`
-  every 10 minutes from 08:00 to 21:50, one `No change.` line unless one of its waits moved,
-  gone once none is left. `CLUTCH_WATCH=off` turns off the ask, the session tag and per-session state.
+  holds such waits and no watch is told to arm a watch once per new wait, and once more after its silent check ends.
+  When every wait is a PR, the watch is a silent check that the session starts in the background:
+  it reads the PRs every 10 minutes from 08:00 to 21:59 and wakes the session only when one
+  merged, closed, or got a review or comment from someone other than you or a bot,
+  or gh failed on one 3 reads in a row (`unreadable`).
+  Otherwise the watch is `/clutch:watch @<tag>` every 30 minutes from 08:07 to 21:37,
+  one `No change.` line unless one of its waits moved, gone once none is left.
+  `CLUTCH_POLL=off` keeps the 10-minute watch for every kind.
+  `CLUTCH_WATCH=off` turns off the ask, the session tag and per-session state.
 - An ops session is told at turn end, once a day, to arm a beat: `/clutch:beat @<tag>`
   every hour from 08:07 to 20:07 while the session is open. It reads the moves
   other sessions logged since the last beat and the waits no session's tag owns, and
@@ -225,7 +231,7 @@ as ignition. The rest set the session's focus, run the day, and check on clutch.
 | `/clutch:intent` | Declares the session's focus and engages the gear | The session-start question, or a change of plan |
 | `/clutch:ideate` | Divergent mode for the whole session | An ideate session |
 | `/clutch:ops` | Operations mode: one sweep, one loop at a time | A day of meetings, people, and threads |
-| `/clutch:watch` | One tick of a session's armed watch: reads only that session's waits, `No change.` unless one moved | Sent by the watch a session arms; you rarely type it |
+| `/clutch:watch` | One tick of a session's armed watch: reads only that session's waits, `No change.` unless one moved | Sent by a session's armed watch, or run on its silent check's wake; you rarely type it |
 | `/clutch:beat` | One beat of an ops session: what other sessions moved and the waits no session's tag owns, `No change.` unless something moved | Sent by the beat an ops session arms; you rarely type it |
 | `/clutch:review` | Review mode: one PR at a time, your conventions applied | A review session |
 | `/clutch:investigate` | Investigate mode: one pointer read to findings, each tied to its evidence | A DM, thread, PR, error or claim to check |
@@ -305,7 +311,7 @@ It writes the local `.clutch/` folder, plus your brain on an absorb verdict, and
 in a repo, adds the local folder to git's ignore list. Sessions also append one-line notes
 of what moved to `~/.clutch/worklog.md`, so parallel sessions can see each
 other. That log is not pool stock: it and the watch markers
-`~/.clutch/watch/<tag>` and `~/.clutch/watch/<tag>.beat` are the only things sessions write to `~/.clutch`
+`~/.clutch/watch/<tag>`, `<tag>.beat`, `<tag>.poll`, `<tag>.woke` and `<tag>.polled` are the only things sessions write to `~/.clutch`
 without a command or a verdict. The log is global: its lines,
 commit subjects and repo names included, reach sessions in every repo, a work
 repo included. If you keep no `~/.clutch` yet, the first note creates it, and
@@ -335,8 +341,9 @@ search. `/clutch:ops` and `/clutch:morning` check the integrations you named.
 extra and close-out steps you wrote can use your integrations.
 `/clutch:review` reads PRs and posts to one only on a yes.
 `/clutch:investigate` reads what the pointer names and sends a reply only on a yes.
-`/clutch:watch` checks the integrations its session's waits name, every 10
-minutes until none is left.
+`/clutch:watch` checks the integrations its session's waits name, every 30
+minutes (every 10 with `CLUTCH_POLL=off`) or on its silent check's wake, until none is left.
+`scripts/poll.sh`, the silent check a session starts in the background while it holds PR waits, calls `gh` and nothing else.
 `/clutch:beat` checks the integrations its waits name, every hour while an ops session is open.
 An ops session's armed sweep sends `/clutch:ops re-sweep armed` at 08:37, 12:37 and 16:37, and only reads, until the session's ops record is gone.
 No hook script here touches the network, and you
@@ -364,6 +371,12 @@ Two commands. Zero configuration.
 ```
 
 No settings, no env vars. The opinions are the product.
+
+One optional allow rule: a session that holds PR waits starts its silent
+check with the shell, which asks permission each time. Add
+`Bash(sh */clutch/*/scripts/poll.sh*)` to `permissions.allow` in your Claude
+Code settings to skip that ask. From a local checkout, allow
+`Bash(sh <checkout>/scripts/poll.sh*)` instead.
 
 One exception, and it is deliberate: one optional file holds your day's facts
 and tool names. The core carries opinions; your day carries facts: which days
