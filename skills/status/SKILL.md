@@ -13,7 +13,7 @@ them distinguishable: it prints facts and changes nothing.
 Procedure:
 
 1. Run the status script that ships with this plugin; the harness substitutes its path when it loads this skill.
-   Replace `@<tag>` with the `Session tag:` from the session start; with no `Session tag:` line, leave it as is:
+   Replace `@<tag>` with the latest `Session tag:` line; with no `Session tag:` line, leave it as is:
 
    ```sh
    sh "${CLAUDE_PLUGIN_ROOT}/scripts/status.sh" '@<tag>'

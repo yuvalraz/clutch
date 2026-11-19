@@ -13,7 +13,7 @@ Twenty minutes, one shippable. The duration is fixed; there is no parameter.
    a run, a sent thing). Do not start until that sentence exists.
 
 2. Write the start marker (POSIX, silent on any failure). Replace the goal text
-   with the shippable in a few words. Replace `@<tag>` with the `Session tag:` from the session start; with no `Session tag:` line, leave it as is:
+   with the shippable in a few words. Replace `@<tag>` with the latest `Session tag:` line; with no `Session tag:` line, leave it as is:
 
    ```sh
    ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0

@@ -36,7 +36,7 @@ Ops fires when you fire it. Nothing here runs on its own.
 
 Confirm in one line: "Espresso engaged: tight convergence, one divergent
 pulse, checkpoint at each closed loop." Then write the marker (POSIX, silent
-on any failure). Replace `@<tag>` with the `Session tag:` from the session start; with no `Session tag:` line, leave it as is:
+on any failure). Replace `@<tag>` with the latest `Session tag:` line; with no `Session tag:` line, leave it as is:
 
 ```sh
 ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || { [ "${CLUTCH_PLAIN:-}" != off ] && ROOT=$(pwd -P) && [ "$ROOT" != / ] && [ ! "$ROOT" -ef "$HOME" ]; } || exit 0
@@ -50,10 +50,10 @@ model next turn, no new state. If the write fails, the declaration still
 governs the live session; only the re-injection is lost.
 
 Then record this session as an ops session, so its turn end asks once a day for the beat (`/clutch:beat`) and the sweep (`/clutch:ops re-sweep armed`).
-Replace `@<tag>` with the `Session tag:` from the session start; with no `Session tag:` line, skip this. Silent on any failure:
+Replace `@<tag>` with the latest `Session tag:` line; with no `Session tag:` line, skip this. Silent on any failure:
 
 ```sh
-T='@<tag>'; F="$HOME/.clutch/watch/${T#@}.beat"; [ "${CLUTCH_BEAT:-}" = off ] || [ ! -d "$HOME/.clutch" ] || [ -e "$F" ] || { mkdir -p "$HOME/.clutch/watch" && printf 'last %s\n' "$(date +%s)" > "$F"; } 2>/dev/null
+T='@<tag>'; case $T in '' | @ | *[./]*) ;; *) F="$HOME/.clutch/watch/${T#@}.beat"; [ "${CLUTCH_BEAT:-}" = off ] || [ ! -d "$HOME/.clutch" ] || [ -e "$F" ] || { mkdir -p "$HOME/.clutch/watch" && printf 'last %s\n' "$(date +%s)" > "$F"; } 2>/dev/null ;; esac
 ```
 
 Hopping between loops is the gait in this gear, not a shape mismatch. The
@@ -196,7 +196,7 @@ behavior:
   - gmail: ref `gmail:<thread id>`; baseline, the thread's last message id.
   - ld: ref `ld:<flag key>`; baseline, the flag version.
   - dd: ref `dd:<monitor id>`; baseline, the monitor state.
-  When the session start gave a `Session tag:`, `<text>` starts with that tag, such as `@0123abcd Or's review`.
+  With a `Session tag:` line, `<text>` starts with the tag of the latest one, such as `@0123abcd Or's review`.
 - **Interruptions are the gait.** A new ping mid-loop gets one line, bank it
   or close it now, then back to the open loop.
 - **A tangent banks.** An idea that pulls sideways goes to `/clutch:fomo` in
@@ -260,6 +260,15 @@ An ops session's beat does not send a tick either: it sends `/clutch:beat @<tag>
 ### Armed sweep
 
 `/clutch:ops re-sweep armed` comes from the session's armed sweep, not from you, so it reads and speaks and writes nothing.
+First check the session's ops record. Replace `@<tag>` with the latest `Session tag:` line; with no `Session tag:` line, skip the check:
+
+```sh
+sh -c '. "${CLAUDE_PLUGIN_ROOT}/scripts/prelude.sh" && clutch_ops_record "@<tag>"'
+```
+
+Exit status 1 with no error text means the record is gone: cancel the recurring task in this session's own task list whose prompt is exactly `/clutch:ops re-sweep armed`, reply with exactly `Not an ops session now; the sweep stopped.` and write nothing.
+Any other outcome goes on below; the check never writes.
+
 It skips Step 0: no gear change and no record.
 Skip it only when the latest `tempo gear:` line in view names a gear other than espresso: reply with exactly `Not in ops; the sweep skipped.` and nothing else.
 An earlier gear line is context, never a reason to skip.

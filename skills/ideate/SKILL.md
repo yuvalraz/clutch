@@ -25,7 +25,7 @@ persists — the mode side of the gearbox. Within it you might invoke
 
 Confirm in one line — "Ballmer engaged — fast divergence, periodic
 convergence checkpoints." — then write the marker (POSIX, silent on any
-failure). Replace `@<tag>` with the `Session tag:` from the session start; with no `Session tag:` line, leave it as is:
+failure). Replace `@<tag>` with the latest `Session tag:` line; with no `Session tag:` line, leave it as is:
 
 ```sh
 ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || { [ "${CLUTCH_PLAIN:-}" != off ] && ROOT=$(pwd -P) && [ "$ROOT" != / ] && [ ! "$ROOT" -ef "$HOME" ]; } || exit 0
