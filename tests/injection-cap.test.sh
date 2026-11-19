@@ -15,6 +15,8 @@
 # PLUGIN_ROOT_UNDER_TEST overrides the CLAUDE_PLUGIN_ROOT used for (i), so a
 # padded rules/ tree can be replayed through it.
 set -u
+# The title has its own suite (session-title.test.sh); this one pins other switches against history.
+export CLUTCH_TITLE=off
 # An ambient CLUTCH_WATCH=off or CLUTCH_GUESS=off would drop the tag line or
 # the guessed ask and under-measure; CLUTCH_PLAIN=off would silence (iv)/(v);
 # CLUTCH_INVESTIGATE=off would shorten the ask; CLUTCH_PER_SESSION=off

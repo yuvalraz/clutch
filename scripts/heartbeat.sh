@@ -108,17 +108,20 @@ clutch-budget: ${EMITS}/2 spent. Before any uninvited line append 'emit model <e
 # fold newlines to spaces so the value is a single JSON string.
 BODY=$(printf '%s' "$CTX" | tr '\n' ' ' | tr -d '\000-\037' | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g') || exit 0
 
-# Session title: the first prompt is always /clutch:intent, so Claude Code
-# auto-titles every session "Clutch intent <focus>". While the title still has
-# that shape, rename it to "<focus> · <gist> @<tag8>" from the first real
-# prompt. The shape check is the whole guard: once renamed (by us or a user's
-# /rename) it no longer matches, so this fires once and never clobbers a
-# rename. Only when the input carries session_title (older Claude Code may
-# reject the output key). The awk reads TOP-LEVEL string keys only, walking
-# escapes, so text inside the prompt cannot pose as a key. CLUTCH_TITLE=off
-# turns this off. Any failure leaves TSEG empty: today's output.
+# Session title: the first prompt is always /clutch:intent, so Claude Code's
+# generated title says only "Clutch intent <focus>". On the first real prompt
+# of an untitled session, set "<focus> · <gist> @<tag8>" instead. Claude Code
+# sends session_title only for a custom title (/rename, --name, or a hook's
+# sessionTitle), so its presence is the whole guard: once we or the user name
+# the session, later turns carry it and this stops. The focus is the
+# transcript's first /clutch:intent command. The awk reads TOP-LEVEL string
+# keys only, walking escapes. CLUTCH_TITLE=off turns this off. Any failure
+# leaves TSEG empty: today's output.
 TSEG=""
-case $INPUT in *'"session_title"'*)
+case $INPUT in
+  # A prompt cannot forge this raw substring: its quotes arrive escaped (\").
+  *'"session_title"'*) ;;
+  *)
   [ "${CLUTCH_TITLE:-}" = off ] || TSEG=$(printf '%s' "$INPUT" | LC_ALL=C awk '
     function dec(s,   o, k, e) {
       o = ""
@@ -134,7 +137,7 @@ case $INPUT in *'"session_title"'*)
     { all = all $0 "\n" }
     END {
       n = split(all, p, "\"")
-      depth = 0; instr = 0; key = ""; want = ""
+      depth = 0; instr = 0; key = ""; want = ""; CAP = 8192
       for (i = 1; i <= n; i++) {
         if (!instr) {
           if (i > 1 && key != "") { want = (p[i] ~ /^[ \t\r\n]*:[ \t\r\n]*$/) ? key : ""; key = "" }
@@ -142,23 +145,24 @@ case $INPUT in *'"session_title"'*)
           t = p[i]; depth += gsub(/[{[]/, "", t); t = p[i]; depth -= gsub(/[]}]/, "", t)
           sd = depth; raw = ""; instr = 1; continue
         }
-        # inside a string: a quote preceded by an odd run of backslashes is escaped
-        if (length(raw) < 8192) raw = raw p[i]
+        # inside a string: a quote preceded by an odd run of backslashes is
+        # escaped. Keep at most CAP bytes of a value: the gist needs one line.
+        if (length(raw) < CAP) raw = raw substr(p[i], 1, CAP - length(raw))
         b = match(p[i], /\\+$/) ? RLENGTH : 0
-        if (b % 2) { raw = raw "\""; continue }
+        if (b % 2) { if (length(raw) < CAP) raw = raw "\""; continue }
         instr = 0
         if (want != "") { v[want] = raw; want = ""; key = "" }
         else if (sd == 1) key = raw
       }
-      if (!("session_title" in v) || !("prompt" in v)) exit
-      st = dec(v["session_title"]); gsub(/[\001-\037]/, " ", st)
-      lt = tolower(st)
-      if (lt !~ /^clutch[^a-z]*intent/) exit
-      pr = dec(v["prompt"]); gsub(/\r/, " ", pr)
+      if (!("prompt" in v)) exit
+      pr = dec(substr(v["prompt"], 1, 4096)); gsub(/\r/, " ", pr)
       full = pr; gsub(/[\001-\037 ]+/, " ", full); sub(/^ /, "", full); sub(/ $/, "", full)
       if (full ~ /^\// || tolower(full) ~ /^(go|yes|y|ok)[.!?,;:]*$/) exit
       m = split(pr, ln, "\n"); g = ""
-      for (j = 1; j <= m && g == ""; j++) { g = ln[j]; gsub(/[\001-\037 ]+/, " ", g); sub(/^ /, "", g); sub(/ $/, "", g) }
+      for (j = 1; j <= m && g == ""; j++) {
+        g = ln[j]; gsub(/[\001-\037 ]+/, " ", g); sub(/^ /, "", g); sub(/ $/, "", g)
+        if (g ~ /^<\/?pasted_content/) g = ""
+      }
       if (g == "") exit
       # cut at 60 characters: a UTF-8 lead byte (not 0x80-0xBF) starts one
       c = 0; out = ""
@@ -167,18 +171,25 @@ case $INPUT in *'"session_title"'*)
         if (ch < "\200" || ch >= "\300") { if (++c > 60) { out = out "…"; break } }
         out = out ch
       }
-      split("build ideate ops review investigate", fo, " "); f = ""
-      w = " " lt " "; gsub(/[^a-z]+/, " ", w)
-      for (j = 1; j <= 5 && f == ""; j++) if (index(w, " " fo[j] " ")) f = fo[j] " · "
-      print f out
-      if ("session_id" in v) print "\"session_id\":\"" v["session_id"] "\""
+      print out
+      print "\"session_id\":\"" v["session_id"] "\""
+      tp = dec(v["transcript_path"]); gsub(/[\001-\037]/, "", tp)
+      print tp
     }' 2>/dev/null) || TSEG=""
   ;;
 esac
 if [ -n "$TSEG" ]; then
   TTL=$(printf '%s\n' "$TSEG" | sed -n 1p)
+  TP=$(printf '%s\n' "$TSEG" | sed -n 3p)
+  # Claude Code records the command JSON-escaped: <command-name>/clutch:intent
+  # </command-name>\n<command-args>build</command-args>, with a literal \n.
+  if [ -n "$TP" ] && [ -f "$TP" ] && [ -r "$TP" ]; then
+    FOCUS=$(LC_ALL=C grep -m1 -oE '<command-name>/clutch:intent</command-name>(\\n| )*<command-args>(build|ideate|ops|review|investigate)</command-args>' "$TP" 2>/dev/null |
+      LC_ALL=C sed -n '1s/.*<command-args>\([a-z]*\)<.*/\1/p') || FOCUS=""
+    [ -n "$FOCUS" ] && TTL="$FOCUS · $TTL"
+  fi
   TAG=$(clutch_session_tag "$(printf '%s\n' "$TSEG" | sed -n 2p)") && TTL="$TTL $TAG"
-  TTL=$(printf '%s' "$TTL" | tr -d '\000-\037' | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g') || TTL=""
+  TTL=$(printf '%s' "$TTL" | LC_ALL=C tr -d '\000-\037' | LC_ALL=C sed -e 's/\\/\\\\/g' -e 's/"/\\"/g') || TTL=""
   TSEG=""
   [ -n "$TTL" ] && TSEG=",\"sessionTitle\":\"$TTL\""
 fi

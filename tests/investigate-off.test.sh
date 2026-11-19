@@ -11,6 +11,8 @@
 # five-way heartbeat differ from base, and CLUTCH_INVESTIGATE=on equals
 # unset. Hermetic: scratch HOME, ambient CLUTCH_* unset. Silent apart from PASS.
 set -u
+# The title has its own suite (session-title.test.sh); this one pins other switches against history.
+export CLUTCH_TITLE=off
 unset CLUTCH_PLAIN CLUTCH_STATE CLUTCH_WATCH CLUTCH_GUESS CLUTCH_INVESTIGATE CLUTCH_PER_SESSION CLAUDE_PLUGIN_ROOT
 # 5f709b5 has no per-session state; that switch is proven in per-session-off.test.sh.
 CLUTCH_PER_SESSION=off; export CLUTCH_PER_SESSION

@@ -1,11 +1,15 @@
 #!/bin/sh
-# The heartbeat renames a session that still carries the clutch auto-title
-# ("Clutch intent build") once a real prompt arrives: hookSpecificOutput gains
-# sessionTitle "<focus> · <gist> @<tag8>". Every other case (CLUTCH_TITLE=off,
-# no session_title key, a user's own title, a slash command, a bare "go")
-# leaves the output byte-identical to the hook without the feature.
+# The heartbeat titles an untitled session from its first real prompt:
+# hookSpecificOutput gains sessionTitle "<focus> · <gist> @<tag8>". Claude Code
+# sends session_title only for a custom title (a /rename, --name, or a hook's
+# own sessionTitle), so a fresh session carries no session_title and any
+# present one stops the feature. Focus comes from the transcript's first
+# /clutch:intent command. Every non-firing case (CLUTCH_TITLE=off, a present
+# session_title, a slash command, a bare "go") leaves the output
+# byte-identical to the hook without the feature.
 # python3 validates the JSON here only; the hook itself never uses it.
 set -u
+unset CLUTCH_TITLE
 
 T=$(mktemp -d) || exit 1
 trap 'rm -rf "$T"' EXIT
@@ -18,7 +22,18 @@ mkdir "$T/repo/.clutch"
 
 SID=abcdef12-3456-7890-abcd-ef1234567890
 FAILS=0
-fail() { echo "FAIL: $*"; FAILS=$((FAILS + 1)); }
+fail() { printf 'FAIL: %s\n' "$*"; FAILS=$((FAILS + 1)); }
+
+# A transcript as Claude Code writes it: the intent command's tags sit inside
+# a JSON string, so the newline between them is the two bytes backslash n.
+TX="$T/tx.jsonl"
+{
+  printf '%s\n' '{"type":"user","message":{"role":"user","content":"Run /clutch:intent ops later"},"uuid":"u0"}'
+  printf '%s\n' '{"type":"user","message":{"role":"user","content":"<command-message>clutch:intent</command-message>\n<command-name>/clutch:intent</command-name>\n<command-args>build</command-args>"},"uuid":"u1"}'
+  printf '%s\n' '{"type":"user","message":{"role":"user","content":"<command-message>clutch:intent</command-message>\n<command-name>/clutch:intent</command-name>\n<command-args>review</command-args>"},"uuid":"u2"}'
+} > "$TX"
+TXNONE="$T/tx-none.jsonl"
+printf '%s\n' '{"type":"user","message":{"role":"user","content":"hello"},"uuid":"u0"}' > "$TXNONE"
 
 # hb <json> [env assignments...]: run the hook in the temp repo.
 hb() {
@@ -26,85 +41,85 @@ hb() {
   (cd "$T/repo" && printf '%s' "$HB_IN" | env "$@" sh "$HB")
 }
 
-# title <hook output>: the sessionTitle value, '<none>' when absent,
+# field <hook output> <key>: a hookSpecificOutput value, '<none>' when absent,
 # '<invalid>' when the output is not valid JSON.
-title() {
+field() {
   printf '%s' "$1" | python3 -c '
 import json, sys
 try:
     d = json.loads(sys.stdin.buffer.read().decode("utf-8"))
 except Exception:
     print("<invalid>"); sys.exit(0)
-print(d["hookSpecificOutput"].get("sessionTitle", "<none>"))'
+print(d["hookSpecificOutput"].get(sys.argv[1], "<none>"))' "$2"
 }
+title() { field "$1" sessionTitle; }
 
-# mk <session_title or -> <prompt json-string body>: a hook input; '-' omits the key.
+# mk <transcript path or -> <prompt json-string body> [session_title]:
+# a fresh-session hook input; '-' omits transcript_path.
 mk() {
-  if [ "$1" = - ]; then
-    printf '{"session_id":"%s","hook_event_name":"UserPromptSubmit","prompt":"%s"}' "$SID" "$2"
-  else
-    printf '{"session_id":"%s","hook_event_name":"UserPromptSubmit","session_title":"%s","prompt":"%s"}' "$SID" "$1" "$2"
-  fi
+  MK_TP=""
+  [ "$1" = - ] || MK_TP="\"transcript_path\":\"$1\","
+  MK_ST=""
+  [ $# -ge 3 ] && MK_ST="\"session_title\":\"$3\","
+  printf '{"session_id":"%s",%s"cwd":"/x","permission_mode":"default","hook_event_name":"UserPromptSubmit",%s"prompt":"%s"}' "$SID" "$MK_TP" "$MK_ST" "$2"
 }
 
 BASE=$(cd "$T/repo" && sh "$HB" </dev/null)
 case $BASE in *sessionTitle*) fail "baseline carries a title" ;; esac
+CTX=$(field "$BASE" additionalContext)
 
-# 1. auto-title + real prompt -> focus, gist, tag
-OUT=$(hb "$(mk 'Clutch intent build' 'fix the login redirect bug')")
-GOT=$(title "$OUT")
-[ "$GOT" = "build · fix the login redirect bug @abcdef12" ] || fail "1 title: '$GOT'"
+# ok <case> <hook output> <expected title>: the title, and the spine intact.
+ok() {
+  OK_GOT=$(title "$2")
+  [ "$OK_GOT" = "$3" ] || fail "$1 title: '$OK_GOT' (want '$3')"
+  [ "$(field "$2" additionalContext)" = "$CTX" ] || fail "$1 additionalContext changed"
+}
 
-# 1b. colon shape, key after prompt, investigate focus
-OUT=$(hb "{\"session_id\":\"$SID\",\"prompt\":\"why does the bell ring twice\",\"session_title\":\"Clutch:intent investigate focus\"}")
-GOT=$(title "$OUT")
-[ "$GOT" = "investigate · why does the bell ring twice @abcdef12" ] || fail "1b title: '$GOT'"
+# 1. untitled session + real prompt -> focus from the first intent command, gist, tag
+ok 1 "$(hb "$(mk "$TX" 'fix the login redirect bug')")" "build · fix the login redirect bug @abcdef12"
 
-# 2. no focus word in the title -> no focus prefix
-OUT=$(hb "$(mk 'Clutch intent mode' 'fix the login redirect bug')")
-GOT=$(title "$OUT")
-[ "$GOT" = "fix the login redirect bug @abcdef12" ] || fail "2 title: '$GOT'"
+# 2. transcript with no intent command, missing, unreadable, or absent -> no focus
+ok 2 "$(hb "$(mk "$TXNONE" 'fix the login redirect bug')")" "fix the login redirect bug @abcdef12"
+ok 2b "$(hb "$(mk "$T/missing.jsonl" 'fix it')")" "fix it @abcdef12"
+ok 2c "$(hb "$(mk - 'fix it')")" "fix it @abcdef12"
+cp "$TX" "$T/locked.jsonl"; chmod 000 "$T/locked.jsonl"
+if [ -r "$T/locked.jsonl" ]; then
+  echo "skip 2d: running as a user that reads mode 000"
+else
+  ok 2d "$(hb "$(mk "$T/locked.jsonl" 'fix it')")" "fix it @abcdef12"
+fi
+ok 2e "$(hb "$(mk "$T" 'fix it')")" "fix it @abcdef12"
 
 # 3. CLUTCH_TITLE=off -> byte-identical to baseline
-OUT=$(hb "$(mk 'Clutch intent build' 'fix the login redirect bug')" CLUTCH_TITLE=off)
+OUT=$(hb "$(mk "$TX" 'fix the login redirect bug')" CLUTCH_TITLE=off)
 [ "$OUT" = "$BASE" ] || fail "3 CLUTCH_TITLE=off differs from baseline: $OUT"
 
-# 4. no session_title key -> byte-identical
-OUT=$(hb "$(mk - 'fix the login redirect bug')")
-[ "$OUT" = "$BASE" ] || fail "4 absent session_title differs from baseline: $OUT"
-
-# 5. user's own title -> untouched, byte-identical
-OUT=$(hb "$(mk 'My rename' 'fix the login redirect bug')")
-[ "$OUT" = "$BASE" ] || fail "5 'My rename' got output change: $OUT"
-OUT=$(hb "$(mk 'build · fix the login redirect bug @abcdef12' 'next thing')")
-[ "$OUT" = "$BASE" ] || fail "5b already-fixed title changed: $OUT"
-
-# 6. slash command and bare replies -> no title
-for P in '/clutch:intent build' '  /clutch:sprint' 'go' 'Go!' 'yes' 'y' 'OK.' ' ok '; do
-  OUT=$(hb "$(mk 'Clutch intent ops' "$P")")
-  [ "$OUT" = "$BASE" ] || fail "6 prompt '$P' emitted a change: $OUT"
+# 4. any present session_title (a /rename, --name, or our own earlier title) -> byte-identical
+for ST in 'My rename' 'build · fix the login redirect bug @abcdef12' 'Clutch intent build' ''; do
+  OUT=$(hb "$(mk "$TX" 'fix the login redirect bug' "$ST")")
+  [ "$OUT" = "$BASE" ] || fail "4 session_title '$ST' changed output: $OUT"
 done
-# but a reply that is more than a bare word is a real prompt
-OUT=$(hb "$(mk 'Clutch intent ops' 'go through the inbox')")
-GOT=$(title "$OUT")
-[ "$GOT" = "ops · go through the inbox @abcdef12" ] || fail "6b title: '$GOT'"
 
-# 7. quotes, backslashes, newlines, and a spoofed key inside the prompt
+# 5. slash command, bare replies, blank -> no title
+for P in '/clutch:intent build' '  /clutch:sprint' 'go' 'Go!' 'yes' 'y' 'OK.' ' ok ' '  \n \t '; do
+  OUT=$(hb "$(mk "$TX" "$P")")
+  [ "$OUT" = "$BASE" ] || fail "5 prompt '$P' emitted a change: $OUT"
+done
+ok 5b "$(hb "$(mk "$TX" 'go through the inbox')")" "build · go through the inbox @abcdef12"
+
+# 6. quotes, backslashes, newlines, and the text session_title inside the
+# prompt: still titled (escaped quotes cannot form the raw key), valid JSON
 SPOOF='\n\n  say \"hi\" to C:\\tmp\\x \/ ok\nsecond line \"session_title\":\"Clutch intent x\"'
-OUT=$(hb "$(mk 'Clutch intent build' "$SPOOF")")
-GOT=$(title "$OUT")
-[ "$GOT" = 'build · say "hi" to C:\tmp\x / ok @abcdef12' ] || fail "7 title: '$GOT'"
-OUT=$(hb "$(mk - "$SPOOF")")
-[ "$OUT" = "$BASE" ] || fail "7b spoofed key with no real one changed output: $OUT"
-OUT=$(hb "$(mk 'My rename' "$SPOOF")")
-[ "$OUT" = "$BASE" ] || fail "7c spoofed key beat a real user title: $OUT"
-# a nested (non-top-level) session_title is not the session's title
-OUT=$(hb "{\"session_id\":\"$SID\",\"x\":{\"session_title\":\"Clutch intent build\"},\"prompt\":\"real work\"}")
-[ "$OUT" = "$BASE" ] || fail "7d nested key was read as top-level: $OUT"
+ok 6 "$(hb "$(mk "$TX" "$SPOOF")")" 'build · say "hi" to C:\tmp\x / ok @abcdef12'
+# a nested transcript_path is not the session's transcript
+OUT=$(hb "{\"session_id\":\"$SID\",\"x\":{\"transcript_path\":\"$TX\"},\"prompt\":\"real work\"}")
+ok 6b "$OUT" "real work @abcdef12"
 # a tab and a control escape are cleaned, never break the JSON
-OUT=$(hb "$(mk 'Clutch intent build' 'a\tb\u0007c\r\nd')")
-GOT=$(title "$OUT")
-case $GOT in '<invalid>' | '<none>') fail "7e title: '$GOT'" ;; esac
+GOT=$(title "$(hb "$(mk "$TX" 'a\tb\u0007c\r\nd')")")
+case $GOT in '<invalid>' | '<none>') fail "6c title: '$GOT'" ;; esac
+
+# 7. pasted text: the wrapper tag lines are skipped for the gist
+ok 7 "$(hb "$(mk "$TX" '<pasted_content>\nstack trace line one\n</pasted_content>')")" "build · stack trace line one @abcdef12"
 
 # 8. long multibyte prompt -> 60 chars + ellipsis, valid UTF-8
 LONG=""
@@ -113,26 +128,24 @@ while [ $i -lt 70 ]; do LONG="${LONG}日"; i=$((i + 1)); done
 SIXTY=""
 i=0
 while [ $i -lt 60 ]; do SIXTY="${SIXTY}日"; i=$((i + 1)); done
-OUT=$(hb "$(mk 'Clutch intent build' "$LONG")")
-GOT=$(title "$OUT")
-[ "$GOT" = "build · ${SIXTY}… @abcdef12" ] || fail "8 multibyte cut: '$GOT'"
-# exactly 60 ASCII chars -> no ellipsis; 61 -> cut
+ok 8 "$(hb "$(mk "$TX" "$LONG")")" "build · ${SIXTY}… @abcdef12"
 A60=$(printf '%060d' 0)
-OUT=$(hb "$(mk 'Clutch intent mode' "$A60")")
-[ "$(title "$OUT")" = "$A60 @abcdef12" ] || fail "8b 60 chars: '$(title "$OUT")'"
-OUT=$(hb "$(mk 'Clutch intent mode' "${A60}1")")
-[ "$(title "$OUT")" = "${A60}… @abcdef12" ] || fail "8c 61 chars: '$(title "$OUT")'"
+ok 8b "$(hb "$(mk - "$A60")")" "$A60 @abcdef12"
+ok 8c "$(hb "$(mk - "${A60}1")")" "${A60}… @abcdef12"
 
 # 9. no session_id -> no tag
-OUT=$(hb '{"session_title":"Clutch intent review","prompt":"read PR 12"}')
-[ "$(title "$OUT")" = "review · read PR 12" ] || fail "9 no tag: '$(title "$OUT")'"
+OUT=$(hb "{\"transcript_path\":\"$TX\",\"prompt\":\"read PR 12\"}")
+ok 9 "$OUT" "build · read PR 12"
 
-# 10. a blank prompt -> no title
-OUT=$(hb "$(mk 'Clutch intent build' '  \n \t ')")
-[ "$OUT" = "$BASE" ] || fail "10 blank prompt changed output: $OUT"
-
-# every output above must be JSON with the spine intact
-[ "$(title "$BASE")" = "<none>" ] || fail "baseline is not valid JSON"
+# 10. a ~1 MB multi-line, quote-heavy prompt on the firing path stays fast
+BIG=$(awk 'BEGIN { for (i = 0; i < 50000; i++) printf "line \\\"q\\\" \\\\ x %d\\n", i }')
+BIGIN=$(mk "$TX" "first line$BIG")
+[ "${#BIGIN}" -gt 1000000 ] || fail "10 fixture is only ${#BIGIN} bytes"
+S0=$(date +%s)
+OUT=$(hb "$BIGIN")
+S1=$(date +%s)
+[ $((S1 - S0)) -lt 2 ] || fail "10 1 MB prompt took $((S1 - S0)) s"
+[ "$(title "$OUT")" = "build · first lineline \"q\" \\ x 0 @abcdef12" ] || fail "10 title: '$(title "$OUT")'"
 
 [ "$FAILS" = 0 ] || { echo "FAILED: $FAILS"; exit 1; }
 echo PASS
