@@ -4,12 +4,14 @@
 # third field): 0 alive (kill -0 passes and ps -ww names poll.sh @<tag8> at
 # the end), 1 no record (proven absent), 2 cannot tell, 3 ended (dead or
 # reused pid, another tag's poller, malformed line). It never writes.
-# M1-M23 with M5b, M12b, M12c, M20b and M20c run scripts/poll.sh @<tag> (the
-# silent check) against a fake gh that applies the real --jq filter to a
-# per-PR GraphQL fixture through /usr/bin/jq, a fake date for +%H and a fake
-# sleep: quiet rounds print nothing, a move prints "<ref> <what>" lines and
-# the closing line after appending <ref> <stamp> to .woke, every other exit
-# prints the ended line, and a failed write prints the stopped line.
+# M1-M25 with M5b, M11b, M12b, M12c, M20b, M20c, M22b and M24b run
+# scripts/poll.sh @<tag> (the silent check) against a fake gh that applies the
+# real --jq filter to a per-PR GraphQL fixture through /usr/bin/jq, a fake
+# date for +%H and +%s and a fake sleep: quiet rounds print nothing, a move
+# prints "<ref> <what>" lines and the closing line after appending
+# <ref> <stamp> to .woke, 3 gh failures in a row print "<ref> unreadable" once
+# per wait line, every other exit prints the ended line, and a failed write
+# prints the stopped line.
 # prelude.sh and poll.sh are staged into a scratch tree and run under a
 # scratch HOME. PRELUDE_SH and POLL_SH override the targets for replay or a
 # mutant copy. Silent on pass apart from PASS.
@@ -122,7 +124,7 @@ rec "$LONGP $NOW
 rec "$LIVE $NOW beat
 "; chk "L11 2.17.1 line" '@0123abcd' 0
 
-# --- M1-M23: scripts/poll.sh @<tag>
+# --- M1-M25: scripts/poll.sh @<tag>
 FIX=$T/fix
 mkdir -p "$FIX" "$T/mbin"
 W="$HOME/.clutch/worklog.md"
@@ -139,6 +141,11 @@ echo call >> "$F/log"
 [ -f "$F/chmodwl" ] && { rm -f "$F/chmodwl"; chmod 000 "$HOME/.clutch/worklog.md"; }
 [ -f "$F/repoll" ] && { rm -f "$F/repoll"; printf '1 1\n' > "$HOME/.clutch/watch/0123abcd.poll"; }
 [ -f "$F/fail1" ] && { rm -f "$F/fail1"; echo 'HTTP 502' >&2; exit 1; }
+# fseq: one line per call, 1 = fail this call, 0 = answer.
+if [ -s "$F/fseq" ]; then
+  s=$(head -n 1 "$F/fseq"); sed 1d "$F/fseq" > "$F/fseq.t"; mv "$F/fseq.t" "$F/fseq"
+  [ "$s" = 1 ] && exit 1
+fi
 o='' r='' n='' q=''
 while [ $# -gt 0 ]; do
   case $1 in
@@ -154,6 +161,7 @@ EOF
 cat > "$T/mbin/date" <<'EOF'
 #!/bin/sh
 if [ "$*" = '+%H' ]; then cat "$HOME/../fix/hour" 2>/dev/null || echo 12; exit 0; fi
+[ "$*" = '+%s' ] && [ -f "$HOME/../fix/datefail" ] && exit 1
 exec /bin/date "$@"
 EOF
 # Fake sleep: counts calls; call N restores the worklog when $FIX/sleepfix.N exists.
@@ -237,11 +245,39 @@ mseed; madd 1000 'proj wait: gh:o/r#1 b1 @0123abcd pr one'; fx o_r_1 OPEN "$NEW"
 pr 1 @0123abcd; ok "M11 epoch baseline" 0 "$(nl 'gh:o/r#1 comment' "$CLOSE")" 1
 mseed; madd 1000 'proj wait: gh:o/r#1 b1 @0123abcd pr one'; fx o_r_1 OPEN "$OLD" "$(cm "$OLD" User al)" ''
 pr 1 @0123abcd; ok "M11 epoch baseline, older" 0 "$ENDED" 1
+# M11b: a baseline with hyphens in the time reads as ISO (OLD < B < NEW).
+HB=$(printf '%s' "$B0" | sed 's/T\(..\):\(..\):/T\1-\2-/')
+mseed; madd 3000 "proj wait: gh:o/r#1 $HB @0123abcd pr one"; fx o_r_1 OPEN "$OLD" "$(cm "$OLD" User al)" ''
+pr 1 @0123abcd; ok "M11b hyphen-time baseline, older" 0 "$ENDED" 1
+mseed; madd 3000 "proj wait: gh:o/r#1 $HB @0123abcd pr one"; fx o_r_1 OPEN "$NEW" "$(cm "$NEW" User al)" ''
+pr 1 @0123abcd; ok "M11b hyphen-time baseline, newer" 0 "$(nl 'gh:o/r#1 comment' "$CLOSE")" 1
 # M13: a failing gh skips the round; the next round wakes.
 own1; fx o_r_1 MERGED "$NEW" '' ''; : > "$FIX/fail1"
 pr 3 @0123abcd; ok "M13 gh fails once" 0 "$(nl 'gh:o/r#1 merged' "$CLOSE")" 2
 own1; fx o_r_1 MERGED "$NEW" '' ''; echo 03 > "$FIX/hour"
 pr 2 @0123abcd; ok "M14 outside the window" 0 "$ENDED" 0
+for h in 07 22; do
+  own1; fx o_r_1 MERGED "$NEW" '' ''; echo "$h" > "$FIX/hour"
+  pr 2 @0123abcd; ok "M14 hour $h" 0 "$ENDED" 0
+done
+for h in 08 21; do
+  own1; fx o_r_1 MERGED "$NEW" '' ''; echo "$h" > "$FIX/hour"
+  pr 2 @0123abcd; ok "M14 hour $h" 0 "$(nl 'gh:o/r#1 merged' "$CLOSE")" 1
+done
+# M24: a gh failure that never clears wakes once as unreadable after 3
+# failed rounds, marking .woke first; a restart does not wake it again, and
+# the mark never holds back a later real move.
+own1
+pr 4 @0123abcd; ok "M24 gh always fails" 0 "$(nl 'gh:o/r#1 unreadable' "$CLOSE")" 3
+grep -q '^unreadable gh:o/r#1 [0-9][0-9]*$' "$WF" 2>/dev/null || { echo "FAIL: M24 -- .woke [$(cat "$WF" 2>/dev/null)], want an unreadable mark"; fail=1; }
+pr 4 @0123abcd; ok "M24 restart stays quiet" 0 "$ENDED" 4
+fx o_r_1 MERGED "$NEW" '' ''
+pr 1 @0123abcd; ok "M24 later move still wakes" 0 "$(nl 'gh:o/r#1 merged' "$CLOSE")" 1
+# M24b: failures must be consecutive; an answer resets the count.
+own1; fx o_r_1 OPEN "$B0" '' ''; nl 1 1 0 1 1 > "$FIX/fseq"
+pr 5 @0123abcd; ok "M24b fails twice, answers, fails twice" 0 "$ENDED" 5
+own1; fx o_r_1 MERGED "$NEW" '' ''; nl 1 1 > "$FIX/fseq"
+pr 4 @0123abcd; ok "M24b fails twice then moves" 0 "$(nl 'gh:o/r#1 merged' "$CLOSE")" 3
 own1; fx o_r_1 OPEN "$B0" '' ''; : > "$FIX/repoll"
 pr 3 @0123abcd; ok "M15 superseded" 0 "$ENDED" 1
 own1; fx o_r_1 MERGED "$NEW" '' ''; : > "$FIX/log"
@@ -295,6 +331,14 @@ pr 1 @0123abcd; ok "M20c no ~/.clutch" 0 "$STOP" 0
 own1; madd 50 "proj wait: gh:o/r#2 $B0 @0123abcd pr two"; madd 40 "proj wait: gh:o/r#3 $B0 @0123abcd pr three"
 fx o_r_1 MERGED "$NEW" '' ''; fx o_r_2 OPEN "$NEW" "$(cm "$NEW" User al)" ''; fx o_r_3 OPEN "$B0" '' ''
 pr 1 @0123abcd; ok "M22 two moved" 0 "$(nl 'gh:o/r#1 merged' 'gh:o/r#2 comment' "$CLOSE")" 3
+# M22b: a newer mark for o/r#1 and a beat line never hold back o/r#2.
+own1; madd 50 "proj wait: gh:o/r#2 $B0 @0123abcd pr two"; mkdir -p "$HOME/.clutch/watch"
+nl "gh:o/r#1 $(iso $((NOW - 100)))" "beat $((NOW - 100))" > "$WF"
+fx o_r_1 OPEN "$B0" '' ''; fx o_r_2 OPEN "$NEW" "$(cm "$NEW" User al)" ''
+pr 1 @0123abcd; ok "M22b marks match their ref" 0 "$(nl 'gh:o/r#2 comment' "$CLOSE")" 2
+# M25: a failed date +%s ends the check; it does not blame ~/.clutch/watch.
+own1; fx o_r_1 MERGED "$NEW" '' ''; : > "$FIX/datefail"
+pr 1 @0123abcd; ok "M25 date fails" 0 "$ENDED" 0
 # M23: .poll is one line "<pid> <epoch>", pid the poller's own.
 own1; fx o_r_1 OPEN "$B0" '' ''; : > "$FIX/pollcopy.on"
 (cd "$T/plain" && PATH="$T/mbin:$PATH" CLUTCH_POLL_SLEEP=0 CLUTCH_POLL_ROUNDS=1 exec sh "$T/scripts/poll.sh" @0123abcd >/dev/null 2>&1) &

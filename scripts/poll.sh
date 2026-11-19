@@ -4,11 +4,14 @@
 # the tag owns, quietly, once per round (CLUTCH_POLL_SLEEP seconds apart,
 # default 600; CLUTCH_POLL_ROUNDS rounds, default 72), from 08:00 to 21:59
 # local. Its exit is the session's one visible turn, so it prints only when
-# it exits: "<ref> <what>" lines and the closing line when a wait moved, the
-# ended line otherwise, the stopped line when it cannot write.
+# it exits: "<ref> <what>" lines and the closing line when a wait moved or
+# gh failed on it 3 rounds in a row (what = unreadable), the ended line
+# otherwise, the stopped line when it cannot write.
 # Records under ~/.clutch/watch (never creating ~/.clutch): <tag8>.poll
 # "<pid> <start epoch>" (read by clutch_poll_alive) and <tag8>.woke,
-# append-only "<ref> <stamp>" wake marks, so the same evidence wakes once.
+# append-only "<ref> <stamp>" wake marks, so the same evidence wakes once, and
+# "unreadable <ref> <wait epoch>" marks, so one wait line wakes unreadable at
+# most once; they never hold back a later move of that ref.
 # It never writes the worklog.
 
 TAG=${1-}
@@ -32,7 +35,7 @@ WF="$D/${TAG#@}.woke"
 # Without a readable, appendable .woke a wake could repeat on the same evidence.
 { : >> "$WF"; } && [ -r "$WF" ] || stopped
 START=$(date +%s)
-case $START in '' | *[!0-9]*) stopped ;; esac
+case $START in '' | *[!0-9]*) ended ;; esac
 { printf '%s %s\n' "$$" "$START" > "$PF.$$" && mv -f "$PF.$$" "$PF"; } || { rm -f "$PF.$$"; stopped; }
 
 MAX=${CLUTCH_POLL_ROUNDS:-72}
@@ -43,6 +46,8 @@ ISO='[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]:[0-9][0-9]:[0-9][0-9]
 Q='query($o:String!,$r:String!,$n:Int!){viewer{login} repository(owner:$o,name:$r){pullRequest(number:$n){state updatedAt comments(last:50){nodes{createdAt author{__typename login}}} reviews(last:50){nodes{state submittedAt author{__typename login}}}}}}'
 
 R=0
+# One line per in-window gh failure; an answer drops the ref's lines.
+FAILS=""
 while [ "$R" -lt "$MAX" ]; do
   [ "$R" = 0 ] || sleep "$NAP"
   R=$((R + 1))
@@ -62,6 +67,8 @@ while [ "$R" -lt "$MAX" ]; do
   MARKS=""
   while read -r REF OWNER REPO NUM BASE EPOCH; do
     [ -n "$REF" ] || continue
+    # A baseline written with hyphens in the time (HH-MM-SS) reads as ISO.
+    case $BASE in [0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]-[0-9][0-9]-[0-9][0-9]Z) BASE=$(printf '%s' "$BASE" | sed 's/T\(..\)-\(..\)-/T\1:\2:/') ;; esac
     case $BASE in $ISO) ;; *) BASE=$(date -u -r "$EPOCH" +%Y-%m-%dT%H:%M:%SZ || date -u -d "@$EPOCH" +%Y-%m-%dT%H:%M:%SZ) ;; esac
     case $BASE in $ISO) ;; *) continue ;; esac
     # Beff: the later of the baseline and this ref's newest wake mark (field 1
@@ -79,7 +86,19 @@ while [ "$R" -lt "$MAX" ]; do
         elif ($rv | length) > 0 then "review \($rv[-1].state) \($t)"
         elif ($cm | length) > 0 then "comment \($t)"
         else empty end'
-    GOT=$(gh api graphql -f query="$Q" -f o="$OWNER" -f r="$REPO" -F n="$NUM" --jq "$F" </dev/null) || continue
+    if ! GOT=$(gh api graphql -f query="$Q" -f o="$OWNER" -f r="$REPO" -F n="$NUM" --jq "$F" </dev/null); then
+      FAILS="$FAILS
+$REF"
+      [ "$(printf '%s\n' "$FAILS" | LC_ALL=C awk -v r="$REF" '$0 == r { n++ } END { print n + 0 }')" -ge 3 ] || continue
+      # 0 = no unreadable mark for this wait line yet; an unreadable .woke prints nothing.
+      [ "$(LC_ALL=C awk -v r="$REF" -v e="$EPOCH" '$1 == "unreadable" && $2 == r && $3 == e { f = 1 } END { print f + 0 }' "$WF")" = 0 ] || continue
+      WAKE="$WAKE$REF unreadable
+"
+      MARKS="${MARKS}unreadable $REF $EPOCH
+"
+      continue
+    fi
+    FAILS=$(printf '%s\n' "$FAILS" | LC_ALL=C awk -v r="$REF" '$0 != r')
     GOT=$(printf '%s\n' "$GOT" | head -n 1)
     STAMP=${GOT##* }
     WHAT=${GOT% *}
