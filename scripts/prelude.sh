@@ -7,7 +7,7 @@
 # clutch_last_authored, clutch_worklog_window, clutch_open_loops,
 # clutch_session_tag, clutch_owned_loops, clutch_ops_due,
 # clutch_guess_intent.
-# Also defines clutch_beat_window.
+# Also defines clutch_beat_window and clutch_ops_record.
 # Also defines clutch_session_paths (CLUTCH_TAG8, CLUTCH_SDIR, CLUTCH_SREL).
 
 CLUTCH_GIT=0
@@ -257,6 +257,22 @@ clutch_beat_window() {
     LC_ALL=C awk '$6 !~ /^@[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]$/'
   [ -z "$CBW_M" ] || printf '%s\n' "$CBW_M"
   return 0
+}
+
+# Is <@tag>'s ops record (~/.clutch/watch/<tag8>.beat) there? 0 yes, 1 surely
+# not (the armed beat and sweep stop), 2 cannot tell (they go on). Writes nothing.
+clutch_ops_record() {
+  case $1 in '' | @ | *[./]* | [!@]*) return 2 ;; esac
+  [ -n "$HOME" ] || return 2
+  COR_F="$HOME/.clutch/watch/${1#@}.beat"
+  if [ -e "$COR_F" ] || [ -L "$COR_F" ]; then return 0; fi
+  for COR_D in "$HOME/.clutch/watch" "$HOME/.clutch"; do
+    if [ -e "$COR_D" ] || [ -L "$COR_D" ]; then
+      [ -d "$COR_D" ] && [ -x "$COR_D" ] && return 1
+      return 2
+    fi
+  done
+  return 1
 }
 
 # The window for the session-start block and the ops sweep: up to 8 lines,

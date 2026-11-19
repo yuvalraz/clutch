@@ -26,7 +26,7 @@ Review fires when you fire it. Nothing here runs on its own.
 
 Confirm in one line: "Espresso engaged: tight convergence, one blast-radius
 read per PR, checkpoint at each closed PR." Then write the marker (POSIX,
-silent on any failure). Replace `@<tag>` with the `Session tag:` from the session start; with no `Session tag:` line, leave it as is:
+silent on any failure). Replace `@<tag>` with the latest `Session tag:` line; with no `Session tag:` line, leave it as is:
 
 ```sh
 ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || { [ "${CLUTCH_PLAIN:-}" != off ] && ROOT=$(pwd -P) && [ "$ROOT" != / ] && [ ! "$ROOT" -ef "$HOME" ]; } || exit 0
@@ -127,7 +127,7 @@ Here the rule is the `<rule, imperative, one line>` text without its reason,
 quoted for the shell so the check and the write hash the same bytes. Each
 `'` in the rule becomes `'\''` inside the single quotes (so `Don't log
 secrets` is written `'Don'\''t log secrets'`), and the write and the check
-hash the same escaped input, so the bytes match. Replace `@<tag>` with the `Session tag:` from the session start; with no `Session tag:` line, leave it as is. The write, on a decline:
+hash the same escaped input, so the bytes match. Replace `@<tag>` with the latest `Session tag:` line; with no `Session tag:` line, leave it as is. The write, on a decline:
 
 ```sh
 ROOT=$(git rev-parse --show-toplevel) || exit 1

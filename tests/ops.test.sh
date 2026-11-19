@@ -316,7 +316,7 @@ fi
 fpin "$R" "README: tick sentence"      '`/clutch:ops tick` checks only those waits, on request, and speaks only when one moved.'
 
 # --- ops: tagged waits, and the pointer to the watch's own tick
-fpin "$O" "ops: wait text tag"          'When the session start gave a `Session tag:`, `<text>` starts with that tag, such as `@0123abcd Or'"'"'s review`.'
+fpin "$O" "ops: wait text tag"          'With a `Session tag:` line, `<text>` starts with the tag of the latest one, such as `@0123abcd Or'"'"'s review`.'
 fpin "$O" "ops: watch pointer"          'A session'"'"'s armed watch does not send a tick: it sends `/clutch:watch @<tag>`, which reads only the waits that tag owns.'
 
 # --- watch skill: the armed watch's tick
@@ -346,8 +346,28 @@ fpin "$WS" "W13 merged not held"        'A thing that merged or closed is not he
 
 # --- ops: the beat record in Step 0, and the pointer to the beat
 fpin "$O" "ops: beat record"            'Then record this session as an ops session, so its turn end asks once a day for the beat (`/clutch:beat`) and the sweep (`/clutch:ops re-sweep armed`).'
-fpin "$O" "ops: beat record tag"        'Replace `@<tag>` with the `Session tag:` from the session start; with no `Session tag:` line, skip this. Silent on any failure:'
-fpin "$O" "ops: beat record snippet"    'T='"'"'@<tag>'"'"'; F="$HOME/.clutch/watch/${T#@}.beat"; [ "${CLUTCH_BEAT:-}" = off ] || [ ! -d "$HOME/.clutch" ] || [ -e "$F" ] || { mkdir -p "$HOME/.clutch/watch" && printf '"'"'last %s\n'"'"' "$(date +%s)" > "$F"; } 2>/dev/null'
+fpin "$O" "ops: beat record tag"        'Replace `@<tag>` with the latest `Session tag:` line; with no `Session tag:` line, skip this. Silent on any failure:'
+fpin "$O" "ops: beat record snippet"    'T='"'"'@<tag>'"'"'; case $T in '"'"''"'"' | @ | *[./]*) ;; *) F="$HOME/.clutch/watch/${T#@}.beat"; [ "${CLUTCH_BEAT:-}" = off ] || [ ! -d "$HOME/.clutch" ] || [ -e "$F" ] || { mkdir -p "$HOME/.clutch/watch" && printf '"'"'last %s\n'"'"' "$(date +%s)" > "$F"; } 2>/dev/null ;; esac'
+
+# --- M2: one tag rule. Every skill takes the latest Session tag line (a fork
+# holds two); none says "from the session start" (joined, so a wrap cannot hide).
+for sk in ops review investigate intent tempo ideate status sprint; do
+  fpin "$HERE/../skills/$sk/SKILL.md" "M2 latest tag ($sk)" 'Replace `@<tag>` with the latest `Session tag:` line; with no `Session tag:` line,'
+done
+for sk in "$HERE"/../skills/*/SKILL.md "$HERE"/../rules/*.md; do
+  case $(tr -s '[:space:]' ' ' < "$sk") in
+    *'from the session start'* | *'session start gave'*) echo "FAIL: M2 old tag rule -- $sk still takes the Session tag from the session start"; fail=1 ;;
+  esac
+done
+
+# --- M1: the armed sweep checks the session's ops record before it reads.
+AS_CHECK='sh -c '"'"'. "${CLAUDE_PLUGIN_ROOT}/scripts/prelude.sh" && clutch_ops_record "@<tag>"'"'"
+fpin "$O" "AS self-check intro"         'First check the session'"'"'s ops record. Replace `@<tag>` with the latest `Session tag:` line; with no `Session tag:` line, skip the check:'
+fpin "$O" "AS self-check line"          "$AS_CHECK"
+fpin "$O" "AS self-check gone"          'Exit status 1 with no error text means the record is gone: cancel the recurring task in this session'"'"'s own task list whose prompt is exactly `/clutch:ops re-sweep armed`, reply with exactly `Not an ops session now; the sweep stopped.` and write nothing.'
+fpin "$O" "AS self-check other"         'Any other outcome goes on below; the check never writes.'
+case $ASEC in *'Not an ops session now; the sweep stopped.'*'Skip it only when the latest `tempo gear:` line'*) ;;
+  *) echo "FAIL: AS self-check -- the record check does not come before the gear skip"; fail=1 ;; esac
 fpin "$O" "ops: beat pointer"           'An ops session'"'"'s beat does not send a tick either: it sends `/clutch:beat @<tag>`, which reads what other sessions moved and the waits no session'"'"'s tag owns.'
 
 # --- beat skill: one beat of an ops session
@@ -380,7 +400,15 @@ fpin "$BS" "BT-moved-untagged"          'A wait that moved: append its `moved:` 
 if grep -qF '<kind>:<ref> @<tag>' "$BS"; then
   echo "FAIL: BT-moved-untagged -- the beat skill writes a tagged moved: or wait: text"; fail=1
 fi
-fpin "$BS" "BT11 never held, stays"     'A beat never holds a wait again and never removes itself: it ends with the session.'
+fpin "$BS" "BT11 never held, stays"     'A beat never holds a wait again and never removes itself while its ops record is there: it ends with the session.'
+# --- M1: the beat checks the session's ops record before its read.
+fpin "$BS" "BT-self-check intro"        'First check that this session is still an ops session, `@<tag>` replaced by the argument:'
+fpin "$BS" "BT-self-check line"         "$AS_CHECK"
+fpin "$BS" "BT-self-check gone"         'Exit status 1 with no error text means its ops record is gone: cancel the recurring task in this session'"'"'s own task list whose prompt is exactly `/clutch:beat @<tag>`, reply with exactly `Not an ops session now; the beat stopped.` and write nothing.'
+fpin "$BS" "BT-self-check other"        'Any other outcome goes on to the read; the check never writes.'
+BSJ=$(tr -s '[:space:]' ' ' < "$BS")
+case $BSJ in *'clutch_ops_record'*'clutch_beat_window'*) ;; *) echo "FAIL: BT-self-check -- the record check does not come before the read"; fail=1 ;; esac
+case $BSJ in *'never removes itself: it ends'*) echo "FAIL: BT11 -- the beat still says it never removes itself, record or not"; fail=1 ;; esac
 fpin "$BS" "BT12 reply shape"           'Then reply in at most two lines, plus the drift line when it applies: what moved, naming at most two movements, the ones nearest the day'"'"'s work, and one smallest move. An outward action waits for its usual yes.'
 fpin "$BS" "BT13 fixed line"            'When nothing moved, reply with exactly `No change.` and nothing more: an empty reply gets prompted for one.'
 fpin "$BS" "BT14 invited"               'The reply answers the beat'"'"'s prompt, so it is not an uninvited line.'

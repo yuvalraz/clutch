@@ -24,7 +24,7 @@ Investigate fires when you fire it. Nothing here runs on its own.
 ### Step 0: Engage the gear
 
 Confirm in one line: "Craft engaged: explore, then commit, checkpoint at each finding."
-Then write the marker (POSIX, silent on any failure). Replace `@<tag>` with the `Session tag:` from the session start; with no `Session tag:` line, leave it as is:
+Then write the marker (POSIX, silent on any failure). Replace `@<tag>` with the latest `Session tag:` line; with no `Session tag:` line, leave it as is:
 
 ```sh
 ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || { [ "${CLUTCH_PLAIN:-}" != off ] && ROOT=$(pwd -P) && [ "$ROOT" != / ] && [ ! "$ROOT" -ef "$HOME" ]; } || exit 0

@@ -10,7 +10,11 @@
 # whose field 5 is not the tag; "last <now - 120>" appended to an existing
 # record before printing; unreadable state is rc 2). R1 runs the
 # beat skill's read line, R2 the ops Step 0 record snippet under sh and
-# zsh -f, R3 the beat skill's moved: text through the constitution snippet.
+# zsh -f (its tag guard against '@', '@../x', '@a/b' and an unguarded
+# mutant), R3 the beat skill's moved: text through the constitution snippet.
+# C1-C7 cover clutch_ops_record (0 record there, 1 surely gone, 2 cannot
+# tell; never writes). R4/R5 run the beat's and the armed sweep's record
+# check line under sh and zsh -f.
 # prelude.sh and stop.sh are staged into a scratch tree and run from a scratch
 # repo or a non-git dir under a scratch HOME. PRELUDE_SH, STOP_SH,
 # BEAT_SKILL, OPS_SKILL and CONST_FILE override the targets for replay
@@ -708,8 +712,86 @@ else
     R2_B=$(cat "$BF")
     rs HOME="$HOME"
     [ -z "$OUT" ] && [ "$(cat "$BF")" = "$R2_B" ] || { echo "FAIL: R2 $sh (d) -- out [$OUT] or record changed: $(cat "$BF")"; fail=1; }
+    # (e) the case guard: an empty, dot or slash tag writes nothing outside
+    # ~/.clutch/watch/<one name>.beat. A mutant without the guard must go red.
+    sed 's/case \$T in .* \*) \(.*\) ;; esac$/\1/' "$T/rsnip.raw" > "$T/rsnip-mut.raw"
+    cmp -s "$T/rsnip.raw" "$T/rsnip-mut.raw" && { echo "FAIL: R2 $sh (e) -- guard mutant did not change the snippet"; fail=1; }
+    for v in snip mut; do
+      [ "$v" = snip ] && src="$T/rsnip.raw" || src="$T/rsnip-mut.raw"
+      made=
+      for tg in '@' '@../x' '@a/b'; do
+        rm -rf "$HOME/.clutch"; mkdir -p "$HOME/.clutch/watch/a"
+        rl1 "$(cat "$src")" '@<tag>' "$tg" > "$T/rsnip-g.sh"
+        (cd "$T/plain" && $run "$T/rsnip-g.sh" >/dev/null 2>&1)
+        for s in "$HOME/.clutch/x.beat" "$HOME/.clutch/watch/.beat" "$HOME/.clutch/watch/a/b.beat"; do [ ! -e "$s" ] || made="$made $tg:$s"; done
+      done
+      rm -rf "$HOME/.clutch"
+      if [ "$v" = snip ]; then
+        [ -z "$made" ] || { echo "FAIL: R2 $sh (e) -- the guard let a bad tag write:$made"; fail=1; }
+      else
+        [ -n "$made" ] || { echo "FAIL: R2 $sh (e) -- the guard check is vacuous: the unguarded mutant wrote nothing"; fail=1; }
+      fi
+    done
   done
 fi
+
+# --- C1-C7: clutch_ops_record <@tag>: 0 the record is there, 1 it surely is
+# not, 2 cannot tell. It never creates or changes anything.
+cr() { OUT=$(cd "$T/plain" && . "$T/scripts/prelude.sh" && clutch_ops_record "$1" 2>&1); RC=$?; }
+rec; R_B=$(cat "$BF")
+cr '@0123abcd'; is "C1 present" 0 ''
+[ "$(cat "$BF")" = "$R_B" ] || { echo "FAIL: C1 -- record changed: $(cat "$BF")"; fail=1; }
+cr '@89abcdef'; is "C2 peer only" 1 ''
+rm -rf "$HOME/.clutch"
+cr '@0123abcd'; is "C3 no ~/.clutch" 1 ''
+[ ! -e "$HOME/.clutch" ] || { echo "FAIL: C3 -- ~/.clutch created"; fail=1; }
+mkdir -p "$HOME/.clutch"
+cr '@0123abcd'; is "C4 no watch dir" 1 ''
+[ ! -e "$HOME/.clutch/watch" ] || { echo "FAIL: C4 -- watch dir created"; fail=1; }
+rec
+for tg in '' '@' '@../0123abcd' '@a/b' '0123abcd'; do cr "$tg"; is "C5 bad tag [$tg]" 2 ''; done
+OUT=$(cd "$T/plain" && HOME='' && . "$T/scripts/prelude.sh" && clutch_ops_record '@0123abcd' 2>&1); RC=$?
+is "C6 empty HOME" 2 ''
+if [ "$(id -u)" = 0 ]; then
+  echo "SKIP: C7 modes (root reads through chmod)"
+else
+  rec; chmod 000 "$HOME/.clutch/watch"; cr '@0123abcd'; chmod 755 "$HOME/.clutch/watch"; is "C7 unsearchable watch" 2 ''
+  rec; chmod 000 "$HOME/.clutch"; cr '@0123abcd'; chmod 755 "$HOME/.clutch"; is "C7 unsearchable ~/.clutch" 2 ''
+fi
+rm -rf "$HOME/.clutch"; mkdir -p "$HOME/.clutch"; : > "$HOME/.clutch/watch"
+cr '@0123abcd'; is "C7 watch not a dir" 2 ''
+
+# --- R4/R5: the beat skill's and the armed sweep's record check line, the
+# plugin root replaced by the staged tree and @<tag> filled, under sh and
+# zsh -f: record there, rc 0 and silent (the beat and sweep go on as before);
+# record gone, rc 1 and silent (the stop path); nothing created either way.
+for pair in "R4:$BS" "R5:$O"; do
+  rid=${pair%%:*}; rf=${pair#*:}
+  CL=$(grep -F 'sh -c' "$rf" 2>/dev/null | grep -F 'clutch_ops_record')
+  if [ "$(printf '%s\n' "$CL" | grep -c .)" != 1 ]; then
+    echo "FAIL: $rid wants exactly one sh -c line reading clutch_ops_record in $rf, got: $CL"; fail=1; continue
+  fi
+  CBAD=$(rl1 "$CL" '${CLAUDE_PLUGIN_ROOT}' "$T")
+  CCMD=$(rl1 "$CBAD" '@<tag>' '@0123abcd')
+  [ "$CCMD" != "$CBAD" ] || { echo "FAIL: $rid -- no @<tag> to fill in: $CL"; fail=1; }
+  SHELLS="sh"
+  if command -v zsh >/dev/null 2>&1; then SHELLS="sh zsh"; else echo "SKIP: $rid zsh (no zsh)"; fi
+  for sh in $SHELLS; do
+    [ "$sh" = zsh ] && run="zsh -f" || run=sh
+    rec; R_B=$(cat "$BF")
+    OUT=$(cd "$T/plain" && $run -c "$CCMD" 2>&1); RC=$?
+    is "$rid $sh present" 0 ''
+    [ "$(cat "$BF")" = "$R_B" ] || { echo "FAIL: $rid $sh -- record changed: $(cat "$BF")"; fail=1; }
+    rm -f "$BF"
+    OUT=$(cd "$T/plain" && $run -c "$CCMD" 2>&1); RC=$?
+    is "$rid $sh gone" 1 ''
+    [ "$(ls -A "$HOME/.clutch/watch")" = '' ] || { echo "FAIL: $rid $sh -- the check wrote: $(ls -A "$HOME/.clutch/watch")"; fail=1; }
+    rm -rf "$HOME/.clutch"
+    OUT=$(cd "$T/plain" && $run -c "$CCMD" 2>&1); RC=$?
+    is "$rid $sh no ~/.clutch" 1 ''
+    [ ! -e "$HOME/.clutch" ] || { echo "FAIL: $rid $sh -- ~/.clutch created"; fail=1; }
+  done
+done
 
 # --- R3: the beat skill's moved: text, filled and written with the
 # constitution's snippet, closes the untagged wait on its ref; a tagged form
