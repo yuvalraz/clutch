@@ -101,7 +101,9 @@ for ST in 'My rename' 'build · fix the login redirect bug @abcdef12' 'Clutch in
 done
 
 # 5. slash command, bare replies, blank -> no title
-for P in '/clutch:intent build' '  /clutch:sprint' 'go' 'Go!' 'yes' 'y' 'OK.' ' ok ' '  \n \t '; do
+# a plain focus word is the answer to the intent ask too (skills/intent/SKILL.md)
+for P in '/clutch:intent build' '  /clutch:sprint' 'go' 'Go!' 'yes' 'y' 'OK.' ' ok ' '  \n \t ' \
+  'build' 'ideate' 'ops' 'Review' 'investigate.'; do
   OUT=$(hb "$(mk "$TX" "$P")")
   [ "$OUT" = "$BASE" ] || fail "5 prompt '$P' emitted a change: $OUT"
 done
@@ -146,6 +148,51 @@ OUT=$(hb "$BIGIN")
 S1=$(date +%s)
 [ $((S1 - S0)) -lt 2 ] || fail "10 1 MB prompt took $((S1 - S0)) s"
 [ "$(title "$OUT")" = "build · first lineline \"q\" \\ x 0 @abcdef12" ] || fail "10 title: '$(title "$OUT")'"
+
+# 11. a 60k backslash run (30k escaped pairs) mid-string stays fast and is cut cleanly
+BS=$(awk 'BEGIN { for (i = 0; i < 60000; i++) printf "\\" }')
+S0=$(date +%s)
+OUT=$(hb "$(mk "$TX" "first line $BS x")")
+S1=$(date +%s)
+[ $((S1 - S0)) -lt 2 ] || fail "11 60k backslash run took $((S1 - S0)) s"
+B49=$(awk 'BEGIN { for (i = 0; i < 49; i++) printf "\\" }')
+[ "$(title "$OUT")" = "build · first line ${B49}… @abcdef12" ] || fail "11 title: '$(title "$OUT")'"
+# a 500k run ending the string (just before its closing quote)
+BS=$(awk 'BEGIN { for (i = 0; i < 500000; i++) printf "\\" }')
+S0=$(date +%s)
+OUT=$(hb "$(mk "$TX" "first line $BS")")
+S1=$(date +%s)
+[ $((S1 - S0)) -lt 2 ] || fail "11b trailing 500k backslash run took $((S1 - S0)) s"
+[ "$(title "$OUT")" = "build · first line ${B49}… @abcdef12" ] || fail "11b title: '$(title "$OUT")'"
+
+# 12. a first line that starts near the 4096-byte decode window ends on a
+# whole character: 4050 spaces then 40 x 日 keeps 15 x 日, never a torn byte
+SP4050=$(printf '%4050s' '')
+FORTY=""
+i=0
+while [ $i -lt 40 ]; do FORTY="${FORTY}日"; i=$((i + 1)); done
+FIFTEEN=""
+i=0
+while [ $i -lt 15 ]; do FIFTEEN="${FIFTEEN}日"; i=$((i + 1)); done
+OUT=$(hb "$(mk "$TX" "$SP4050$FORTY")")
+printf '%s' "$OUT" | python3 -c '
+import json, sys
+json.loads(sys.stdin.buffer.read().decode("utf-8", "strict"))' 2>/dev/null || fail "12 output is not strict UTF-8 JSON"
+ok 12 "$OUT" "build · $FIFTEEN @abcdef12"
+
+# 13. a FIFO transcript_path is never opened (the -f guard): the hook returns
+mkfifo "$T/fifo"
+(hb "$(mk "$T/fifo" 'fix it')" > "$T/fifo.out") &
+HBPID=$!
+i=0
+while kill -0 "$HBPID" 2>/dev/null && [ $i -lt 30 ]; do sleep 0.1; i=$((i + 1)); done
+if kill -0 "$HBPID" 2>/dev/null; then
+  fail "13 hook blocked on a FIFO transcript_path"
+  kill "$HBPID" 2>/dev/null
+  : > "$T/fifo" &
+else
+  ok 13 "$(cat "$T/fifo.out")" "fix it @abcdef12"
+fi
 
 [ "$FAILS" = 0 ] || { echo "FAILED: $FAILS"; exit 1; }
 echo PASS

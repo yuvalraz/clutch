@@ -148,7 +148,10 @@ case $INPUT in
         # inside a string: a quote preceded by an odd run of backslashes is
         # escaped. Keep at most CAP bytes of a value: the gist needs one line.
         if (length(raw) < CAP) raw = raw substr(p[i], 1, CAP - length(raw))
-        b = match(p[i], /\\+$/) ? RLENGTH : 0
+        # trailing backslash run: the last field of a split on non-backslash
+        # text (a run regex, gsub or per-char substr loop is quadratic in bwk awk)
+        b = 0
+        if (substr(p[i], length(p[i])) == "\\") { b = split(p[i], q, /[^\\]+/); b = length(q[b]) }
         if (b % 2) { if (length(raw) < CAP) raw = raw "\""; continue }
         instr = 0
         if (want != "") { v[want] = raw; want = ""; key = "" }
@@ -157,7 +160,7 @@ case $INPUT in
       if (!("prompt" in v)) exit
       pr = dec(substr(v["prompt"], 1, 4096)); gsub(/\r/, " ", pr)
       full = pr; gsub(/[\001-\037 ]+/, " ", full); sub(/^ /, "", full); sub(/ $/, "", full)
-      if (full ~ /^\// || tolower(full) ~ /^(go|yes|y|ok)[.!?,;:]*$/) exit
+      if (full ~ /^\// || tolower(full) ~ /^(go|yes|y|ok|build|ideate|ops|review|investigate)[.!?,;:]*$/) exit
       m = split(pr, ln, "\n"); g = ""
       for (j = 1; j <= m && g == ""; j++) {
         g = ln[j]; gsub(/[\001-\037 ]+/, " ", g); sub(/^ /, "", g); sub(/ $/, "", g)
@@ -165,13 +168,22 @@ case $INPUT in
       }
       if (g == "") exit
       # cut at 60 characters: a UTF-8 lead byte (not 0x80-0xBF) starts one
-      c = 0; out = ""
+      c = 0; out = ""; cut = 0
       for (j = 1; j <= length(g); j++) {
         ch = substr(g, j, 1)
-        if (ch < "\200" || ch >= "\300") { if (++c > 60) { out = out "…"; break } }
+        if (ch < "\200" || ch >= "\300") { if (++c > 60) { cut = 1; break } }
         out = out ch
       }
-      print out
+      # the 4096-byte decode window can tear the last character: drop it
+      k = length(out)
+      while (k > 0 && (ch = substr(out, k, 1)) >= "\200" && ch < "\300") k--
+      if (k > 0) {
+        ch = substr(out, k, 1)
+        need = (ch >= "\360") ? 4 : (ch >= "\340") ? 3 : (ch >= "\300") ? 2 : 1
+        if (length(out) - k + 1 < need) out = substr(out, 1, k - 1)
+      }
+      if (out == "") exit
+      print out (cut ? "…" : "")
       print "\"session_id\":\"" v["session_id"] "\""
       tp = dec(v["transcript_path"]); gsub(/[\001-\037]/, "", tp)
       print tp
