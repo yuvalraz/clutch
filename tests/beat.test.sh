@@ -414,8 +414,9 @@ if [ "$(id -u)" != 0 ]; then
   chmod 644 "$BF"
 fi
 
-# B-scrub: brain.test.sh's sibling runs clear CLUTCH_BEAT and BEAT_SKILL.
-for v in CLUTCH_BEAT BEAT_SKILL; do
+# B-scrub: brain.test.sh's sibling runs clear CLUTCH_BEAT and BEAT_SKILL, and
+# the silent check's CLUTCH_POLL* switches and POLL_SH override.
+for v in CLUTCH_BEAT BEAT_SKILL CLUTCH_POLL CLUTCH_POLL_SLEEP CLUTCH_POLL_ROUNDS POLL_SH; do
   grep -E '^[[:space:]]*\( unset ' "$HERE/brain.test.sh" | grep -qw "$v" \
     || { echo "FAIL: B-scrub -- $v missing from brain.test.sh's run_scrubbed unset line"; fail=1; }
 done
