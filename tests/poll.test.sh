@@ -169,11 +169,11 @@ fi
 [ "$*" = '+%s' ] && [ -f "$HOME/../fix/datefail" ] && exit 1
 exec /bin/date "$@"
 EOF
-# Fake sleep: counts calls; call N restores the worklog when $FIX/sleepfix.N exists.
+# Fake sleep: counts calls, keeps its last argument; call N restores the worklog when $FIX/sleepfix.N exists.
 cat > "$T/mbin/sleep" <<'EOF'
 #!/bin/sh
 F=$HOME/../fix
-c=$(cat "$F/sleeps" 2>/dev/null || echo 0); c=$((c + 1)); echo "$c" > "$F/sleeps"
+c=$(cat "$F/sleeps" 2>/dev/null || echo 0); c=$((c + 1)); echo "$c" > "$F/sleeps"; echo "$1" > "$F/sleeparg"
 [ -f "$F/sleepfix.$c" ] && chmod 644 "$HOME/.clutch/worklog.md"
 exit 0
 EOF
@@ -204,7 +204,7 @@ rv() { printf '{"state":"%s","submittedAt":"%s","author":{"__typename":"%s","log
 # pr <rounds> <tag>: run the poller; OUT, RC, ERR, NGH (gh calls).
 pr() {
   : > "$FIX/log"
-  OUT=$(cd "$T/plain" && PATH="$T/mbin:$PATH" CLUTCH_POLL_SLEEP=0 CLUTCH_POLL_ROUNDS=$1 sh "$T/scripts/poll.sh" "$2" 2>"$T/err")
+  OUT=$(cd "$T/plain" && PATH="$T/mbin:$PATH" CLUTCH_POLL_SLEEP=${PSLEEP:-0} CLUTCH_POLL_ROUNDS=$1 sh "$T/scripts/poll.sh" "$2" 2>"$T/err")
   RC=$?
   ERR=$(cat "$T/err")
   NGH=$(grep -c '' "$FIX/log")
@@ -356,6 +356,14 @@ pr 1 @0123abcd; ok "M22b marks match their ref" 0 "$(nl 'gh:o/r#2 comment' "$CLO
 # M25: a failed date +%s ends the check; it does not blame ~/.clutch/watch.
 own1; fx o_r_1 MERGED "$NEW" '' ''; : > "$FIX/datefail"
 pr 1 @0123abcd; ok "M25 date fails" 0 "$ENDED" 0
+# M26: CLUTCH_POLL_SLEEP that is not 1-5 digits >= 1 sleeps 600 s, as
+# stop.sh reads a round; a valid one is kept.
+for nap in 0 00 abc 999999 30; do
+  own1; fx o_r_1 OPEN "$B0" '' ''; rm -f "$FIX/sleeparg"
+  PSLEEP=$nap; pr 2 @0123abcd; unset PSLEEP
+  want=600; [ "$nap" != 30 ] || want=30
+  [ "$(cat "$FIX/sleeparg" 2>/dev/null)" = "$want" ] || { echo "FAIL: M26 [$nap] -- slept [$(cat "$FIX/sleeparg" 2>/dev/null)], want $want"; fail=1; }
+done
 # M23: .poll is one line "<pid> <epoch>", pid the poller's own.
 own1; fx o_r_1 OPEN "$B0" '' ''; : > "$FIX/pollcopy.on"
 (cd "$T/plain" && PATH="$T/mbin:$PATH" CLUTCH_POLL_SLEEP=0 CLUTCH_POLL_ROUNDS=1 exec sh "$T/scripts/poll.sh" @0123abcd >/dev/null 2>&1) &

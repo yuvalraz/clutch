@@ -589,8 +589,8 @@ for pid in "$DEAD" "$NOTPOLL"; do
   quiet "P3b after restart [$pid]"
 done
 # P3c: after that restart ask, a restarted poller that died young (fresh
-# start, no wake) leaves a dead .poll: quiet, .poll removed, and quiet again
-# once it would have aged past a round. Asked once per poller that ran.
+# start, no wake) leaves a dead .poll: quiet, .poll removed, and the next
+# stop, with no .poll left, is quiet too. Asked once per poller that ran.
 owned1
 stp "$PL1" "$IN"
 prec "$DEAD" "$OLD"
@@ -630,6 +630,47 @@ CLUTCH_POLL_SLEEP=60; export CLUTCH_POLL_SLEEP
 stp "$PL1" "$IN"
 unset CLUTCH_POLL_SLEEP
 is "P3e CLUTCH_POLL_SLEEP" 0 "$WPOLL"
+# P3g: a .poll line clutch_poll_alive calls malformed, or a start that is not
+# a plain 1-12 digit epoch, has no start: never young, WPOLL once, then quiet.
+for line in "abc $NOW" "0 $NOW" "$DEAD 09" "$DEAD 99999999999999999999" "$DEAD $NOW 1 2"; do
+  owned1
+  stp "$PL1" "$IN"
+  mkdir -p "$HOME/.clutch/watch" && printf '%s\n' "$line" > "$PP"
+  stp "$PL1" "$IN"
+  is "P3g malformed .poll [$line]" 0 "$WPOLL"
+  stp "$PL1" "$IN"
+  quiet "P3g again [$line]"
+done
+# P3h: under dash an oversized start still asks once with rc 0.
+if command -v dash >/dev/null 2>&1; then
+  owned1
+  stp "$PL1" "$IN"
+  prec "$DEAD" 99999999999999999999
+  OUT=$(cd "$PL1" && printf '%s' "$IN" | CLUTCH_WATCH=$WATCH CLUTCH_POLL=$POLL GIT_CEILING_DIRECTORIES=$T dash "$T/scripts/stop.sh" 2>/dev/null); RC=$?
+  is "P3h dash oversized start" 0 "$WPOLL"
+fi
+# P3i: the empty .woke a poller creates in its start second is not a wake:
+# a young death with it is quiet.
+owned1
+stp "$PL1" "$IN"
+prec "$DEAD"
+: > "$FP.woke"
+touch -r "$PP" "$FP.woke"
+stp "$PL1" "$IN"
+quiet "P3i empty .woke"
+rm -f "$FP.woke"
+# P3j: CLUTCH_POLL_SLEEP that is not 1-5 digits >= 1 reads as 600: a young
+# death stays quiet.
+for nap in abc 0 00 999999; do
+  owned1
+  stp "$PL1" "$IN"
+  rm -f "$FP.woke"
+  prec "$DEAD" "$((NOW - 100))"
+  CLUTCH_POLL_SLEEP=$nap; export CLUTCH_POLL_SLEEP
+  OUT=$(cd "$PL1" && printf '%s' "$IN" | CLUTCH_WATCH=$WATCH CLUTCH_POLL=$POLL GIT_CEILING_DIRECTORIES=$T sh "$T/scripts/stop.sh" 2>&1); RC=$?
+  unset CLUTCH_POLL_SLEEP
+  is "P3j CLUTCH_POLL_SLEEP=$nap (stderr included)" 0 ''
+done
 # P5: any /clutch:watch @tag cron arms the set, a stale .poll included.
 for c in '*/15 8-21 * * *' '*/10 8-21 * * *' '7,37 8-21 * * *'; do
   owned1

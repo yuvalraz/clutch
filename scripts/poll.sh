@@ -41,7 +41,8 @@ case $START in '' | *[!0-9]*) ended ;; esac
 MAX=${CLUTCH_POLL_ROUNDS:-72}
 case $MAX in '' | *[!0-9]*) MAX=72 ;; esac
 NAP=${CLUTCH_POLL_SLEEP:-600}
-case $NAP in '' | *[!0-9]*) NAP=600 ;; esac
+# 1-5 digits, >= 1, as stop.sh reads a round; else 600.
+case $NAP in [1-9] | [1-9][0-9] | [1-9][0-9][0-9] | [1-9][0-9][0-9][0-9] | [1-9][0-9][0-9][0-9][0-9]) ;; *) NAP=600 ;; esac
 ISO='[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]:[0-9][0-9]:[0-9][0-9]Z'
 Q='query($o:String!,$r:String!,$n:Int!){viewer{login} repository(owner:$o,name:$r){pullRequest(number:$n){state updatedAt comments(last:50){nodes{createdAt author{__typename login}}} reviews(last:50){nodes{state submittedAt author{__typename login}}}}}}'
 
