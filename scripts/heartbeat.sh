@@ -108,6 +108,81 @@ clutch-budget: ${EMITS}/2 spent. Before any uninvited line append 'emit model <e
 # fold newlines to spaces so the value is a single JSON string.
 BODY=$(printf '%s' "$CTX" | tr '\n' ' ' | tr -d '\000-\037' | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g') || exit 0
 
-printf '{"hookSpecificOutput":{"hookEventName":"UserPromptSubmit","additionalContext":"%s"}}\n' "$BODY"
+# Session title: the first prompt is always /clutch:intent, so Claude Code
+# auto-titles every session "Clutch intent <focus>". While the title still has
+# that shape, rename it to "<focus> · <gist> @<tag8>" from the first real
+# prompt. The shape check is the whole guard: once renamed (by us or a user's
+# /rename) it no longer matches, so this fires once and never clobbers a
+# rename. Only when the input carries session_title (older Claude Code may
+# reject the output key). The awk reads TOP-LEVEL string keys only, walking
+# escapes, so text inside the prompt cannot pose as a key. CLUTCH_TITLE=off
+# turns this off. Any failure leaves TSEG empty: today's output.
+TSEG=""
+case $INPUT in *'"session_title"'*)
+  [ "${CLUTCH_TITLE:-}" = off ] || TSEG=$(printf '%s' "$INPUT" | LC_ALL=C awk '
+    function dec(s,   o, k, e) {
+      o = ""
+      while ((k = index(s, "\\")) > 0) {
+        o = o substr(s, 1, k - 1); e = substr(s, k + 1, 1)
+        if (e == "n") o = o "\n"; else if (e == "t" || e == "r") o = o " "
+        else if (e == "\"" || e == "\\" || e == "/") o = o e
+        else if (e == "u") k += 4
+        s = substr(s, k + 2)
+      }
+      return o s
+    }
+    { all = all $0 "\n" }
+    END {
+      n = split(all, p, "\"")
+      depth = 0; instr = 0; key = ""; want = ""
+      for (i = 1; i <= n; i++) {
+        if (!instr) {
+          if (i > 1 && key != "") { want = (p[i] ~ /^[ \t\r\n]*:[ \t\r\n]*$/) ? key : ""; key = "" }
+          else if (i > 1) want = ""
+          t = p[i]; depth += gsub(/[{[]/, "", t); t = p[i]; depth -= gsub(/[]}]/, "", t)
+          sd = depth; raw = ""; instr = 1; continue
+        }
+        # inside a string: a quote preceded by an odd run of backslashes is escaped
+        if (length(raw) < 8192) raw = raw p[i]
+        b = match(p[i], /\\+$/) ? RLENGTH : 0
+        if (b % 2) { raw = raw "\""; continue }
+        instr = 0
+        if (want != "") { v[want] = raw; want = ""; key = "" }
+        else if (sd == 1) key = raw
+      }
+      if (!("session_title" in v) || !("prompt" in v)) exit
+      st = dec(v["session_title"]); gsub(/[\001-\037]/, " ", st)
+      lt = tolower(st)
+      if (lt !~ /^clutch[^a-z]*intent/) exit
+      pr = dec(v["prompt"]); gsub(/\r/, " ", pr)
+      full = pr; gsub(/[\001-\037 ]+/, " ", full); sub(/^ /, "", full); sub(/ $/, "", full)
+      if (full ~ /^\// || tolower(full) ~ /^(go|yes|y|ok)[.!?,;:]*$/) exit
+      m = split(pr, ln, "\n"); g = ""
+      for (j = 1; j <= m && g == ""; j++) { g = ln[j]; gsub(/[\001-\037 ]+/, " ", g); sub(/^ /, "", g); sub(/ $/, "", g) }
+      if (g == "") exit
+      # cut at 60 characters: a UTF-8 lead byte (not 0x80-0xBF) starts one
+      c = 0; out = ""
+      for (j = 1; j <= length(g); j++) {
+        ch = substr(g, j, 1)
+        if (ch < "\200" || ch >= "\300") { if (++c > 60) { out = out "…"; break } }
+        out = out ch
+      }
+      split("build ideate ops review investigate", fo, " "); f = ""
+      w = " " lt " "; gsub(/[^a-z]+/, " ", w)
+      for (j = 1; j <= 5 && f == ""; j++) if (index(w, " " fo[j] " ")) f = fo[j] " · "
+      print f out
+      if ("session_id" in v) print "\"session_id\":\"" v["session_id"] "\""
+    }' 2>/dev/null) || TSEG=""
+  ;;
+esac
+if [ -n "$TSEG" ]; then
+  TTL=$(printf '%s\n' "$TSEG" | sed -n 1p)
+  TAG=$(clutch_session_tag "$(printf '%s\n' "$TSEG" | sed -n 2p)") && TTL="$TTL $TAG"
+  TTL=$(printf '%s' "$TTL" | tr -d '\000-\037' | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g') || TTL=""
+  TSEG=""
+  [ -n "$TTL" ] && TSEG=",\"sessionTitle\":\"$TTL\""
+fi
+
+printf '{"hookSpecificOutput":{"hookEventName":"UserPromptSubmit","additionalContext":"%s"%s}}\n' "$BODY" "$TSEG"
 
 exit 0
