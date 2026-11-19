@@ -321,6 +321,8 @@ fpin "$O" "ops: watch pointer"          'A session'"'"'s armed watch does not se
 
 # --- watch skill: the armed watch's tick
 fpin "$WS" "W1 trigger"                 'Use ONLY when the prompt is `/clutch:watch @<tag>`'
+# W1b: a silent check's wake arrives as a background task's output, not a prompt.
+fpin "$WS" "W1b wake trigger"           'or when a silent check'"'"'s output, which arrives when a background task ends, holds the line `Run /clutch:watch @<tag> for the moved waits.`'
 # A fire only runs skills the model may invoke, so model invocation stays on.
 if grep -qiE '^disable-model-invocation:[[:space:]]*["'"'"']?true' "$WS"; then
   echo "FAIL: W2 watch skill disables model invocation -- its fires never run"

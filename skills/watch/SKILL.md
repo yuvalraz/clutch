@@ -1,7 +1,7 @@
 ---
 name: watch
 description: Run one tick of a session's armed watch. Read only the wait loops its tag owns, reply `No change.` when none moved, act on what moved, and remove the watch once none is left.
-when_to_use: Use ONLY when the prompt is `/clutch:watch @<tag>`, the line a session's armed watch sends. Any other mention of watching or waiting, "watch <thing>" in ops included, is not a trigger.
+when_to_use: Use ONLY when the prompt is `/clutch:watch @<tag>`, the line a session's armed watch sends, or when a silent check's output, which arrives when a background task ends, holds the line `Run /clutch:watch @<tag> for the moved waits.` Any other mention of watching or waiting, "watch <thing>" in ops included, is not a trigger.
 argument-hint: "@<tag>"
 ---
 
