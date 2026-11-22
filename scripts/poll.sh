@@ -3,16 +3,23 @@
 # session with the Bash tool's run_in_background. It reads the gh wait loops
 # the tag owns, quietly, once per round (CLUTCH_POLL_SLEEP seconds apart,
 # default 600; CLUTCH_POLL_ROUNDS rounds, default 72), from 08:00 to 21:59
-# local. Its exit is the session's one visible turn, so it prints only when
-# it exits: "<ref> <what>" lines and the closing line when a wait moved or
-# gh failed on it 3 rounds in a row (what = unreadable), the ended line
-# otherwise, the stopped line when it cannot write.
+# local. Unless CLUTCH_BEAT=off, it also beats while the tag's ops record
+# (<tag8>.beat) is there: from 08:00 to 20:59 it peeks the beat window and
+# wakes on peer moves, at most once an hour (the newer of the record's newest
+# last and the newest beat mark). Its exit is the session's one visible turn,
+# so it prints only when it exits: "<ref> <what>" lines and the watch closing
+# line when a wait moved or gh failed on it 3 rounds in a row (what =
+# unreadable), then the beat closing line "Run /clutch:beat @<tag>." when the
+# beat woke; the ended line otherwise, the stopped line when it cannot write.
+# It ends once it owns no gh wait and the beat is off or the record is gone.
 # Records under ~/.clutch/watch (never creating ~/.clutch): <tag8>.poll
-# "<pid> <start epoch>" (read by clutch_poll_alive) and <tag8>.woke,
-# append-only "<ref> <stamp>" wake marks, so the same evidence wakes once, and
-# "unreadable <ref> <wait epoch>" marks, so one wait line wakes unreadable at
-# most once; they never hold back a later move of that ref.
-# It never writes the worklog.
+# "<pid> <start epoch>[ beat]" (read by clutch_poll_alive; beat while the
+# beat check is on) and <tag8>.woke, append-only "<ref> <stamp>" wake marks,
+# so the same evidence wakes once, "unreadable <ref> <wait epoch>" marks, so
+# one wait line wakes unreadable at most once, and "beat <epoch>" marks for
+# the hourly cap; they never hold back a later move of that ref.
+# It never writes the worklog; it writes the record only to seed a missing
+# last line once.
 
 TAG=${1-}
 # Spelled-out class, the same guard as clutch_ops_record.
@@ -25,18 +32,26 @@ ended() { printf 'The silent check for %s ended; end the turn.\n' "$TAG"; exit 0
 stopped() { printf 'The silent check for %s cannot write ~/.clutch/watch; it stopped.\n' "$TAG"; exit 0; }
 
 [ "${CLUTCH_WATCH:-}" != off ] || ended
+BEAT=" beat"
+[ "${CLUTCH_BEAT:-}" != off ] || BEAT=""
 PRELUDE=$(dirname "$0")/prelude.sh
 [ -f "$PRELUDE" ] && . "$PRELUDE" || ended
 
 D="$HOME/.clutch/watch"
 PF="$D/${TAG#@}.poll"
 WF="$D/${TAG#@}.woke"
+BF="$D/${TAG#@}.beat"
 [ ! -d "$HOME/.clutch" ] || mkdir -p "$D"
 # Without a readable, appendable .woke a wake could repeat on the same evidence.
 { : >> "$WF"; } && [ -r "$WF" ] || stopped
 START=$(date +%s)
 case $START in '' | *[!0-9]*) ended ;; esac
-{ printf '%s %s\n' "$$" "$START" > "$PF.$$" && mv -f "$PF.$$" "$PF"; } || { rm -f "$PF.$$"; stopped; }
+{ printf '%s %s%s\n' "$$" "$START" "$BEAT" > "$PF.$$" && mv -f "$PF.$$" "$PF"; } || { rm -f "$PF.$$"; stopped; }
+# A record with no last line has an empty window: seed one, once.
+if [ -n "$BEAT" ] && clutch_ops_record "$TAG"; then
+  LC_ALL=C grep -q '^last [0-9][0-9]*$' "$BF"
+  [ "$?" != 1 ] || clutch_beat_window "$TAG" >/dev/null
+fi
 
 MAX=${CLUTCH_POLL_ROUNDS:-72}
 case $MAX in '' | *[!0-9]*) MAX=72 ;; esac
@@ -55,9 +70,15 @@ while [ "$R" -lt "$MAX" ]; do
   # A newer poller for this tag rewrote .poll: this one is superseded.
   case $(head -n 1 "$PF") in "$$ "*) ;; *) ended ;; esac
   OWN=$(clutch_owned_loops "$TAG")
-  case $? in 0) ;; 1) ended ;; *) continue ;; esac
-  printf '%s\n' "$OWN" | LC_ALL=C awk '$4 ~ /^gh:/ { f = 1 } END { exit !f }' || ended
-  case $(date +%H) in 0[89] | 1[0-9] | 2[01]) ;; *) continue ;; esac
+  case $? in 0 | 1) ;; *) continue ;; esac
+  # No owned gh wait: end, unless the beat check is on and the record may be there.
+  if ! printf '%s\n' "$OWN" | LC_ALL=C awk '$4 ~ /^gh:/ { f = 1 } END { exit !f }'; then
+    [ -n "$BEAT" ] || ended
+    clutch_ops_record "$TAG"
+    [ "$?" != 1 ] || ended
+  fi
+  HR=$(date +%H)
+  case $HR in 0[89] | 1[0-9] | 2[01]) ;; *) continue ;; esac
   # One line per well-formed gh wait: ref owner repo number baseline epoch;
   # the ref loses a trailing ,;:. or CR as the worklog scan does.
   WAITS=$(printf '%s\n' "$OWN" | LC_ALL=C awk '$4 ~ /^gh:/ {
@@ -112,11 +133,32 @@ $REF"
   done <<EOF
 $WAITS
 EOF
-  [ -n "$WAKE" ] || continue
+  # The beat, 08:00-20:59: peer moves in the window and the hourly cap open
+  # (no M, or now - 120 - M >= 3600, M the newer of the newest last and the
+  # newest beat mark). An unreadable record or .woke means no beat wake.
+  BW=""
+  case $BEAT$HR in
+    ' beat'0[89] | ' beat'1[0-9] | ' beat'20)
+      BN=$(date +%s)
+      case $BN in '' | *[!0-9]*) ;; *)
+        if clutch_ops_record "$TAG" && MV=$(clutch_beat_window "$TAG" peek) && [ -n "$MV" ] &&
+          [ -r "$BF" ] && [ -r "$WF" ] &&
+          [ "$(LC_ALL=C awk -v n="$BN" -v bf="$BF" '
+            FILENAME == bf && /^last [0-9]+$/ && (m == "" || $2 + 0 > m + 0) { m = $2 }
+            FILENAME != bf && /^beat [0-9]+$/ && (m == "" || $2 + 0 > m + 0) { m = $2 }
+            END { if (m == "" || n - 120 - m >= 3600) print "open" }' "$BF" "$WF")" = open ]; then
+          BW=1
+          MARKS="${MARKS}beat $((BN - 120))
+"
+        fi ;;
+      esac ;;
+  esac
+  [ -n "$WAKE$BW" ] || continue
   # Mark before waking; with no mark the restarted check would wake again.
   { printf '%s' "$MARKS" >> "$WF"; } || stopped
   printf '%s' "$WAKE"
-  printf 'Run /clutch:watch %s for the moved waits.\n' "$TAG"
+  [ -z "$WAKE" ] || printf 'Run /clutch:watch %s for the moved waits.\n' "$TAG"
+  [ -z "$BW" ] || printf 'Run /clutch:beat %s.\n' "$TAG"
   exit 0
 done
 ended
