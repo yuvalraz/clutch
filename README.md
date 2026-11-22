@@ -100,16 +100,19 @@ only at one of those moments.
   one `No change.` line unless one of its waits moved, gone once none is left.
   `CLUTCH_POLL=off` keeps the 10-minute watch for every kind.
   `CLUTCH_WATCH=off` turns off the ask, the session tag and per-session state.
-- An ops session is told at turn end, once a day, to arm a beat: `/clutch:beat @<tag>`
-  every hour from 08:07 to 20:07 while the session is open. It reads the moves
-  other sessions logged since the last beat and the waits no session's tag owns, and
-  says `No change.` unless something moved. When what moved sits off the day's
+- An ops session is told at turn end, once a day and once more after its silent check
+  ends, to start the silent check in the background. It wakes the session for a beat,
+  `/clutch:beat @<tag>`, at most once an hour from 08:00 to 20:59, only when another
+  session logged a move. The beat reads the moves other sessions logged since the
+  last beat and the waits no session's tag owns, and says `No change.` unless
+  something moved. When what moved sits off the day's
   focuses, it names the focus it sits beside. After the beat's ask, the session is
   told, once a day, to arm a sweep: `/clutch:ops re-sweep armed` at 08:37, 12:37 and 16:37.
   The armed sweep only reads and speaks: it keeps the session's mode, and the actions
   and posts your delegation policy pre-approves wait for a sweep you type.
   The beat and the armed sweep stop themselves once the session's ops record is gone,
   such as when the session turns to review.
+  `CLUTCH_POLL=off` keeps the hourly `/clutch:beat @<tag>` from 08:07 to 20:07.
   `CLUTCH_BEAT=off` turns off both asks;
   `CLUTCH_WATCH=off` also turns off both the beat and sweep asks.
 - The next session start shows them in its `Worklog:` block.
@@ -233,7 +236,7 @@ as ignition. The rest set the session's focus, run the day, and check on clutch.
 | `/clutch:ideate` | Divergent mode for the whole session | An ideate session |
 | `/clutch:ops` | Operations mode: one sweep, one loop at a time | A day of meetings, people, and threads |
 | `/clutch:watch` | One tick of a session's armed watch: reads only that session's waits, `No change.` unless one moved | Sent by a session's armed watch, or run on its silent check's wake; you rarely type it |
-| `/clutch:beat` | One beat of an ops session: what other sessions moved and the waits no session's tag owns, `No change.` unless something moved | Sent by the beat an ops session arms; you rarely type it |
+| `/clutch:beat` | One beat of an ops session: what other sessions moved and the waits no session's tag owns, `No change.` unless something moved | Sent by an ops session's beat, or run on its silent check's wake; you rarely type it |
 | `/clutch:review` | Review mode: one PR at a time, your conventions applied | A review session |
 | `/clutch:investigate` | Investigate mode: one pointer read to findings, each tied to its evidence | A DM, thread, PR, error or claim to check |
 | `/clutch:tempo` | Sets or reports the gear: espresso, craft, ballmer, freefall, ferment | You want the gearbox itself |
@@ -344,8 +347,8 @@ extra and close-out steps you wrote can use your integrations.
 `/clutch:investigate` reads what the pointer names and sends a reply only on a yes.
 `/clutch:watch` checks the integrations its session's waits name, every 30
 minutes (every 10 with `CLUTCH_POLL=off`) or on its silent check's wake, until none is left.
-`scripts/poll.sh`, the silent check a session starts in the background while it holds PR waits, calls `gh` and nothing else.
-`/clutch:beat` checks the integrations its waits name, every hour while an ops session is open.
+`scripts/poll.sh`, the silent check a session starts in the background while it holds PR waits or is an ops session, calls `gh` and nothing else.
+`/clutch:beat` checks the integrations its waits name, at most once an hour, on its silent check's wake (every hour with `CLUTCH_POLL=off`), while an ops session is open.
 An ops session's armed sweep sends `/clutch:ops re-sweep armed` at 08:37, 12:37 and 16:37, and only reads, until the session's ops record is gone.
 No hook script here touches the network, and you
 can verify it:
@@ -373,8 +376,8 @@ Two commands. Zero configuration.
 
 No settings, no env vars. The opinions are the product.
 
-One optional allow rule: a session that holds PR waits starts its silent
-check with the shell, which asks permission each time. Add
+One optional allow rule: a session that holds PR waits, or an ops session,
+starts its silent check with the shell, which asks permission each time. Add
 `Bash(sh */clutch/*/scripts/poll.sh*)` to `permissions.allow` in your Claude
 Code settings to skip that ask. From a local checkout, allow
 `Bash(sh <checkout>/scripts/poll.sh*)` instead.

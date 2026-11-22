@@ -315,7 +315,7 @@ fpin "$R" "README: young-death limit"  'A silent check that keeps ending early, 
 fpin "$R" "README: unreadable wake"     'or gh failed on one 3 reads in a row (`unreadable`)'
 fpin "$R" "README: poll off"            '`CLUTCH_POLL=off` keeps the 10-minute watch for every kind.'
 fpin "$R" "README: poll allow rule"     '`Bash(sh */clutch/*/scripts/poll.sh*)`'
-fpin "$R" "README: poll network"        '`scripts/poll.sh`, the silent check a session starts in the background while it holds PR waits, calls `gh` and nothing else.'
+fpin "$R" "README: poll network"        '`scripts/poll.sh`, the silent check a session starts in the background while it holds PR waits or is an ops session, calls `gh` and nothing else.'
 if grep -qE 'asked once to arm|one ask to arm' "$R"; then
   echo "FAIL: README says the user is asked to arm a watch"; fail=1
 fi
@@ -385,14 +385,15 @@ fpin "$O" "ops: beat pointer"           'An ops session'"'"'s beat does not send
 # --- beat skill: one beat of an ops session
 fpin "$BS" "BT0 name"                   'name: beat'
 fpin "$BS" "BT0 description"            'description: Run one beat of an ops session. Read the moves other sessions logged since the last beat and the waits no session'"'"'s tag owns, reply `No change.` when nothing moved, and name what moved with one smallest move.'
-fpin "$BS" "BT1 trigger"                'when_to_use: Use ONLY when the prompt is `/clutch:beat @<tag>`, the line an ops session'"'"'s armed beat sends. Any other mention of a beat or a check-in is not a trigger.'
+fpin "$BS" "BT1 trigger"                'when_to_use: Use ONLY when the prompt is `/clutch:beat @<tag>`, the line an ops session'"'"'s armed beat sends, or when a silent check'"'"'s output, which arrives when a background task ends, holds the line `Run /clutch:beat @<tag>.` Any other mention of a beat or a check-in is not a trigger.'
 fpin "$BS" "BT0 argument"               'argument-hint: "@<tag>"'
 # A fire only runs skills the model may invoke, so model invocation stays on.
 if grep -qiE '^disable-model-invocation:[[:space:]]*["'"'"']?true' "$BS"; then
   echo "FAIL: BT2 beat skill disables model invocation -- its fires never run"
   fail=1
 fi
-fpin "$BS" "BT3 what sends it"          '`/clutch:beat @<tag>` is what an ops session'"'"'s armed beat sends, every hour from 08:07 to 20:07 while the session is open.'
+fpin "$BS" "BT3 what sends it"          '`/clutch:beat @<tag>` is what an ops session'"'"'s armed beat sends: the session'"'"'s silent check, at most once an hour from 08:00 to 20:59 when another session moved, or an older hourly task.'
+fpin "$BS" "BT3 wake"                   'A wake from the session'"'"'s silent check holds `Run /clutch:beat @<tag>.`, alone or after the watch'"'"'s lines: run this skill once for that tag.'
 fpin "$BS" "BT4 no gear"                'It sets no gear, no focus and no mode: the session keeps the rules it had.'
 fpin "$BS" "BT4b not a sweep"           'It is not a sweep or a tick: no sweep, no config read.'
 fpin "$BS" "BT5 read line"              'sh -c '"'"'. "${CLAUDE_PLUGIN_ROOT}/scripts/prelude.sh" && L=$(clutch_beat_window "@<tag>") || exit; [ -z "$L" ] || printf "%s\n" "$L" | LC_ALL=C cut -c1-300'"'"

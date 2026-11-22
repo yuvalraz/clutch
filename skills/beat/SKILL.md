@@ -1,15 +1,17 @@
 ---
 name: beat
 description: Run one beat of an ops session. Read the moves other sessions logged since the last beat and the waits no session's tag owns, reply `No change.` when nothing moved, and name what moved with one smallest move.
-when_to_use: Use ONLY when the prompt is `/clutch:beat @<tag>`, the line an ops session's armed beat sends. Any other mention of a beat or a check-in is not a trigger.
+when_to_use: Use ONLY when the prompt is `/clutch:beat @<tag>`, the line an ops session's armed beat sends, or when a silent check's output, which arrives when a background task ends, holds the line `Run /clutch:beat @<tag>.` Any other mention of a beat or a check-in is not a trigger.
 argument-hint: "@<tag>"
 ---
 
 # Beat
 
-`/clutch:beat @<tag>` is what an ops session's armed beat sends, every hour from 08:07 to 20:07 while the session is open.
+`/clutch:beat @<tag>` is what an ops session's armed beat sends: the session's silent check, at most once an hour from 08:00 to 20:59 when another session moved, or an older hourly task.
 It sets no gear, no focus and no mode: the session keeps the rules it had.
 It is not a sweep or a tick: no sweep, no config read.
+
+A wake from the session's silent check holds `Run /clutch:beat @<tag>.`, alone or after the watch's lines: run this skill once for that tag.
 
 First check that this session is still an ops session, `@<tag>` replaced by the argument:
 
