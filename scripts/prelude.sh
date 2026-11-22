@@ -8,6 +8,7 @@
 # clutch_session_tag, clutch_owned_loops, clutch_ops_due,
 # clutch_guess_intent.
 # Also defines clutch_beat_window and clutch_ops_record.
+# Also defines clutch_poll_alive.
 # Also defines clutch_session_paths (CLUTCH_TAG8, CLUTCH_SDIR, CLUTCH_SREL).
 
 CLUTCH_GIT=0
@@ -271,6 +272,38 @@ clutch_ops_record() {
   for COR_D in "$HOME/.clutch/watch" "$HOME/.clutch"; do
     if [ -e "$COR_D" ] || [ -L "$COR_D" ]; then
       [ -d "$COR_D" ] && [ -x "$COR_D" ] && return 1
+      return 2
+    fi
+  done
+  [ -d "$HOME" ] && [ -x "$HOME" ] || return 2
+  return 1
+}
+
+# Is <@tag>'s silent check (~/.clutch/watch/<tag8>.poll, first line "<pid>
+# <start epoch>" with an optional third field) alive? 0 alive: the pid runs
+# and its full command line (ps -ww; macOS cuts at 80 columns otherwise) ends
+# with poll.sh @<tag8>. 1 no .poll (proven absent), 2 cannot tell, 3 ended
+# (dead or reused pid, another tag's poller, a malformed line). Writes nothing.
+clutch_poll_alive() {
+  # Spelled-out class, the same guard as clutch_ops_record.
+  case $1 in @????????) ;; *) return 2 ;; esac
+  case $1 in @*[!0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz-]*) return 2 ;; esac
+  [ -n "$HOME" ] || return 2
+  CPA_F="$HOME/.clutch/watch/${1#@}.poll"
+  if [ -e "$CPA_F" ] || [ -L "$CPA_F" ]; then
+    [ -f "$CPA_F" ] && [ -r "$CPA_F" ] || return 2
+    CPA_L=$(head -n 1 "$CPA_F" 2>/dev/null) || return 2
+    # pid 0 is refused: kill -0 0 signals the caller's own process group.
+    CPA_P=$(printf '%s\n' "$CPA_L" | LC_ALL=C awk '(NF == 2 || NF == 3) && $1 ~ /^[1-9][0-9]*$/ && $2 ~ /^[0-9]+$/ { print $1 }')
+    [ -n "$CPA_P" ] || return 3
+    kill -0 "$CPA_P" 2>/dev/null || return 3
+    CPA_C=$(ps -ww -p "$CPA_P" -o command= 2>/dev/null) || return 2
+    case $CPA_C in *"poll.sh $1") return 0 ;; esac
+    return 3
+  fi
+  for CPA_D in "$HOME/.clutch/watch" "$HOME/.clutch"; do
+    if [ -e "$CPA_D" ] || [ -L "$CPA_D" ]; then
+      [ -d "$CPA_D" ] && [ -x "$CPA_D" ] && return 1
       return 2
     fi
   done

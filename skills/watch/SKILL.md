@@ -1,7 +1,7 @@
 ---
 name: watch
 description: Run one tick of a session's armed watch. Read only the wait loops its tag owns, reply `No change.` when none moved, act on what moved, and remove the watch once none is left.
-when_to_use: Use ONLY when the prompt is `/clutch:watch @<tag>`, the line a session's armed watch sends. Any other mention of watching or waiting, "watch <thing>" in ops included, is not a trigger.
+when_to_use: Use ONLY when the prompt is `/clutch:watch @<tag>`, the line a session's armed watch sends, or when a silent check's output, which arrives when a background task ends, holds the line `Run /clutch:watch @<tag> for the moved waits.` Any other mention of watching or waiting, "watch <thing>" in ops included, is not a trigger.
 argument-hint: "@<tag>"
 ---
 
@@ -21,6 +21,10 @@ sh -c '. "${CLAUDE_PLUGIN_ROOT}/scripts/prelude.sh" && L=$(clutch_owned_loops "@
 Each line is `<epoch> <repo> wait: <kind>:<ref> <baseline> @<tag> <text>`.
 Exit status 0 with empty output, or exit status 1 with no error text, means no wait is left: delete the recurring task whose prompt is `/clutch:watch @<tag>` and say so in one line.
 Any other outcome, error text included, keeps the watch: say once that the waits cannot be read, and stay silent about it on later ticks.
+
+A wake from the session's silent check holds `Run /clutch:watch @<tag> for the moved waits.` after one `<ref> <what>` line per wait, `<what>` being `merged`, `closed`, `review <STATE>`, `comment` or `unreadable` (gh failed on it 3 reads in a row): run this skill once for that tag, reading every owned wait as above.
+On a wake where no wait is left and there is no recurring task, say so in one line and delete nothing.
+The silent check's ended line, `The silent check for @<tag> ended; end the turn.`, needs no reply beyond ending the turn.
 
 Read each wait once, by its kind, against its baseline. Only this counts as movement:
 
