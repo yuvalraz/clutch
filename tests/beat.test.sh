@@ -8,7 +8,8 @@
 # H1-H14 cover clutch_beat_window (the untagged open waits, then the newest
 # 20 moved: lines after the record's last epoch and at or before now - 120
 # whose field 5 is not the tag; "last <now - 120>" appended to an existing
-# record before printing; unreadable state is rc 2). R1 runs the
+# record before printing; unreadable state is rc 2). H-peek1-H-peek5 cover
+# its peek mode (the moved: lines only, nothing appended). R1 runs the
 # beat skill's read line, R2 the ops Step 0 record snippet under sh and
 # zsh -f (its tag guard against '@', '@../x', '@a/b' and an unguarded
 # mutant), R3 the beat skill's moved: text through the constitution snippet.
@@ -662,6 +663,56 @@ rm -f "$T/tailn"
 OUT=$(cd "$T/plain" && PATH="$T/bin:$PATH" && export PATH && . "$T/scripts/prelude.sh" && clutch_beat_window '@0123abcd' 2>/dev/null); RC=$?
 rm -f "$T/bin/tail"
 is H14 2 ''
+
+# --- H-peek1-H-peek5: clutch_beat_window <@tag> peek prints only the
+# window's moved: lines, never the waits, and never appends last; same rc.
+bwp() {
+  OUT=$(cd "$T/plain" && . "$T/scripts/prelude.sh" && clutch_beat_window "$1" peek 2>"$T/err"); RC=$?
+  ERR=$(cat "$T/err")
+}
+seed
+add 900 'proj wait: gh:o/r#9 b1 plain'
+add 500 'proj moved: gh:o/r#1 @0123abcd own'
+add 400 'proj moved: gh:o/r#2 @ffffffff other'
+mkrec "last $((NOW - 1000))"
+RB=$(cat "$BF")
+bwp '@0123abcd'
+is H-peek1 0 "$(wl 400 'proj moved: gh:o/r#2 @ffffffff other')"
+[ "$(cat "$BF")" = "$RB" ] || { echo "FAIL: H-peek1 -- record changed: $(cat "$BF")"; fail=1; }
+bwp '@0123abcd'
+is "H-peek1 again" 0 "$(wl 400 'proj moved: gh:o/r#2 @ffffffff other')"
+seed
+add 900 'proj wait: gh:o/r#9 b1 plain'
+add 500 'proj moved: gh:o/r#1 @0123abcd own'
+mkrec "last $((NOW - 1000))"
+bwp '@0123abcd'
+is H-peek2 0 ''
+seed
+add 400 'proj moved: gh:o/r#2 @ffffffff other'
+mkrec 'asked 2000-01-01'
+bwp '@0123abcd'
+is H-peek3 0 ''
+[ "$(cat "$BF")" = 'asked 2000-01-01' ] || { echo "FAIL: H-peek3 -- record changed: $(cat "$BF")"; fail=1; }
+if [ "$(id -u)" != 0 ]; then
+  seed
+  add 400 'proj moved: gh:o/r#2 @ffffffff other'
+  mkrec "last $((NOW - 1000))"
+  chmod 000 "$W"; bwp '@0123abcd'; chmod 644 "$W"
+  is "H-peek4 unreadable worklog" 2 ''
+  chmod 222 "$BF"; bwp '@0123abcd'; chmod 644 "$BF"
+  is "H-peek4 unreadable record" 2 ''
+  [ "$(cat "$BF")" = "last $((NOW - 1000))" ] || { echo "FAIL: H-peek4 -- record changed: $(cat "$BF")"; fail=1; }
+  # A read-only record peeks fine: peek never writes.
+  chmod 444 "$BF"; bwp '@0123abcd'; chmod 644 "$BF"
+  is "H-peek4 read-only record" 0 "$(wl 400 'proj moved: gh:o/r#2 @ffffffff other')"
+fi
+rm -rf "$HOME/.clutch"
+bwp '@0123abcd'
+is "H-peek5 none" 1 ''
+mkrec "last $((NOW - 1000))"
+bwp '@0123abcd'
+is "H-peek5 record" 1 ''
+[ "$(lastn)" = 1 ] || { echo "FAIL: H-peek5 -- record changed: $(cat "$BF")"; fail=1; }
 
 # --- R1: the beat skill's one read line, the plugin root replaced by the
 # staged tree and @<tag> filled, prints what the helper prints and passes

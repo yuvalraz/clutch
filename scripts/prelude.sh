@@ -8,7 +8,7 @@
 # clutch_session_tag, clutch_owned_loops, clutch_ops_due,
 # clutch_guess_intent.
 # Also defines clutch_beat_window and clutch_ops_record.
-# Also defines clutch_poll_alive.
+# Also defines clutch_poll_alive and clutch_poll_young.
 # Also defines clutch_session_paths (CLUTCH_TAG8, CLUTCH_SDIR, CLUTCH_SREL).
 
 CLUTCH_GIT=0
@@ -221,7 +221,8 @@ clutch_owned_loops() {
 # the record and ~/.clutch/watch are never created. Returns 2 on a malformed
 # tag, a date failure, an unreadable worklog or record, a ~/.clutch or HOME
 # that cannot be searched, or a failed append (nothing printed), and 1 only
-# with no worklog proven absent (nothing recorded).
+# with no worklog proven absent (nothing recorded). With a second argument
+# peek it prints only the moved: lines and appends nothing; same rc.
 clutch_beat_window() {
   # Spelled-out class: a range like A-Z matches é under a UTF-8 /bin/sh.
   case $1 in @????????) ;; *) return 2 ;; esac
@@ -251,6 +252,10 @@ clutch_beat_window() {
   # shortcut: newest 20 moves only; upgrade if a beat gap logs more that matter
   CBW_M=$(printf '%s\n' "$CBW_T" | LC_ALL=C awk -v s="$CBW_S" -v n="$CBW_E" -v t="$1" \
     '$1 ~ /^[0-9]+$/ && $3 == "moved:" && $1 + 0 > s + 0 && $1 + 0 <= n + 0 && $5 != t' | tail -n 20) || return 2
+  if [ "${2-}" = peek ]; then
+    [ -z "$CBW_M" ] || printf '%s\n' "$CBW_M"
+    return 0
+  fi
   if [ -f "$CBW_F" ]; then
     { printf 'last %s\n' "$CBW_E" >> "$CBW_F"; } 2>/dev/null || return 2
   fi
@@ -283,7 +288,9 @@ clutch_ops_record() {
 # <start epoch>" with an optional third field) alive? 0 alive: the pid runs
 # and its full command line (ps -ww; macOS cuts at 80 columns otherwise) ends
 # with poll.sh @<tag8>. 1 no .poll (proven absent), 2 cannot tell, 3 ended
-# (dead or reused pid, another tag's poller, a malformed line). Writes nothing.
+# (dead or reused pid, another tag's poller, a malformed line). With a second
+# argument beat, a live poller whose line has no third field beat (a 2.18.0
+# poller, which never beats) is 4. Writes nothing.
 clutch_poll_alive() {
   # Spelled-out class, the same guard as clutch_ops_record.
   case $1 in @????????) ;; *) return 2 ;; esac
@@ -298,7 +305,11 @@ clutch_poll_alive() {
     [ -n "$CPA_P" ] || return 3
     kill -0 "$CPA_P" 2>/dev/null || return 3
     CPA_C=$(ps -ww -p "$CPA_P" -o command= 2>/dev/null) || return 2
-    case $CPA_C in *"poll.sh $1") return 0 ;; esac
+    case $CPA_C in
+      *"poll.sh $1")
+        [ "${2-}" != beat ] || [ "$(printf '%s\n' "$CPA_L" | LC_ALL=C awk '{ print $3 }')" = beat ] || return 4
+        return 0 ;;
+    esac
     return 3
   fi
   for CPA_D in "$HOME/.clutch/watch" "$HOME/.clutch"; do
@@ -309,6 +320,33 @@ clutch_poll_alive() {
   done
   [ -d "$HOME" ] && [ -x "$HOME" ] || return 2
   return 1
+}
+
+# Did <@tag>'s ended silent check die young? 0 when its .poll first line is
+# well-formed ("<pid> <start>[ <third>]", start of at most 12 digits), the
+# start is under one round ago (poll.sh's sleep: CLUTCH_POLL_SLEEP when 1-5
+# digits >= 1, else 600 s; a future start reads as young) and it never woke
+# (.woke empty or absent, or .poll newer than .woke; equal mtimes on a
+# non-empty .woke count as a wake), say killed by a Bash timeout or a
+# headless exit. 1 otherwise, an unreadable .poll or a date failure included.
+# Call it only after clutch_poll_alive returned 3. Writes nothing; the caller
+# removes .poll.
+clutch_poll_young() {
+  # Spelled-out class, the same guard as clutch_ops_record.
+  case $1 in @????????) ;; *) return 1 ;; esac
+  case $1 in @*[!0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz-]*) return 1 ;; esac
+  [ -n "$HOME" ] || return 1
+  CPY_F="$HOME/.clutch/watch/${1#@}"
+  # A round is poll.sh's own sleep, read the same way.
+  CPY_NAP=${CLUTCH_POLL_SLEEP:-600}
+  case $CPY_NAP in [1-9] | [1-9][0-9] | [1-9][0-9][0-9] | [1-9][0-9][0-9][0-9] | [1-9][0-9][0-9][0-9][0-9]) ;; *) CPY_NAP=600 ;; esac
+  # clutch_poll_alive's well-formed rule, the start capped at 12 digits: a
+  # malformed .poll has no start and is never young.
+  CPY_START=$(LC_ALL=C awk 'NR == 1 && (NF == 2 || NF == 3) && $1 ~ /^[1-9][0-9]*$/ && $2 ~ /^[1-9][0-9]*$/ && length($2) <= 12 { print $2 }' "$CPY_F.poll" 2>/dev/null)
+  CPY_NOW=$(date +%s 2>/dev/null)
+  case $CPY_START.$CPY_NOW in *[!0-9.]* | .* | *.) return 1 ;; esac
+  [ $((CPY_NOW - CPY_START)) -lt "$CPY_NAP" ] 2>/dev/null || return 1
+  [ ! -s "$CPY_F.woke" ] || [ "$CPY_F.poll" -nt "$CPY_F.woke" ]
 }
 
 # The window for the session-start block and the ops sweep: up to 8 lines,

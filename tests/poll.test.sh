@@ -4,6 +4,10 @@
 # third field): 0 alive (kill -0 passes and ps -ww names poll.sh @<tag8> at
 # the end), 1 no record (proven absent), 2 cannot tell, 3 ended (dead or
 # reused pid, another tag's poller, malformed line). It never writes.
+# L12-L14 cover its beat mode (4 for a live poller whose line has no third
+# field beat). Y1-Y9 cover clutch_poll_young <@tag> (0 died young: a
+# well-formed .poll started under one round ago whose .woke is empty, absent
+# or older; 1 otherwise; it never writes).
 # M1-M25 with M5b, M11b, M12b, M12c, M20b, M20c, M22b and M24b-M24e run
 # scripts/poll.sh @<tag> (the silent check) against a fake gh that applies the
 # real --jq filter to a per-PR GraphQL fixture through /usr/bin/jq, a fake
@@ -123,6 +127,81 @@ rec "$LONGP $NOW
 "; chk "L10 long path" '@0123abcd' 0
 rec "$LIVE $NOW beat
 "; chk "L11 2.17.1 line" '@0123abcd' 0
+
+# --- L12-L14: clutch_poll_alive <@tag> beat: 0 only when the live poller's
+# line carries the third field beat, 4 for a live poller without it.
+pab() { OUT=$(cd "$T/plain" && . "$T/scripts/prelude.sh" && clutch_poll_alive "$1" beat 2>&1); RC=$?; }
+chkb() {
+  B=$(snap); pab "$2"; is "$1" "$3" ''
+  [ "$(snap)" = "$B" ] || { echo "FAIL: $1 -- the reader changed ~/.clutch"; fail=1; }
+}
+rec "$LIVE $NOW beat
+"; chkb "L12 beat mode, beat line" '@0123abcd' 0
+rec "$LIVE $NOW
+"; chkb "L13 beat mode, 2.18.0 line" '@0123abcd' 4
+rec "$LIVE $NOW other
+"; chkb "L13 beat mode, another third field" '@0123abcd' 4
+rec "$DEAD $NOW beat
+"; chkb "L14 beat mode, dead pid" '@0123abcd' 3
+rm -f "$PF"; chkb "L14 beat mode, no .poll" '@0123abcd' 1
+if [ "$(id -u)" != 0 ]; then
+  rec "$LIVE $NOW beat
+"; chmod 000 "$PF"; chkb "L14 beat mode, unreadable .poll" '@0123abcd' 2; chmod 644 "$PF"
+fi
+
+# --- Y1-Y9: clutch_poll_young <@tag>: 0 when .poll names a poller that died
+# young (well-formed line, start under one round ago by the CLUTCH_POLL_SLEEP
+# clamp, .woke empty or absent or older than .poll), 1 otherwise. Every case
+# checks the ~/.clutch tree is unchanged (Y9: it writes nothing).
+WY="$HOME/.clutch/watch/0123abcd.woke"
+mkdir -p "$T/ybin"
+printf '#!/bin/sh\nexit 1\n' > "$T/ybin/date"; chmod 755 "$T/ybin/date"
+# py <tag>: the helper, CLUTCH_POLL_SLEEP=$YSLEEP when set, date from $YPATH.
+py() {
+  OUT=$(cd "$T/plain" && if [ -n "${YSLEEP:-}" ]; then CLUTCH_POLL_SLEEP=$YSLEEP; export CLUTCH_POLL_SLEEP; fi &&
+    PATH="${YPATH:-}$PATH" && . "$T/scripts/prelude.sh" && clutch_poll_young "$1" 2>&1); RC=$?
+}
+ychk() {
+  B=$(snap); py "$2"; is "$1" "$3" ''
+  [ "$(snap)" = "$B" ] || { echo "FAIL: $1 Y9 -- the helper changed ~/.clutch"; fail=1; }
+}
+YN=$(date +%s)
+rec "$DEAD $YN
+"; ychk "Y1 no .woke" '@0123abcd' 0
+: > "$WY"; ychk "Y1 empty .woke" '@0123abcd' 0
+printf 'gh:o/r#1 x\n' > "$WY"; touch -t 200001010000 "$WY"; ychk "Y2 .woke older" '@0123abcd' 0
+rec "$DEAD $YN
+"; printf 'gh:o/r#1 x\n' > "$WY"; touch -t 200001010000 "$PF"; ychk "Y3 .woke newer" '@0123abcd' 1
+touch -t 200001010000 "$WY"; ychk "Y4 equal mtimes" '@0123abcd' 1
+rec "$DEAD $((YN - 600))
+"; ychk "Y5 600 s old, default round" '@0123abcd' 1
+rec "$DEAD $((YN - 20))
+"; YSLEEP=30; ychk "Y5 20 s old, round 30" '@0123abcd' 0
+rec "$DEAD $((YN - 40))
+"; ychk "Y5 40 s old, round 30" '@0123abcd' 1
+rec "$DEAD $((YN - 300))
+"; YSLEEP=abc; ychk "Y5 300 s old, round abc clamped to 600" '@0123abcd' 0
+unset YSLEEP
+rec "$DEAD $((YN + 1000))
+"; ychk "Y5 future start" '@0123abcd' 0
+for c in '' "$DEAD" "$DEAD $YN x y" "0 $YN" "$DEAD 1234567890123" 'abc 1' "$DEAD 0$YN"; do
+  rec "$c
+"; ychk "Y6 malformed [$c]" '@0123abcd' 1
+done
+rec "$DEAD $YN beat
+"; ychk "Y7 third field" '@0123abcd' 0
+rm -f "$PF"; ychk "Y8 no .poll" '@0123abcd' 1
+rec "$DEAD $YN
+"
+for tg in '@a/b' '' '@0123abc'; do
+  ychk "Y8 bad tag [$tg]" "$tg" 1
+done
+YPATH="$T/ybin:"; ychk "Y8 date fails" '@0123abcd' 1; unset YPATH
+OUT=$(cd "$T/plain" && HOME='' && . "$T/scripts/prelude.sh" && clutch_poll_young '@0123abcd' 2>&1); RC=$?
+is "Y8 empty HOME" 1 ''
+if [ "$(id -u)" != 0 ]; then
+  chmod 000 "$PF"; ychk "Y8 unreadable .poll" '@0123abcd' 1; chmod 644 "$PF"
+fi
 
 # --- M1-M25: scripts/poll.sh @<tag>
 FIX=$T/fix
