@@ -19,7 +19,7 @@
 # one wait line wakes unreadable at most once, and "beat <epoch>" marks for
 # the hourly cap; they never hold back a later move of that ref.
 # It never writes the worklog; it writes the record only to seed a missing
-# last line once.
+# last line, in a beat round, retried each round until it lands.
 
 TAG=${1-}
 # Spelled-out class, the same guard as clutch_ops_record.
@@ -47,11 +47,6 @@ BF="$D/${TAG#@}.beat"
 START=$(date +%s)
 case $START in '' | *[!0-9]*) ended ;; esac
 { printf '%s %s%s\n' "$$" "$START" "$BEAT" > "$PF.$$" && mv -f "$PF.$$" "$PF"; } || { rm -f "$PF.$$"; stopped; }
-# A record with no last line has an empty window: seed one, once.
-if [ -n "$BEAT" ] && clutch_ops_record "$TAG"; then
-  LC_ALL=C grep -q '^last [0-9][0-9]*$' "$BF"
-  [ "$?" != 1 ] || clutch_beat_window "$TAG" >/dev/null
-fi
 
 MAX=${CLUTCH_POLL_ROUNDS:-72}
 case $MAX in '' | *[!0-9]*) MAX=72 ;; esac
@@ -141,7 +136,14 @@ EOF
     ' beat'0[89] | ' beat'1[0-9] | ' beat'20)
       BN=$(date +%s)
       case $BN in '' | *[!0-9]*) ;; *)
-        if clutch_ops_record "$TAG" && MV=$(clutch_beat_window "$TAG" peek) && [ -n "$MV" ] &&
+        # BL: 0 the record holds a last line, 1 it holds none, else no beat.
+        BL=2
+        ! clutch_ops_record "$TAG" || { LC_ALL=C grep -q '^last [0-9][0-9]*$' "$BF"; BL=$?; }
+        # No last line means an empty window: seed one and skip this round's
+        # peek; a failed seed retries next round.
+        if [ "$BL" = 1 ]; then
+          clutch_beat_window "$TAG" >/dev/null
+        elif [ "$BL" = 0 ] && MV=$(clutch_beat_window "$TAG" peek) && [ -n "$MV" ] &&
           [ -r "$BF" ] && [ -r "$WF" ] &&
           [ "$(LC_ALL=C awk -v n="$BN" -v bf="$BF" '
             FILENAME == bf && /^last [0-9]+$/ && (m == "" || $2 + 0 > m + 0) { m = $2 }

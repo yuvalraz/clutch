@@ -15,11 +15,12 @@
 # prints "<ref> <what>" lines and the closing line after appending
 # <ref> <stamp> to .woke, 3 gh failures in a row print "<ref> unreadable" once
 # per wait line, every other exit prints the ended line, and a failed write
-# prints the stopped line. Bt1-Bt16 with Bt5b, Bt6b, Bt8b, Bt10b and Bt13b
+# prints the stopped line. Bt1-Bt16 with Bt4b, Bt5b, Bt6b, Bt8b, Bt10b and Bt13b
 # cover the beat: with the tag's ops record there it peeks the beat window
 # from 08:00 to 20:59, wakes on peer moves at most once an hour with
 # "Run /clutch:beat @<tag>." after a "beat <epoch>" mark, seeds a record with
-# no last line, and keeps running with no gh wait while the record is there.
+# no last line in a beat round (a failed seed retries next round), and
+# keeps running with no gh wait while the record is there.
 # prelude.sh and poll.sh are staged into a scratch tree and run under a
 # scratch HOME. PRELUDE_SH and POLL_SH override the targets for replay or a
 # mutant copy. Silent on pass apart from PASS.
@@ -252,12 +253,14 @@ if [ "$*" = '+%H' ]; then
   cat "$F/hour" 2>/dev/null || echo 12; exit 0
 fi
 [ "$*" = '+%s' ] && [ -f "$HOME/../fix/datefail" ] && exit 1
+# skew: seconds added to +%s (the fake sleep sets it, to step the clock).
+[ "$*" = '+%s' ] && [ -f "$F/skew" ] && { echo $(($(/bin/date +%s) + $(cat "$F/skew"))); exit 0; }
 exec /bin/date "$@"
 EOF
 # Fake sleep: counts calls, keeps its last argument; call N restores the
 # worklog when $FIX/sleepfix.N exists, the ops record when $FIX/sleepbf.N
 # exists, and appends $FIX/sleepadd.N to the worklog; it waits while
-# $FIX/sleephold exists.
+# $FIX/sleephold exists; $FIX/skew.N becomes the fake date's clock skew.
 cat > "$T/mbin/sleep" <<'EOF'
 #!/bin/sh
 F=$HOME/../fix
@@ -265,6 +268,7 @@ c=$(cat "$F/sleeps" 2>/dev/null || echo 0); c=$((c + 1)); echo "$c" > "$F/sleeps
 [ -f "$F/sleepfix.$c" ] && chmod 644 "$HOME/.clutch/worklog.md"
 [ -f "$F/sleepbf.$c" ] && chmod 644 "$HOME/.clutch/watch/0123abcd.beat"
 [ -f "$F/sleepadd.$c" ] && cat "$F/sleepadd.$c" >> "$HOME/.clutch/worklog.md"
+[ -f "$F/skew.$c" ] && cp "$F/skew.$c" "$F/skew"
 while [ -f "$F/sleephold" ]; do /bin/sleep 0.1; done
 exit 0
 EOF
@@ -501,6 +505,14 @@ pr 2 @0123abcd; ok "Bt3 no peer move" 0 "$ENDED" 0
 mseed; opsrec 'asked 2000-01-01'; peer 600
 pr 2 @0123abcd; ok "Bt4 no last: seeded, no wake" 0 "$ENDED" 0
 [ "$(grep -c '^last [0-9][0-9]*$' "$BFR")" = 1 ] || { echo "FAIL: Bt4 -- record [$(cat "$BFR")], want one last line"; fail=1; }
+# Bt4b: the seed fails in round 1 (no worklog, rc 1) and retries: round 2
+# seeds (no wake in its seeding round), round 3, an hour later by the clock,
+# wakes once on the peer move logged after the seed.
+mseed; rm -f "$W"; opsrec 'asked 2000-01-01'
+printf '%s proj moved: gh:o/r#7 @ffffffff peer\n' "$((NOW + 3600))" > "$FIX/sleepadd.1"; echo 7200 > "$FIX/skew.2"
+pr 3 @0123abcd; ok "Bt4b failed seed retried, then a wake" 0 "$BEATL" 0
+[ "$(grep -c '^last [0-9][0-9]*$' "$BFR")" = 1 ] || { echo "FAIL: Bt4b -- record [$(cat "$BFR")], want one last line"; fail=1; }
+[ "$(sleeps)" = 2 ] || { echo "FAIL: Bt4b -- slept $(sleeps) times, want 2 (woke in round 3)"; fail=1; }
 own1; fx o_r_1 OPEN "$B0" '' ''; opsrec "last $((NOW - 7200))"; peer 600; RB=$(cat "$BFR"); : > "$FIX/pollcopy.on"
 PBEAT=off; pr 2 @0123abcd; unset PBEAT; ok "Bt5 CLUTCH_BEAT=off" 0 "$ENDED" 2
 [ "$(cat "$BFR")" = "$RB" ] || { echo "FAIL: Bt5 -- record changed: $(cat "$BFR")"; fail=1; }
