@@ -10,7 +10,7 @@
 # the switch unset the ops fixture blocks where base does not, and
 # CLUTCH_BEAT=on equals unset. Hermetic: scratch HOME, ambient CLUTCH_*
 # unset. Silent apart from PASS.
-# CLUTCH_POLL=off on both sides (7631acb ignores it): 2.17.0's silent-check
+# CLUTCH_POLL=off on both sides (7631acb ignores it): 2.18.0's silent-check
 # ask replaces the watch block by default, and off restores the 2.16.2 one
 # this suite compares (watch.test.sh PZ compares the off mode to 75ddf0e).
 set -u
