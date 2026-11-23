@@ -1,0 +1,348 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ops view</title>
+</head>
+<body>
+<main id="app"></main>
+
+<script type="application/json" id="demo-data">
+{
+  "now": "2026-11-23T12:00:00Z",
+  "builds": [
+    {"wf": "wf-20261123T100346Z-245172e6", "type": "BUILD", "repo": "clutch", "branch": "feat/opsview-demo", "ticket": "DEMO-12",
+     "status": "running", "created_at": "2026-11-23T10:03:46Z", "updated_at": "2026-11-23T11:41:02Z"},
+    {"wf": "wf-20261122T151500Z-4e7f9b10", "type": "DEBUG", "repo": "backend", "branch": "fix/demo-overview",
+     "status": "waiting", "created_at": "2026-11-22T15:15:00Z", "updated_at": "2026-11-23T09:48:31Z"}
+  ],
+  "sessions": [
+    {"kind": "session", "tag": "@0a1b2c3d", "repo": "clutch", "on": "ops view page for DEMO-12", "on_at": "2026-11-23T11:20:00Z",
+     "moves": [{"text": "pushed the page logic", "at": "2026-11-23T11:35:00Z"}, {"text": "fixtures in", "at": "2026-11-23T10:50:00Z"}],
+     "ticket": "DEMO-12", "tickets": ["DEMO-12", "DEMO-11"], "last_at": "2026-11-23T11:35:00Z", "updated_at": "2026-11-23T11:35:00Z"},
+    {"kind": "session", "tag": null, "repo": "backend", "on": "reading the overview logs", "on_at": "2026-11-23T09:10:00Z",
+     "moves": [{"text": "found the failing filter", "at": "2026-11-23T09:40:00Z"}],
+     "ticket": null, "tickets": [], "last_at": "2026-11-23T09:40:00Z", "updated_at": "2026-11-23T09:40:00Z"}
+  ],
+  "waits": [
+    {"kind": "wait", "ref": "gh:demo/clutch#40", "wait_kind": "gh", "tag": "@0a1b2c3d", "repo": "clutch", "baseline": "open",
+     "text": "review from Sam on DEMO-21", "ticket": "DEMO-21", "state": "open", "opened_at": "2026-11-23T08:30:00Z",
+     "closed_at": null, "updated_at": "2026-11-23T08:30:00Z"},
+    {"kind": "wait", "ref": "slack:C000/1795349629.465929", "wait_kind": "slack", "tag": null, "repo": "backend", "baseline": "0",
+     "text": "answer from Pat", "ticket": null, "state": "open", "opened_at": "2026-11-23T10:05:00Z",
+     "closed_at": null, "updated_at": "2026-11-23T10:05:00Z"}
+  ],
+  "sweep": [
+    {"kind": "sweep", "key": "linear:DEMO-71", "item_kind": "linear", "ref": "https://linear.app/demo/issue/DEMO-71",
+     "title": "Partner export", "state": "in progress", "waiting_on": "Pat", "ticket": "DEMO-71", "present": true,
+     "seen_at": "2026-11-23T08:37:00Z", "updated_at": "2026-11-23T08:37:00Z"},
+    {"kind": "sweep", "key": "cal:demo-planning", "item_kind": "meeting", "ref": null,
+     "title": "Planning", "state": "today 15:00", "waiting_on": null, "ticket": "DEMO-31", "present": true,
+     "seen_at": "2026-11-23T08:37:00Z", "updated_at": "2026-11-23T08:37:00Z"}
+  ],
+  "linear": {
+    "projects": {"projects": [
+      {"id": "P-DEMO-1", "uuid": "20000000-0000-4000-8000-000000000001", "name": "Ops view", "lead": "Pat",
+       "status": {"id": "30000000-0000-4000-8000-000000000001", "name": "In Progress", "type": "started"},
+       "initiatives": [{"id": "40000000-0000-4000-8000-000000000001", "name": "Harness"}],
+       "url": "https://linear.app/demo/project/ops-view"},
+      {"id": "P-DEMO-2", "uuid": "20000000-0000-4000-8000-000000000002", "name": "Review flow", "lead": "Sam",
+       "status": {"id": "30000000-0000-4000-8000-000000000002", "name": "Planned", "type": "planned"},
+       "initiatives": [{"id": "40000000-0000-4000-8000-000000000002", "name": "Team flow"}],
+       "url": "https://linear.app/demo/project/review-flow"},
+      {"id": "P-DEMO-3", "uuid": "20000000-0000-4000-8000-000000000003", "name": "Local stack", "lead": "Pat",
+       "status": {"id": "30000000-0000-4000-8000-000000000001", "name": "In Progress", "type": "started"},
+       "initiatives": [],
+       "url": "https://linear.app/demo/project/local-stack"},
+      {"id": "P-DEMO-4", "uuid": "20000000-0000-4000-8000-000000000004", "name": "Old board", "lead": "Sam",
+       "status": {"id": "30000000-0000-4000-8000-000000000003", "name": "Completed", "type": "completed"},
+       "initiatives": [{"id": "40000000-0000-4000-8000-000000000001", "name": "Harness"}],
+       "url": "https://linear.app/demo/project/old-board"}
+    ], "hasNextPage": false},
+    "assigned": {"issues": [
+      {"id": "DEMO-12", "title": "Page logic and fixtures", "url": "https://linear.app/demo/issue/DEMO-12",
+       "status": "In Progress", "statusType": "started", "assignee": "Pat", "project": "Ops view",
+       "projectId": "20000000-0000-4000-8000-000000000001"},
+      {"id": "DEMO-71", "title": "Partner export", "url": "https://linear.app/demo/issue/DEMO-71",
+       "status": "In Progress", "statusType": "started", "assignee": "Pat", "project": "Partner work",
+       "projectId": "20000000-0000-4000-8000-000000000007"}
+    ], "hasNextPage": false},
+    "issuesByProject": {
+      "P-DEMO-1": {"issues": [
+        {"id": "DEMO-11", "title": "Ops view", "url": "https://linear.app/demo/issue/DEMO-11", "status": "In Progress",
+         "statusType": "started", "assignee": "Pat", "projectId": "20000000-0000-4000-8000-000000000001", "parentId": null,
+         "updatedAt": "2026-11-23T10:00:00Z", "priority": 2},
+        {"id": "DEMO-12", "title": "Page logic and fixtures", "url": "https://linear.app/demo/issue/DEMO-12",
+         "status": "In Progress", "statusType": "started", "assignee": "Pat",
+         "projectId": "20000000-0000-4000-8000-000000000001", "parentId": "DEMO-11",
+         "updatedAt": "2026-11-23T11:00:00Z", "priority": 2},
+        {"id": "DEMO-13", "title": "Page rendering", "url": "https://linear.app/demo/issue/DEMO-13", "status": "Todo",
+         "statusType": "unstarted", "assignee": "Pat", "projectId": "20000000-0000-4000-8000-000000000001",
+         "parentId": "DEMO-11", "updatedAt": "2026-11-23T09:00:00Z", "priority": 3}
+      ], "hasNextPage": false},
+      "P-DEMO-2": {"issues": [
+        {"id": "DEMO-21", "title": "Review conventions", "url": "https://linear.app/demo/issue/DEMO-21", "status": "Backlog",
+         "statusType": "backlog", "assignee": "Sam", "projectId": "20000000-0000-4000-8000-000000000002", "parentId": null,
+         "updatedAt": "2026-11-22T16:00:00Z", "priority": 3}
+      ], "hasNextPage": false},
+      "P-DEMO-3": {"issues": [
+        {"id": "DEMO-31", "title": "Stack for every dev", "url": "https://linear.app/demo/issue/DEMO-31", "status": "In Review",
+         "statusType": "started", "assignee": "Sam", "projectId": "20000000-0000-4000-8000-000000000003", "parentId": null,
+         "updatedAt": "2026-11-23T07:00:00Z", "priority": 2}
+      ], "hasNextPage": false}
+    },
+    "initiativesById": {
+      "40000000-0000-4000-8000-000000000001": {"id": "I-1", "uuid": "40000000-0000-4000-8000-000000000001", "name": "Harness",
+        "url": "https://linear.app/demo/initiative/harness", "status": "Active", "owner": {"name": "Pat"},
+        "parentInitiatives": [{"id": "40000000-0000-4000-8000-000000000009", "name": "Ship faster",
+          "url": "https://linear.app/demo/initiative/ship-faster"}]},
+      "40000000-0000-4000-8000-000000000002": {"id": "I-2", "uuid": "40000000-0000-4000-8000-000000000002", "name": "Team flow",
+        "url": "https://linear.app/demo/initiative/team-flow", "status": "Active", "owner": {"name": "Sam"},
+        "parentInitiatives": []}
+    }
+  }
+}
+</script>
+
+<script id="ops-logic">
+// Pure page logic: no DOM and no capability access. Plain objects and arrays only
+// (no Set or Map), so the page source holds no write-shaped call.
+var OPS_MAX_PROJECTS = 40;
+var OPS_MAX_INITIATIVES = 15;
+var OPS_DAY_MS = 86400000;
+var OPS_FLOOR_MS = 4 * 3600000;
+
+function opsUnwrap(p) {
+  if (typeof p === "string") {
+    try { p = JSON.parse(p); } catch (e) { return null; }
+  }
+  if (p && typeof p === "object" && !Array.isArray(p) && "payload" in p && "content" in p) return opsUnwrap(p.payload);
+  return p && typeof p === "object" ? p : null;
+}
+
+function opsList(p, key) {
+  p = opsUnwrap(p);
+  if (Array.isArray(p)) return p;
+  return p && Array.isArray(p[key]) ? p[key] : null;
+}
+
+function opsStr(v) {
+  return typeof v === "string" && v ? v : null;
+}
+
+function opsOwn(map, key) {
+  return map && typeof map === "object" && Object.prototype.hasOwnProperty.call(map, key) ? map[key] : null;
+}
+
+function opsTime(v) {
+  var t = typeof v === "number" ? v : typeof v === "string" ? Date.parse(v) : NaN;
+  return isNaN(t) ? null : t;
+}
+
+// Member projects of one list_projects payload, completed and canceled dropped.
+function opsMembers(projects) {
+  return (projects || []).filter(function (p) {
+    var type = p && p.status && p.status.type;
+    return p && opsStr(p.id) && type !== "completed" && type !== "canceled";
+  });
+}
+
+function opsIssue(i) {
+  var status = i.status && typeof i.status === "object" ? i.status.name : i.status;
+  return {id: i.id, title: opsStr(i.title), state: opsStr(status),
+          open: i.statusType !== "completed" && i.statusType !== "canceled",
+          url: opsStr(i.url), parent: opsStr(i.parentId)};
+}
+
+function opsLane(id, name, url) {
+  return {lane: {id: id, name: name, url: url, issues: []}, seen: Object.create(null)};
+}
+
+function opsAddIssue(home, i) {
+  if (!i || !opsStr(i.id) || home.seen[i.id]) return;
+  home.seen[i.id] = true;
+  home.lane.issues.push(opsIssue(i));
+}
+
+function opsZone(ref, raw) {
+  var init = opsUnwrap(raw) || {};
+  var first = Array.isArray(init.parentInitiatives) ? init.parentInitiatives[0] : null;
+  var parent = first && typeof first === "object"
+    ? {id: opsStr(first.id), name: opsStr(first.name), url: opsStr(first.url)} : null;
+  return {id: ref.id, name: opsStr(init.name) || opsStr(ref.name), url: opsStr(init.url), parent: parent, projects: []};
+}
+
+function normalizeLinear(payloads) {
+  payloads = payloads || {};
+  var initiatives = [], noInitiative = [], outside = [];
+  var zones = Object.create(null), homes = Object.create(null), away = Object.create(null), none = null;
+  opsMembers(opsList(payloads.projects, "projects")).forEach(function (p) {
+    var home = opsLane(p.id, opsStr(p.name), opsStr(p.url));
+    (opsList(opsOwn(payloads.issuesByProject, p.id), "issues") || []).forEach(function (i) { opsAddIssue(home, i); });
+    homes[p.id] = home;
+    if (opsStr(p.uuid)) homes[p.uuid] = home;
+    var ref = Array.isArray(p.initiatives) ? p.initiatives[0] : null;
+    if (ref && opsStr(ref.id)) {
+      if (!zones[ref.id]) {
+        zones[ref.id] = opsZone(ref, opsOwn(payloads.initiativesById, ref.id));
+        initiatives.push(zones[ref.id]);
+      }
+      zones[ref.id].projects.push(home.lane);
+    } else {
+      noInitiative.push(home.lane);
+    }
+  });
+  (opsList(payloads.assigned, "issues") || []).forEach(function (i) {
+    if (!i || !opsStr(i.id)) return;
+    var pid = opsStr(i.projectId), home = pid ? homes[pid] : null;
+    if (!home && pid) {
+      if (!away[pid]) {
+        var name = i.project && typeof i.project === "object" ? i.project.name : i.project;
+        away[pid] = opsLane(pid, opsStr(name), null);
+        outside.push(away[pid].lane);
+      }
+      home = away[pid];
+    } else if (!home) {
+      home = none = none || opsLane("none", "No project", null);
+    }
+    opsAddIssue(home, i);
+  });
+  if (none) noInitiative.push(none.lane);
+  return {initiatives: initiatives, noInitiative: noInitiative, outside: outside};
+}
+
+function watchDiff(have, projectsPayload) {
+  var projects = opsList(projectsPayload, "projects");
+  if (!projects) return {drop: [], add: []};
+  var members = opsMembers(projects);
+  var started = members.filter(function (p) { return p.status && p.status.type === "started"; });
+  var kept = started.concat(members.filter(function (p) { return started.indexOf(p) < 0; })).slice(0, OPS_MAX_PROJECTS);
+  var wanted = Object.create(null), order = [], initiatives = 0;
+  function want(entry) {
+    if (wanted[entry.key]) return false;
+    wanted[entry.key] = entry;
+    order.push(entry.key);
+    return true;
+  }
+  kept.forEach(function (p) {
+    want({key: "project:" + p.id, tool: "list_issues", input: {project: p.id, limit: 100}});
+  });
+  kept.forEach(function (p) {
+    (Array.isArray(p.initiatives) ? p.initiatives : []).forEach(function (ref) {
+      if (initiatives < OPS_MAX_INITIATIVES && ref && opsStr(ref.id)
+          && want({key: "initiative:" + ref.id, tool: "get_initiative", input: {query: ref.id}})) initiatives += 1;
+    });
+  });
+  have = Array.isArray(have) ? have : [];
+  var held = Object.create(null);
+  have.forEach(function (key) { held[key] = true; });
+  return {
+    drop: have.filter(function (key) { return !wanted[key]; }),
+    add: order.filter(function (key) { return !held[key]; }).map(function (key) { return wanted[key]; })
+  };
+}
+
+function opsModel(input) {
+  input = input || {};
+  var now = opsTime(input.now);
+  if (now === null) now = Date.now();
+  var linear = input.linear || null;
+  var index = Object.create(null), issues = [];
+  function lanes(projects) {
+    return (projects || []).map(function (p) {
+      return {id: p.id, name: p.name, url: p.url, nodes: (p.issues || []).map(function (i) {
+        var node = {ticket: i.id, title: i.title, state: i.state, url: i.url, items: []};
+        if (!index[i.id]) index[i.id] = node;
+        issues.push(i);
+        return node;
+      })};
+    });
+  }
+  var zones = linear ? (linear.initiatives || []).map(function (z) {
+    return {id: z.id, name: z.name, url: z.url, parent: z.parent, lanes: lanes(z.projects)};
+  }) : [];
+  var noInitiative = linear ? lanes(linear.noInitiative) : [];
+  var outside = linear ? lanes(linear.outside) : [];
+
+  function docs(name) {
+    return (Array.isArray(input[name]) ? input[name] : []).filter(function (d) { return d && typeof d === "object"; });
+  }
+  function recent(d, ms) {
+    var t = opsTime(d.last_at);
+    return t !== null && now - t <= ms;
+  }
+  var builds = docs("builds").map(function (d) { return {kind: "build", id: d.wf, doc: d}; });
+  var sessions = docs("sessions").filter(function (d) { return recent(d, OPS_DAY_MS); })
+    .map(function (d) { return {kind: "session", id: d.tag || "repo:" + d.repo, doc: d}; });
+  var waits = docs("waits").filter(function (d) { return d.state === "open"; })
+    .map(function (d) { return {kind: "wait", id: d.tag ? d.ref + " " + d.tag : d.ref, doc: d}; });
+  var sweep = docs("sweep").filter(function (d) { return d.present === true; })
+    .map(function (d) { return {kind: "sweep", id: d.key, doc: d}; });
+
+  var other = [], otherOf = Object.create(null), unlinked = [];
+  builds.concat(sessions, waits, sweep).forEach(function (item) {
+    var ticket = opsStr(item.doc.ticket);
+    if (!ticket) {
+      unlinked.push(item);
+    } else if (index[ticket]) {
+      index[ticket].items.push(item);
+    } else {
+      if (!otherOf[ticket]) {
+        otherOf[ticket] = {ticket: ticket, items: []};
+        other.push(otherOf[ticket]);
+      }
+      otherOf[ticket].items.push(item);
+    }
+  });
+
+  function newest(a, b) { return (opsTime(b.at) || 0) - (opsTime(a.at) || 0); }
+  var moves = [];
+  sessions.forEach(function (s) {
+    (Array.isArray(s.doc.moves) ? s.doc.moves : []).forEach(function (m) {
+      if (m && typeof m === "object") moves.push({text: m.text, at: m.at, session: s.id});
+    });
+  });
+  var floor = {
+    builds: builds.filter(function (b) { return b.doc.status === "running" || b.doc.status === "waiting"; }),
+    sessions: sessions.filter(function (s) { return recent(s.doc, OPS_FLOOR_MS); }),
+    moves: moves.sort(newest).slice(0, 10)
+  };
+
+  var waitsList = waits.concat(sweep).sort(function (a, b) {
+    return newest({at: a.doc.updated_at}, {at: b.doc.updated_at});
+  });
+
+  var edges = [], edgeSeen = Object.create(null);
+  function edge(from, to, kind, key) {
+    if (edgeSeen[key]) return;
+    edgeSeen[key] = true;
+    edges.push({from: from, to: to, kind: kind});
+  }
+  issues.forEach(function (i) {
+    if (i.parent && index[i.parent]) edge(i.parent, i.id, "parent", i.parent + " " + i.id);
+  });
+  sessions.forEach(function (s) {
+    var on = [];
+    (Array.isArray(s.doc.tickets) ? s.doc.tickets : []).forEach(function (t) {
+      if (opsStr(t) && index[t] && on.indexOf(t) < 0) on.push(t);
+    });
+    for (var a = 0; a < on.length; a += 1) {
+      for (var b = a + 1; b < on.length; b += 1) edge(on[a], on[b], "session", [on[a], on[b]].sort().join(" "));
+    }
+  });
+
+  var lastChange = null;
+  ["builds", "sessions", "waits", "sweep"].forEach(function (name) {
+    docs(name).forEach(function (d) {
+      var t = opsTime(d.updated_at);
+      if (t !== null && (lastChange === null || t > opsTime(lastChange))) lastChange = d.updated_at;
+    });
+  });
+
+  return {zones: zones, noInitiative: noInitiative, outside: outside, other: other, unlinked: unlinked,
+          floor: floor, waitsList: waitsList, edges: edges, lastChange: lastChange};
+}
+</script>
+</body>
+</html>
