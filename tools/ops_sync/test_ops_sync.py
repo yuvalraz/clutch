@@ -1154,6 +1154,48 @@ class SweepCli(unittest.TestCase):
         rc, out, _ = self.run_sweep(s, data)
         self.assertEqual(load(s.path("opsview", "docs", "sweep", "gh:demo~2Fapp~237.json"))["updated_at"], first)
 
+    def test_people_guard_sweep_docs_already_on_disk(self):
+        # Sweep docs written before the guard line existed never go out under their old id or content.
+        canary = "dana.canary@example.com"
+        s = Scratch(self)
+        s.config()
+        key = "mail:%s/1" % canary
+        data = {"items": [item(title="ask %s about it" % canary), item(key, title="plain title")]}
+        rc, out, _ = self.run_sweep(s, data)
+        self.assertEqual(rc, 0)
+        self.assertIn(ops_sync.enc_doc_id(key), out)
+        self.assertIn(canary, load(s.path("opsview", "docs", "sweep", "gh:demo~2Fapp~237.json"))["title"])
+        # Not acked: the old docs are still waiting to go out when the guard line lands.
+        raw_path = s.path("opsview", "docs", "sweep", ops_sync.enc_doc_id(key) + ".json")
+        with open(raw_path, "rb") as handle:
+            raw_before = handle.read()
+        with open(s.path("people.md"), "w") as handle:
+            handle.write("- %s\n" % canary)
+        forms = [f.casefold() for f in (canary, ops_sync.enc_doc_id(canary),
+                                        ops_sync.enc_doc_id(canary).replace("~", "%"))]
+        hashed = "~h" + hashlib.sha256(key.encode()).hexdigest()[:40]
+        # A plain run re-reads the old record; a later sweep without the items marks them gone.
+        for run in (s.run, lambda: self.run_sweep(s, {"items": [item("cal:standup", title="Standup")]})):
+            rc, out, err = run()
+            self.assertEqual(rc, 0)
+            rows = doc_lines(out)
+            self.assertIn(("sweep", hashed), [(c, d) for c, d, _, _ in rows])
+            for _, d, path, _ in rows:
+                with open(path, encoding="utf-8") as handle:
+                    text = handle.read().casefold()
+                for form in forms:
+                    self.assertNotIn(form, d.casefold())
+                    self.assertNotIn(form, path.casefold())
+                    self.assertNotIn(form, text)
+            self.assertTrue(err.startswith("ops_sync: people-file text kept out of "), err)
+            s.run("--ack", *ack_args(rows))
+        self.assertIs(load(s.path("opsview", "docs", "sweep", hashed + ".json"))["present"], False)
+        self.assertEqual(load(s.path("opsview", "docs", "sweep", "gh:demo~2Fapp~237.json"))["title"], "")
+        # The old file stays on disk as it was (no delete path, no rewrite) and never comes back.
+        with open(raw_path, "rb") as handle:
+            self.assertEqual(handle.read(), raw_before)
+        self.assertEqual(s.run()[:2], (0, "OPS: %s\nOPS: unchanged\n" % URL))
+
 
 if __name__ == "__main__":
     unittest.main()
