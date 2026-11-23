@@ -5,6 +5,7 @@ Run: /usr/bin/python3 -B tools/ops_sync/test_ops_sync.py
 """
 from __future__ import annotations
 
+import ast
 import contextlib
 import hashlib
 import io
@@ -825,6 +826,20 @@ class Safety(unittest.TestCase):
             source = handle.read()
         for call in ("os.remove", "os.unlink", "rmtree", ".unlink("):
             self.assertNotIn(call, source)
+
+    def test_imports_no_network_module(self):
+        # README: ops_sync sends nothing; subprocess runs only the local prelude.
+        banned = {"socket", "http", "urllib", "ssl", "ftplib", "smtplib", "requests"}
+        with open(TOOL) as handle:
+            tree = ast.parse(handle.read())
+        names = set()
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                names.update(alias.name.split(".")[0] for alias in node.names)
+            elif isinstance(node, ast.ImportFrom):
+                names.add((node.module or "").split(".")[0])
+        self.assertTrue(names)
+        self.assertEqual(names & banned, set())
 
     def test_future_import_first(self):
         with open(TOOL) as handle:

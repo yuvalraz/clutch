@@ -589,7 +589,7 @@ awk '/^- An ops session is told at turn end/{f=1} f && /^- / && !/^- An ops/{f=0
   tr -s '[:space:]' ' ' | grep -q 'The beat and the armed sweep stop themselves once the session.s ops record is gone' \
   || { echo "FAIL: B-readme-stop -- the beat bullet does not say the beat and sweep stop once the ops record is gone"; fail=1; }
 tr -s '[:space:]' ' ' < "$HERE/../README.md" |
-  grep -q 'and only reads, until the session.s ops record is gone' \
+  grep -q 'and only reads, plus the ops view push when it is on, until the session.s ops record is gone' \
   || { echo "FAIL: B-readme-stop -- the armed sweep line does not say it runs until the ops record is gone"; fail=1; }
 
 # --- H1-H10: clutch_beat_window. bw <tag>: the helper sourced from the
