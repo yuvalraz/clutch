@@ -686,6 +686,9 @@ class People(unittest.TestCase):
         self.assertEqual(sorted(hashed), sorted([
             "~h" + hashlib.sha256(("repo:" + canary).encode()).hexdigest()[:40],
             "~h" + hashlib.sha256(("mail:%s %s" % (canary, TAG)).encode()).hexdigest()[:40]]))
+        # IF-5: a guarded wait ref is "", never null (only a sweep's ref is nullable).
+        wait = [path for c, _, path, _ in rows if c == "waits"][0]
+        self.assertEqual(load(wait)["ref"], "")
         # Two fields (repo, ref) and two ids.
         self.assertEqual(err, "ops_sync: people-file text kept out of 4 fields\n")
         # A second run keeps the same ids: the hashed wait stays open, not closed and re-keyed.
@@ -827,6 +830,371 @@ class Safety(unittest.TestCase):
         with open(TOOL) as handle:
             source = handle.read()
         self.assertRegex(source, r'^(#[^\n]*\n)*("""[\s\S]*?"""\n)?from __future__ import annotations\n')
+
+
+SWEEP_KEYS = {"kind", "key", "item_kind", "ref", "title", "state", "waiting_on", "ticket", "present",
+              "seen_at", "updated_at"}
+
+
+def item(key="gh:demo/app#7", **extra):
+    base = {"key": key, "kind": "pr", "title": "Review DEMO-7 fix", "state": "review requested"}
+    base.update(extra)
+    return base
+
+
+def sweep_fail(obj):
+    """The exit-2 reason validate_sweep raises for `obj`, or None when it accepts it."""
+    try:
+        ops_sync.validate_sweep(obj)
+    except ops_sync.Fail as err:
+        return err.code, str(err)
+    return None
+
+
+class ValidateSweep(unittest.TestCase):
+    """Unit seam: validate_sweep(obj) -> list of items with every IF-6 key."""
+
+    def test_sweep_rejects_unknown_key(self):
+        self.assertEqual(sweep_fail({"items": [item(), item("k2", body="the whole message")]}),
+                         (2, "sweep: items[1].body"))
+
+    def test_sweep_rejects_each(self):
+        no_title = item()
+        del no_title["title"]
+        cases = [
+            ({"items": [no_title]}, "sweep: items[0].title"),
+            ({"items": [item(kind="email")]}, "sweep: items[0].kind"),
+            ({"items": [item(ref="http://x")]}, "sweep: items[0].ref"),
+            ({"items": [item(ref="https://x y")]}, "sweep: items[0].ref"),
+            ({"items": [item(ref="https://" + "x" * 493)]}, "sweep: items[0].ref"),
+            ({"items": [item("a b")]}, "sweep: items[0].key"),
+            ({"items": [item("a\x01")]}, "sweep: items[0].key"),
+            ({"items": [item("")]}, "sweep: items[0].key"),
+            ({"items": [item("k" * 201)]}, "sweep: items[0].key"),
+            ({"items": [item(title=5)]}, "sweep: items[0].title"),
+            ({"items": [item(state=None)]}, "sweep: items[0].state"),
+            ({"items": [item(waiting_on=7)]}, "sweep: items[0].waiting_on"),
+            ({"items": [item(ticket=12)]}, "sweep: items[0].ticket"),
+            ({"items": [item("a\ud800b")]}, "sweep: items[0].key"),
+            ({"items": [item(title="a\ud800b")]}, "sweep: items[0].title"),
+            ({"items": [item(), "not an object"]}, "sweep: items[1]"),
+            ({"items": [item("k%d" % i) for i in range(101)]}, "sweep: items"),
+            ({"items": {}}, "sweep: items"),
+            ({}, "sweep: items"),
+            ({"items": [], "extra": 1}, "sweep: extra key"),
+            ([item()], "sweep: not an object"),
+        ]
+        for obj, want in cases:
+            with self.subTest(want=want):
+                self.assertEqual(sweep_fail(obj), (2, want))
+
+    def test_sweep_accepts_and_fills(self):
+        got = ops_sync.validate_sweep({"items": [item(ref="https://" + "x" * 492), item("k2", ref=None)]})
+        self.assertEqual(got[1], {"key": "k2", "kind": "pr", "ref": None, "title": "Review DEMO-7 fix",
+                                  "state": "review requested", "waiting_on": None, "ticket": None})
+        self.assertEqual(len(got[0]["ref"]), 500)
+        self.assertEqual(ops_sync.validate_sweep({"items": [item("k%d" % i) for i in range(100)]})[99]["key"], "k99")
+
+    def test_sweep_repeat_key(self):
+        got = ops_sync.validate_sweep({"items": [item(state="first"), item("other"), item(state="last")]})
+        self.assertEqual([(i["key"], i["state"]) for i in got], [("gh:demo/app#7", "last"), ("other", "review requested")])
+
+    def test_sweep_cuts(self):
+        got = ops_sync.validate_sweep({"items": [item(title="t" * 300, state="s" * 50, waiting_on="w" * 70)]})[0]
+        self.assertEqual((len(got["title"]), len(got["state"]), len(got["waiting_on"])), (120, 40, 60))
+
+    def test_sweep_ticket_fallback(self):
+        record = {"swept_at": 1_800_000_000, "items": ops_sync.validate_sweep({"items": [
+            item("linear:ENG-12", ticket="eng-1"),
+            item("slack:C1/2", title="ask about OPS-676", ticket="ENG-1x"),
+            item("slack:C1/3", title="no ticket here", ticket=None),
+            item("gh:x#1", ticket="DEMO-77")]})}
+        docs = ops_sync.build_docs([], [], record, {}, 1_800_000_000)
+        got = {k[1]: d["ticket"] for k, d in docs.items()}
+        self.assertEqual(got, {"linear:ENG-12": "ENG-12", "slack:C1~2F2": "OPS-676", "slack:C1~2F3": None,
+                               "gh:x~231": "DEMO-77"})
+
+
+class SweepDocs(unittest.TestCase):
+    """Unit seam: sweep documents through build_docs (IF-5 sweep, RP-6)."""
+
+    T1, T2 = 1_800_000_000, 1_800_003_600
+
+    def record(self, at, *items):
+        return {"swept_at": at, "items": ops_sync.validate_sweep({"items": list(items)})}
+
+    def test_sweep_updated_at(self):
+        first = ops_sync.build_docs([], [], self.record(self.T1, item(), item("k2")), {}, self.T1)
+        doc = first[("sweep", "gh:demo~2Fapp~237")]
+        self.assertEqual(doc, {"kind": "sweep", "key": "gh:demo/app#7", "item_kind": "pr", "ref": None,
+                               "title": "Review DEMO-7 fix", "state": "review requested", "waiting_on": None,
+                               "ticket": "DEMO-7", "present": True, "seen_at": iso(self.T1),
+                               "updated_at": iso(self.T1)})
+        second = ops_sync.build_docs([], [], self.record(self.T2, item(), item("k2", state="merged")), first, self.T2)
+        same, moved = second[("sweep", "gh:demo~2Fapp~237")], second[("sweep", "k2")]
+        self.assertEqual((same["seen_at"], same["updated_at"]), (iso(self.T2), iso(self.T1)))
+        self.assertEqual((moved["seen_at"], moved["updated_at"], moved["state"]), (iso(self.T2), iso(self.T2), "merged"))
+
+    def test_sweep_item_gone_unit(self):
+        first = ops_sync.build_docs([], [], self.record(self.T1, item(), item("k2")), {}, self.T1)
+        second = ops_sync.build_docs([], [], self.record(self.T2, item()), first, self.T2)
+        gone = second[("sweep", "k2")]
+        self.assertEqual((gone["present"], gone["updated_at"], gone["seen_at"]), (False, iso(self.T2), iso(self.T1)))
+        # An item already gone is left as it is; no record means no sweep documents at all.
+        third = ops_sync.build_docs([], [], self.record(self.T2 + 60, item()), second, self.T2 + 60)
+        self.assertNotIn(("sweep", "k2"), third)
+        self.assertEqual(ops_sync.build_docs([], [], None, second, self.T2 + 60), {})
+
+    def test_sweep_ids_go_through_ident(self):
+        # One id rule for sessions, waits and sweep: build_docs' ident names every sweep document.
+        ident = lambda key: "~hguarded" if key == "k2" else ops_sync.enc_doc_id(key)
+        docs = ops_sync.build_docs([], [], self.record(self.T1, item(), item("k2")), {}, self.T1, ident)
+        self.assertEqual(sorted(docs), [("sweep", "gh:demo~2Fapp~237"), ("sweep", "~hguarded")])
+
+
+class SweepCli(unittest.TestCase):
+    """CLI seam: `ops_sync.py --sweep` with IF-6 JSON on stdin."""
+
+    def run_sweep(self, s, data, args=("--sweep",)):
+        env = dict(os.environ)
+        env["HOME"] = s.home
+        env["PYTHONDONTWRITEBYTECODE"] = "1"
+        raw = data if isinstance(data, bytes) else json.dumps(data).encode("utf-8")
+        proc = subprocess.run([sys.executable, "-B", TOOL] + list(args), env=env, cwd=s.base, input=raw,
+                              stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=60)
+        return proc.returncode, proc.stdout.decode("utf-8"), proc.stderr.decode("utf-8")
+
+    def items3(self):
+        return {"items": [
+            item(ref="https://github.com/demo/app/pull/7", waiting_on="a reviewer", ticket="DEMO-7"),
+            {"key": "slack:C01/123.456", "kind": "slack", "title": "Question on rollout", "state": "unanswered"},
+            {"key": "cal:standup", "kind": "meeting", "title": "Standup", "state": "in 20 min",
+             "waiting_on": None, "ref": None, "ticket": None}]}
+
+    def test_sweep_record_and_docs(self):
+        s = Scratch(self)
+        s.config()
+        before = int(time.time())
+        rc, out, err = self.run_sweep(s, self.items3())
+        after = int(time.time())
+        self.assertEqual((rc, err), (0, ""))
+        record = load(s.path("sweep.json"))
+        self.assertEqual(set(record), {"swept_at", "items"})
+        self.assertTrue(before <= record["swept_at"] <= after)
+        self.assertEqual([i["key"] for i in record["items"]], ["gh:demo/app#7", "slack:C01/123.456", "cal:standup"])
+        lines = out.splitlines()
+        self.assertEqual(lines[0], "OPS: " + URL)
+        rows = doc_lines(out)
+        self.assertEqual(len(rows), 3)
+        self.assertEqual(sorted(d for c, d, _, _ in rows), ["cal:standup", "gh:demo~2Fapp~237", "slack:C01~2F123.456"])
+        swept = iso(record["swept_at"])
+        for c, d, path, _ in rows:
+            self.assertEqual(c, "sweep")
+            doc = load(path)
+            self.assertEqual(set(doc), SWEEP_KEYS)
+            self.assertEqual((doc["present"], doc["seen_at"], doc["updated_at"]), (True, swept, swept))
+        self.assertEqual(load(rows[[d for _, d, _, _ in rows].index("gh:demo~2Fapp~237")][2]), {
+            "kind": "sweep", "key": "gh:demo/app#7", "item_kind": "pr", "ref": "https://github.com/demo/app/pull/7",
+            "title": "Review DEMO-7 fix", "state": "review requested", "waiting_on": "a reviewer",
+            "ticket": "DEMO-7", "present": True, "seen_at": swept, "updated_at": swept})
+        # A plain sync run reads the record back: same documents, nothing new.
+        s.run("--ack", *ack_args(rows))
+        self.assertEqual(s.run(), (0, "OPS: %s\nOPS: unchanged\n" % URL, ""))
+
+    def test_sweep_item_gone(self):
+        s = Scratch(self)
+        s.config()
+        self.run_sweep(s, self.items3())
+        data = self.items3()
+        data["items"] = data["items"][:2]
+        rc, out, _ = self.run_sweep(s, data)
+        self.assertEqual(rc, 0)
+        gone = s.path("opsview", "docs", "sweep", "cal:standup.json")
+        self.assertIs(load(gone)["present"], False)
+        self.assertIn(("sweep", "cal:standup"), [(c, d) for c, d, _, _ in doc_lines(out)])
+        self.assertEqual(len(load(s.path("sweep.json"))["items"]), 2)
+
+    def test_sweep_key_dot(self):
+        s = Scratch(self)
+        s.config()
+        rc, out, _ = self.run_sweep(s, {"items": [item("."), item("..")]})
+        self.assertEqual(rc, 0)
+        self.assertEqual(sorted(d for _, d, _, _ in doc_lines(out)), ["~2E", "~2E~2E"])
+        self.assertEqual(load(s.path("opsview", "docs", "sweep", "~2E.json"))["key"], ".")
+
+    def test_sweep_rejects_cli(self):
+        cases = [
+            ({"items": [item(body="private message text")]}, "ops_sync: sweep: items[0].body\n"),
+            (b"not json {", "ops_sync: sweep: not JSON\n"),
+            (b"\xff\xfe", "ops_sync: sweep: not JSON\n"),
+            (b"[" * 200000, "ops_sync: sweep: not JSON\n"),
+            (json.dumps([item()]).encode(), "ops_sync: sweep: not an object\n"),
+            (b" " * (1 << 20) + b"{}", "ops_sync: sweep: input over 1 MiB\n"),
+            (json.dumps({"items": [item(title="a\ud800b")]}).encode(), "ops_sync: sweep: items[0].title\n"),
+            (b'{"items": []}', None),
+        ]
+        for data, want in cases:
+            with self.subTest(want=want):
+                s = Scratch(self)
+                s.config()
+                rc, out, err = self.run_sweep(s, data)
+                if want is None:
+                    self.assertEqual(rc, 0)
+                    continue
+                self.assertEqual((rc, out, err), (2, "", want))
+                self.assertFalse(os.path.exists(s.path("sweep.json")))
+                self.assertFalse(os.path.exists(s.path("opsview")))
+        # Exactly 1 MiB is read whole.
+        s = Scratch(self)
+        s.config()
+        self.assertEqual(self.run_sweep(s, b'{"items": []}' + b" " * ((1 << 20) - 13))[0], 0)
+        self.assertEqual(self.run_sweep(s, {"items": []}, ("--sweep", "extra"))[0], 2)
+
+    def test_sweep_off(self):
+        s = Scratch(self)
+        before = tree(s.base)
+        rc, out, err = self.run_sweep(s, b"not json at all")
+        self.assertEqual((rc, out, err), (0, "OPS: off\n", ""))
+        self.assertEqual(tree(s.base), before)
+
+    def test_sweep_write_fail(self):
+        s = Scratch(self)
+        s.config()
+        os.makedirs(s.path("sweep.json"))
+        rc, out, err = self.run_sweep(s, self.items3())
+        self.assertEqual((rc, out), (1, ""))
+        self.assertEqual(err, "ops_sync: cannot write the sweep record\n")
+        self.assertFalse(os.path.exists(s.path("opsview", "docs")))
+
+    def test_sweep_config_invalid_writes_nothing(self):
+        s = Scratch(self)
+        s.config(raw="[]")
+        rc, out, _ = self.run_sweep(s, self.items3())
+        self.assertEqual((rc, out), (1, ""))
+        self.assertFalse(os.path.exists(s.path("sweep.json")))
+
+    def test_sweep_record_absent_or_bad(self):
+        s = Scratch(self)
+        s.config()
+        self.assertEqual(s.run(), (0, "OPS: %s\nOPS: unchanged\n" % URL, ""))
+        self.run_sweep(s, self.items3())
+        with open(s.path("sweep.json"), "w") as handle:
+            handle.write('{"swept_at": 1, "items": [{"key": "a b"}]}')
+        rc, out, err = s.run()
+        self.assertEqual((rc, err), (0, "ops_sync: sweep record ignored\n"))
+        # An unreadable record marks nothing gone.
+        for _, _, path, _ in doc_lines(out):
+            self.assertIs(load(path)["present"], True)
+        # A swept_at iso() cannot format, or a lone surrogate, is a bad record, not a crash.
+        for raw in ('{"swept_at": %d, "items": []}' % (1 << 62), '{"swept_at": -1, "items": []}',
+                    '{"swept_at": 1, "items": [{"key": "a\\ud800b", "kind": "pr", "title": "t", "state": "s"}]}'):
+            with self.subTest(raw=raw):
+                with open(s.path("sweep.json"), "w") as handle:
+                    handle.write(raw)
+                rc, _, err = s.run()
+                self.assertEqual((rc, err), (0, "ops_sync: sweep record ignored\n"))
+
+    def test_people_guard_sweep_key(self):
+        s = Scratch(self)
+        s.config()
+        canary = "canarytokenzulu42"
+        with open(s.path("people.md"), "w") as handle:
+            handle.write("- %s\n" % canary)
+        key = "slack:%s/1" % canary
+        rc, out, err = self.run_sweep(s, {"items": [item(key, title="plain title")]})
+        self.assertEqual((rc, err), (0, "ops_sync: people-file text kept out of 1 fields\n"))
+        rows = doc_lines(out)
+        self.assertEqual([d for _, d, _, _ in rows], ["~h" + hashlib.sha256(key.encode()).hexdigest()[:40]])
+        for form in (canary, ops_sync.enc_doc_id(canary), ops_sync.enc_doc_id(key)):
+            self.assertNotIn(form.casefold(), out.casefold())
+            self.assertNotIn(form.casefold(), err.casefold())
+        self.assertNotIn(canary, load(rows[0][2])["key"])
+        for _, _, names in os.walk(s.path("opsview")):
+            for name in names:
+                self.assertNotIn(canary, name)
+        # A second sweep with the same item is no change (the blanked key compares equal).
+        first = load(rows[0][2])["updated_at"]
+        s.run("--ack", *ack_args(rows))
+        later = int(time.time()) + 3600
+        stdin = io.TextIOWrapper(io.BytesIO(json.dumps({"items": [item(key, title="plain title")]}).encode()))
+        with unittest.mock.patch.dict(os.environ, {"HOME": s.home}), \
+                unittest.mock.patch.object(ops_sync.time, "time", return_value=later), \
+                unittest.mock.patch.object(sys, "stdin", stdin), \
+                contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+            self.assertEqual(ops_sync.main(["--sweep"]), 0)
+        doc = load(rows[0][2])
+        self.assertEqual((doc["seen_at"], doc["updated_at"]), (iso(later), first))
+
+    def test_people_guard_sweep(self):
+        s = Scratch(self)
+        s.config()
+        with open(s.path("people.md"), "w") as handle:
+            handle.write("# People\n- Canary Person Alpha is the CTO here\n> canary bravo secret twelve\n"
+                         "- slack:C0PEOPLE/123.456\n")
+        data = {"items": [item(title="ask CANARY PERSON ALPHA IS THE CTO HERE about it",
+                               waiting_on="Canary Bravo Secret"), item("slack:C0PEOPLE/123.456")]}
+        rc, out, err = self.run_sweep(s, data)
+        self.assertEqual(rc, 0)
+        self.assertEqual(err, "ops_sync: people-file text kept out of 3 fields\n")
+        rows = doc_lines(out)
+        # A key the guard hits gets IF-2's hash id, and the document's key field is blanked.
+        hashed = "~h" + hashlib.sha256(b"slack:C0PEOPLE/123.456").hexdigest()[:40]
+        self.assertEqual(sorted(d for _, d, _, _ in rows), ["gh:demo~2Fapp~237", hashed])
+        self.assertEqual(load(s.path("opsview", "docs", "sweep", hashed + ".json"))["key"], "")
+        doc = load(s.path("opsview", "docs", "sweep", "gh:demo~2Fapp~237.json"))
+        self.assertEqual((doc["title"], doc["waiting_on"]), ("", None))
+        for _, _, path, _ in rows:
+            with open(path, encoding="utf-8") as handle:
+                text = handle.read().casefold()
+            for canary in People.CANARIES:
+                self.assertNotIn(canary, text)
+                self.assertNotIn(canary, err.casefold())
+        # A second sweep with the same item is no change: updated_at holds.
+        first = doc["updated_at"]
+        rc, out, _ = self.run_sweep(s, data)
+        self.assertEqual(load(s.path("opsview", "docs", "sweep", "gh:demo~2Fapp~237.json"))["updated_at"], first)
+
+    def test_people_guard_sweep_docs_already_on_disk(self):
+        # Sweep docs written before the guard line existed never go out under their old id or content.
+        canary = "dana.canary@example.com"
+        s = Scratch(self)
+        s.config()
+        key = "mail:%s/1" % canary
+        data = {"items": [item(title="ask %s about it" % canary), item(key, title="plain title")]}
+        rc, out, _ = self.run_sweep(s, data)
+        self.assertEqual(rc, 0)
+        self.assertIn(ops_sync.enc_doc_id(key), out)
+        self.assertIn(canary, load(s.path("opsview", "docs", "sweep", "gh:demo~2Fapp~237.json"))["title"])
+        # Not acked: the old docs are still waiting to go out when the guard line lands.
+        raw_path = s.path("opsview", "docs", "sweep", ops_sync.enc_doc_id(key) + ".json")
+        with open(raw_path, "rb") as handle:
+            raw_before = handle.read()
+        with open(s.path("people.md"), "w") as handle:
+            handle.write("- %s\n" % canary)
+        forms = [f.casefold() for f in (canary, ops_sync.enc_doc_id(canary),
+                                        ops_sync.enc_doc_id(canary).replace("~", "%"))]
+        hashed = "~h" + hashlib.sha256(key.encode()).hexdigest()[:40]
+        # A plain run re-reads the old record; a later sweep without the items marks them gone.
+        for run in (s.run, lambda: self.run_sweep(s, {"items": [item("cal:standup", title="Standup")]})):
+            rc, out, err = run()
+            self.assertEqual(rc, 0)
+            rows = doc_lines(out)
+            self.assertIn(("sweep", hashed), [(c, d) for c, d, _, _ in rows])
+            for _, d, path, _ in rows:
+                with open(path, encoding="utf-8") as handle:
+                    text = handle.read().casefold()
+                for form in forms:
+                    self.assertNotIn(form, d.casefold())
+                    self.assertNotIn(form, path.casefold())
+                    self.assertNotIn(form, text)
+            self.assertTrue(err.startswith("ops_sync: people-file text kept out of "), err)
+            s.run("--ack", *ack_args(rows))
+        self.assertIs(load(s.path("opsview", "docs", "sweep", hashed + ".json"))["present"], False)
+        self.assertEqual(load(s.path("opsview", "docs", "sweep", "gh:demo~2Fapp~237.json"))["title"], "")
+        # The old file stays on disk as it was (no delete path, no rewrite) and never comes back.
+        with open(raw_path, "rb") as handle:
+            self.assertEqual(handle.read(), raw_before)
+        self.assertEqual(s.run()[:2], (0, "OPS: %s\nOPS: unchanged\n" % URL))
 
 
 if __name__ == "__main__":

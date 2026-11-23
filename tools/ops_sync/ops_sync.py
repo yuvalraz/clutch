@@ -31,6 +31,14 @@ TEXT_RE = re.compile(r"(?<![A-Za-z0-9-])([A-Z]{2,6})-([0-9]{1,6})(?![A-Za-z0-9])
 NOT_TICKETS = ("CVE", "GPT", "HTTP", "ISO", "PEP", "RFC", "SHA", "UTF", "OD", "IF", "RP")
 # Schema fields that hold null rather than "" when the people guard blanks them.
 NULLABLE = frozenset(("tag", "on", "on_at", "ticket", "closed_at"))
+SWEEP_NULLABLE = NULLABLE | {"ref", "waiting_on"}
+SWEEP_MAX = 1 << 20
+SWEEP_KINDS = ("pr", "slack", "meeting", "linear", "other")
+SWEEP_CUTS = (("title", 120), ("state", 40), ("waiting_on", 60))
+SWEEP_KEY_RE = re.compile(r"[^\s\x00-\x1f\x7f-\x9f]{1,200}")
+SWEEP_REF_RE = re.compile(r"https://[^\s\x00-\x1f\x7f-\x9f]{0,492}")
+SWEEP_TICKET_RE = re.compile(r"[A-Z]{2,6}-[0-9]{1,6}")
+FIELD_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]{0,31}")
 
 
 class Fail(Exception):
@@ -76,7 +84,7 @@ def guard_hit(value: str, guard_lines: list) -> bool:
     return any(g.casefold() in folded or (len(value) >= 16 and folded in g.casefold()) for g in guard_lines)
 
 
-def people_guard(doc: dict, guard_lines: list) -> int:
+def people_guard(doc: dict, guard_lines: list, nullable=NULLABLE) -> int:
     """Blank every string in `doc` that holds a guard line or sits inside one; returns the count."""
 
     def walk(node):
@@ -84,7 +92,7 @@ def people_guard(doc: dict, guard_lines: list) -> int:
         items = node.items() if isinstance(node, dict) else enumerate(node)
         for key, value in list(items):
             if isinstance(value, str) and guard_hit(value, guard_lines):
-                node[key] = None if key in NULLABLE else ""
+                node[key] = None if key in nullable else ""
                 count += 1
             elif isinstance(value, (dict, list)):
                 count += walk(value)
@@ -177,15 +185,83 @@ def wait_docs(open_wait_lines: list, previous_docs: dict, now: int, ident=enc_do
     return docs
 
 
+def validate_sweep(obj: dict) -> list:
+    """IF-6: the record's items, cut and with every key, the last of a repeated key winning.
+
+    Raises Fail (exit 2) naming the item index and field, never a value.
+    """
+    if not isinstance(obj, dict):
+        raise Fail("sweep: not an object", 2)
+    if set(obj) - {"items"}:
+        raise Fail("sweep: extra key", 2)
+    items = obj.get("items")
+    if not isinstance(items, list) or len(items) > 100:
+        raise Fail("sweep: items", 2)
+    kept = {}
+    for index, raw in enumerate(items):
+        where = "sweep: items[%d]" % index
+        if not isinstance(raw, dict):
+            raise Fail(where, 2)
+        for name in raw:
+            if name not in ("key", "kind", "ref", "title", "state", "waiting_on", "ticket"):
+                # The field name only when it looks like one: a key may hold anything.
+                raise Fail(where + ("." + name if FIELD_RE.fullmatch(name) else ": unknown key"), 2)
+        out = {"key": raw.get("key"), "kind": raw.get("kind"), "ref": raw.get("ref"), "title": raw.get("title"),
+               "state": raw.get("state"), "waiting_on": raw.get("waiting_on"), "ticket": raw.get("ticket")}
+        checks = (("key", isinstance(out["key"], str) and SWEEP_KEY_RE.fullmatch(out["key"])),
+                  ("kind", isinstance(out["kind"], str) and out["kind"] in SWEEP_KINDS),
+                  ("ref", out["ref"] is None or isinstance(out["ref"], str) and SWEEP_REF_RE.fullmatch(out["ref"])),
+                  ("title", isinstance(out["title"], str)), ("state", isinstance(out["state"], str)),
+                  ("waiting_on", out["waiting_on"] is None or isinstance(out["waiting_on"], str)),
+                  ("ticket", out["ticket"] is None or isinstance(out["ticket"], str)))
+        for name, ok in checks:
+            if not ok:
+                raise Fail("%s.%s" % (where, name), 2)
+        for name, value in out.items():
+            try:
+                if value is not None:
+                    value.encode("utf-8")
+            except UnicodeEncodeError:  # a lone surrogate would crash dump()
+                raise Fail("%s.%s" % (where, name), 2)
+        for name, cut in SWEEP_CUTS:
+            if out[name] is not None:
+                out[name] = out[name][:cut]
+        if out["ticket"] is not None and not SWEEP_TICKET_RE.fullmatch(out["ticket"]):
+            out["ticket"] = None
+        kept[out["key"]] = out
+    return list(kept.values())
+
+
+def sweep_docs(record: dict, previous_docs: dict, ident=enc_doc_id) -> dict:
+    swept = iso(record["swept_at"])
+    docs = {}
+    for item in record["items"]:
+        # sync blanks a guarded key field before building and keeps the raw key in id_key for ident.
+        key = ("sweep", ident(item.get("id_key", item["key"])))
+        built = {"kind": "sweep", "key": item["key"], "item_kind": item["kind"], "ref": item["ref"],
+                 "title": item["title"], "state": item["state"], "waiting_on": item["waiting_on"],
+                 "ticket": item["ticket"] or ticket_of([], [item["key"], item["title"]]), "present": True}
+        prev = previous_docs.get(key)
+        same = isinstance(prev, dict) and isinstance(prev.get("updated_at"), str) \
+            and all(k in prev and prev[k] == v for k, v in built.items())
+        docs[key] = dict(built, seen_at=swept, updated_at=prev["updated_at"] if same else swept)
+    for key, doc in previous_docs.items():
+        if key[0] == "sweep" and key not in docs and isinstance(doc, dict) and doc.get("present") is True:
+            docs[key] = dict(doc, present=False, updated_at=swept)
+    return docs
+
+
 def build_docs(worklog_lines: list, open_wait_lines: list, sweep_record, previous_docs: dict, now: int,
                ident=enc_doc_id) -> dict:
-    """{(collection, doc_id): document} for every session and wait to (re)write.
+    """{(collection, doc_id): document} for every session, wait and sweep item to (re)write.
 
-    `sweep_record` is the IF-6 record (S1b); unused until the sweep documents land.
+    `sweep_record` is the IF-6 record ({"swept_at", "items"} with validated items) or None.
     `ident` maps a document's key to its id; sync passes one that hashes keys holding people text.
     """
     docs = session_docs(parse_worklog(worklog_lines, now), ident)
     docs.update(wait_docs(open_wait_lines, previous_docs, now, ident))
+    if sweep_record is not None:
+        docs.update(sweep_docs(sweep_record, previous_docs, ident))
     return docs
 
 
@@ -198,6 +274,7 @@ def dump(obj) -> bytes:
 
 def write_atomic(path: Path, data: bytes):
     path.parent.mkdir(parents=True, exist_ok=True)
+    # shortcut: a failed replace leaves .<name>.tmp behind (no deletes here); add it to the write set.
     tmp = path.parent / ("." + path.name + ".tmp")
     with open(tmp, "wb") as handle:
         handle.write(data)
@@ -291,8 +368,29 @@ def read_docs(docs_dir: Path) -> dict:
     return found
 
 
-def sync(home: str) -> int:
-    if not os.path.isfile(Path(home) / ".clutch" / "opsview.json"):
+def read_sweep(home: str):
+    """The IF-6 record in ~/.clutch/sweep.json, None when absent or not a valid record."""
+    path = Path(home) / ".clutch" / "sweep.json"
+    if not os.path.lexists(path):
+        return None
+    try:
+        record = json.loads(path.read_bytes().decode("utf-8"))
+        if not isinstance(record, dict) or set(record) != {"swept_at", "items"} or type(record["swept_at"]) is not int \
+                or not 0 <= record["swept_at"] < 1 << 40:
+            raise ValueError
+        return {"swept_at": record["swept_at"], "items": validate_sweep({"items": record["items"]})}
+    except (OSError, ValueError, RecursionError, Fail):
+        print("ops_sync: sweep record ignored", file=sys.stderr)
+        return None
+
+
+def off(home: str) -> bool:
+    return not home or not os.path.isfile(Path(home) / ".clutch" / "opsview.json")
+
+
+def sync(home: str, sweep_items=None) -> int:
+    """The sync run; with `sweep_items` (validated IF-6 items), first record them in ~/.clutch/sweep.json."""
+    if off(home):
         print("OPS: off")
         return 0
     url = read_config(home)
@@ -303,6 +401,26 @@ def sync(home: str) -> int:
     guard = read_guard(home)
     worklog_lines, open_lines = read_worklog(home)
     now = int(time.time())
+    if sweep_items is None:
+        record = read_sweep(home)
+    else:
+        record = {"swept_at": now, "items": sweep_items}
+        try:
+            write_atomic(Path(home) / ".clutch" / "sweep.json", dump(record))
+        except OSError:
+            raise Fail("cannot write the sweep record")
+    blanked = 0
+    if record is not None:
+        # Guard before building, so a blanked field compares equal to its blanked document (RP-6).
+        # The key's id comes from ident below (which counts a hit); a hit also blanks the key field.
+        items = []
+        for item in record["items"]:
+            item = dict(item)
+            key = item.pop("key")
+            blanked += people_guard(item, guard, SWEEP_NULLABLE)
+            item.update(key="" if guard_hit(key, guard) else key, id_key=key)
+            items.append(item)
+        record = {"swept_at": record["swept_at"], "items": items}
     state = load_state(base)
     previous = read_docs(docs_dir)
     hashed = []
@@ -329,10 +447,12 @@ def sync(home: str) -> int:
             key = (collection, hash_id(dec_doc_id(doc_id)))
             if key not in known:
                 carried.setdefault(key, json.loads(dump(doc)))
-    docs = build_docs(worklog_lines, open_lines, None, {**known, **carried}, now, ident)
+    docs = build_docs(worklog_lines, open_lines, record, {**known, **carried}, now, ident)
     for key, doc in carried.items():
         docs.setdefault(key, doc)
-    blanked = len(hashed) + sum(people_guard(doc, guard) for doc in docs.values())
+    blanked += len(hashed) + sum(
+        people_guard(doc, guard, SWEEP_NULLABLE if collection == "sweep" else NULLABLE)
+        for (collection, _), doc in docs.items())
     try:
         for (collection, doc_id), doc in docs.items():
             data = dump(doc)
@@ -437,16 +557,25 @@ def main(argv: list | None = None) -> int:
     home = os.environ.get("HOME", "")
     try:
         if not argv:
-            if not home:
-                print("OPS: off")
-                return 0
             return sync(home)
+        if argv == ["--sweep"]:
+            if off(home):
+                print("OPS: off")  # stdin is never read when the view is off
+                return 0
+            raw = sys.stdin.buffer.read(SWEEP_MAX + 1)
+            if len(raw) > SWEEP_MAX:
+                raise Fail("sweep: input over 1 MiB", 2)
+            try:
+                obj = json.loads(raw.decode("utf-8"))
+            except (ValueError, RecursionError):
+                raise Fail("sweep: not JSON", 2)
+            return sync(home, validate_sweep(obj))
         if argv[0] == "--ack":
             return ack(home, argv[1:])
         if argv[0] == "--failed":
             speak = argv[1:2] == ["--speak"]
             return failed(home, speak, " ".join(argv[2:] if speak else argv[1:]))
-        raise Fail("usage: ops_sync [--ack <collection>/<doc_id>=<version> ...] [--failed [--speak] <reason>]", 2)
+        raise Fail("usage: ops_sync [--sweep] [--ack <collection>/<doc_id>=<version> ...] [--failed [--speak] <reason>]", 2)
     except Fail as err:
         print("ops_sync: %s" % err, file=sys.stderr)
         return err.code
