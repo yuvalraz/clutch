@@ -559,6 +559,11 @@ else
   rec; prec "$DEAD" "$OLD"; chmod 555 "$HOME/.clutch/watch"; fresh "$SF"; stp "$T/run" "$IN"
   chmod 755 "$HOME/.clutch/watch"; sblocked PB9; asked PB9 0
   [ -e "$PF" ] || { echo "FAIL: PB9 -- .poll removed"; fail=1; }
+  # PB9c: a young dead .poll that cannot be removed: not dropped, rc 3
+  # stands: no beat ask; the sweep asks.
+  rec; prec "$DEAD"; : > "$WK"; chmod 555 "$HOME/.clutch/watch"; fresh "$SF"; stp "$T/run" "$IN"
+  chmod 755 "$HOME/.clutch/watch"; sblocked PB9c; asked PB9c 0
+  [ -e "$PF" ] || { echo "FAIL: PB9c -- .poll removed"; fail=1; }
   # PB9b: the record unreadable (grep rc 2) with a stale .poll: no beat ask,
   # .poll bytes unchanged, no sweep ask.
   rec; prec "$DEAD" "$OLD"; PB_P=$(cat "$PF"); chmod 000 "$BF"; fresh "$SF"; stp "$T/run" "$IN"
@@ -647,8 +652,9 @@ $(wl 290 "proj moved: landed 'x'")"
 [ "$(lastn)" = 2 ] || { echo "FAIL: H2 -- want 2 last lines: $(cat "$BF")"; fail=1; }
 [ "$(tail -n 1 "$BF")" = "last $((NOW - 120))" ] || { echo "FAIL: H2 -- last is not now - 120: $(tail -n 1 "$BF")"; fail=1; }
 
-# H3: a second read straight after prints the waits only.
-bw '@0123abcd'
+# H3: a second read straight after prints the waits only (the clock pinned to
+# H2's, so a long suite never reaches the grace-window move).
+bwat "$NOW" '@0123abcd'
 is H3 0 "$(wl 900 'proj wait: gh:o/r#9 b1 plain')"
 [ "$(lastn)" = 3 ] || { echo "FAIL: H3 -- want 3 last lines: $(cat "$BF")"; fail=1; }
 

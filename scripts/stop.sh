@@ -33,9 +33,9 @@ PRELUDE=$(dirname "$0")/prelude.sh
 # prints. A dead poller that started under one round ago (poll.sh's sleep,
 # CLUTCH_POLL_SLEEP when 1-5 digits >= 1, else 600 s) and never woke (an
 # empty .woke, or its .poll newer than .woke) died young (clutch_poll_young),
-# say killed by a Bash timeout or a headless exit: its .poll is
-# dropped quietly and the dedupe applies as with no .poll, so a poller that
-# keeps dying young is asked for once, not at every stop.
+# say killed by a Bash timeout or a headless exit: its .poll is dropped
+# quietly and the dedupe applies as with no .poll, so a poller that keeps
+# dying young is asked for once, not at every stop; a failed drop asks nothing.
 # A set with any other wait is asked the 30-minute watch through <tag8> and
 # leaves .poll alone. CLUTCH_POLL=off, or a scripts dir that is not absolute,
 # holds a byte outside the spelled-out class, or has no poll.sh, keeps the
@@ -70,10 +70,9 @@ if [ "${CLUTCH_WATCH:-}" != off ]; then
               clutch_poll_alive "$WATCH_TAG"
               WATCH_RC=$?
               # Died young (clutch_poll_young): drop its .poll quietly and
-              # dedupe as rc 1.
+              # dedupe as rc 1; a failed rm keeps rc 3.
               if [ "$WATCH_RC" = 3 ] && clutch_poll_young "$WATCH_TAG"; then
-                rm -f "$WATCH_FILE.poll" 2>/dev/null
-                WATCH_RC=1
+                rm -f "$WATCH_FILE.poll" 2>/dev/null && WATCH_RC=1
               fi
               case $WATCH_RC in 1 | 3) ;; *) WATCH_RC=0 ;; esac
               WATCH_NEW=$WATCH_OWN
@@ -155,8 +154,7 @@ if [ "${CLUTCH_BEAT:-}" != off ] && [ "${CLUTCH_WATCH:-}" != off ]; then
                     clutch_poll_alive "$BEAT_TAG" beat
                     BEAT_RC=$?
                     if [ "$BEAT_RC" = 3 ] && clutch_poll_young "$BEAT_TAG"; then
-                      rm -f "$BEAT_POLL" 2>/dev/null
-                      BEAT_RC=1
+                      rm -f "$BEAT_POLL" 2>/dev/null && BEAT_RC=1
                     fi
                     ;;
                 esac

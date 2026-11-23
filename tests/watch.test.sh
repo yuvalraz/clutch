@@ -15,7 +15,7 @@
 # session holds an owned open wait not yet recorded in ~/.clutch/watch/<tag8>
 # and no "prompt" whose whole value is /clutch:watch @<tag8>; S19 bounds the
 # time on a ~160 KB message), all under CLUTCH_POLL=off, the 2.16.2 asks.
-# P1-P16 with P3b, P6b-P6e and P10b cover the silent-check gate with
+# P1-P16 with P3b-P3l, P6b-P6e and P10b cover the silent-check gate with
 # CLUTCH_POLL unset (WPOLL, WCRON30, the stale .poll restart, the path rule,
 # the 2.16.2 record read on upgrade and 75ddf0e's ask after a revert); PZ
 # proves the off mode matches 75ddf0e byte for byte, files included.
@@ -547,10 +547,11 @@ NOTPOLL=$(bg sleep 60)
 DEAD=$(bg true)
 trap 'kill $LIVE $NOTPOLL 2>/dev/null; chmod -R u+rwx "$T" 2>/dev/null; rm -rf "$T"' EXIT
 sleep 1
-# prec <pid> [<start epoch>]: a .poll naming that pid, started now by default.
+# prec <pid> [<start epoch>]: a .poll naming that pid, started now (the clock
+# read at the fixture, not at suite start) by default.
 # OLD is a start more than one round (poll.sh's default 600 s sleep) ago.
 OLD=$((NOW - 700))
-prec() { mkdir -p "$HOME/.clutch/watch" && printf '%s %s\n' "$1" "${2:-$NOW}" > "$PP"; }
+prec() { mkdir -p "$HOME/.clutch/watch" && printf '%s %s\n' "$1" "${2:-$(date +%s)}" > "$PP"; }
 # snap: the ~/.clutch tree, modes and contents, to prove a stop wrote nothing.
 snap() { ls -lRa "$HOME" 2>/dev/null | grep -v '^total'; cat "$HOME"/.clutch/watch/* 2>/dev/null; }
 same_tree() { [ "$(snap)" = "$1" ] || { echo "FAIL: $2 -- the stop changed ~/.clutch"; fail=1; }; }
@@ -642,12 +643,14 @@ for line in "abc $NOW" "0 $NOW" "$DEAD 09" "$DEAD 99999999999999999999" "$DEAD $
   quiet "P3g again [$line]"
 done
 # P3h: under dash an oversized start still asks once with rc 0.
-if command -v dash >/dev/null 2>&1; then
+if ! command -v dash >/dev/null 2>&1; then
+  echo "SKIP: P3h (no dash)"
+else
   owned1
   stp "$PL1" "$IN"
   prec "$DEAD" 99999999999999999999
-  OUT=$(cd "$PL1" && printf '%s' "$IN" | CLUTCH_WATCH=$WATCH CLUTCH_POLL=$POLL GIT_CEILING_DIRECTORIES=$T dash "$T/scripts/stop.sh" 2>/dev/null); RC=$?
-  is "P3h dash oversized start" 0 "$WPOLL"
+  OUT=$(cd "$PL1" && printf '%s' "$IN" | CLUTCH_WATCH=$WATCH CLUTCH_POLL=$POLL GIT_CEILING_DIRECTORIES=$T dash "$T/scripts/stop.sh" 2>"$T/err"); RC=$?
+  is "P3h dash oversized start (dash stderr [$(cat "$T/err")])" 0 "$WPOLL"
 fi
 # P3i: the empty .woke a poller creates in its start second is not a wake:
 # a young death with it is quiet.
@@ -665,12 +668,40 @@ for nap in abc 0 00 999999; do
   owned1
   stp "$PL1" "$IN"
   rm -f "$FP.woke"
-  prec "$DEAD" "$((NOW - 100))"
+  prec "$DEAD" "$(($(date +%s) - 100))"
   CLUTCH_POLL_SLEEP=$nap; export CLUTCH_POLL_SLEEP
   OUT=$(cd "$PL1" && printf '%s' "$IN" | CLUTCH_WATCH=$WATCH CLUTCH_POLL=$POLL GIT_CEILING_DIRECTORIES=$T sh "$T/scripts/stop.sh" 2>&1); RC=$?
   unset CLUTCH_POLL_SLEEP
   is "P3j CLUTCH_POLL_SLEEP=$nap (stderr included)" 0 ''
 done
+# P3k: the 5-digit edge of the round: CLUTCH_POLL_SLEEP=99999 is kept (a
+# start 700 s ago died young: quiet), 100000 reads as 600 (not young: WPOLL).
+for nap in 99999 100000; do
+  owned1
+  stp "$PL1" "$IN"
+  rm -f "$FP.woke"
+  prec "$DEAD" "$OLD"
+  CLUTCH_POLL_SLEEP=$nap; export CLUTCH_POLL_SLEEP
+  stp "$PL1" "$IN"
+  unset CLUTCH_POLL_SLEEP
+  if [ "$nap" = 99999 ]; then quiet "P3k CLUTCH_POLL_SLEEP=$nap"; else is "P3k CLUTCH_POLL_SLEEP=$nap" 0 "$WPOLL"; fi
+done
+# P3l: a young death whose .poll cannot be removed (~/.clutch/watch 555) is
+# not read as dropped: rc 3 stands and the ask stops at the failed rm: quiet,
+# .poll left.
+if [ "$(id -u)" = 0 ]; then
+  echo "SKIP: P3l (root writes through chmod)"
+else
+  owned1
+  stp "$PL1" "$IN"
+  add 50 'proj wait: gh:o/r#2 b1 @0123abcd pr two'
+  prec "$DEAD"
+  chmod 555 "$HOME/.clutch/watch"
+  stp "$PL1" "$IN"
+  chmod 755 "$HOME/.clutch/watch"
+  quiet "P3l young .poll not removable"
+  [ -e "$PP" ] || { echo "FAIL: P3l -- .poll removed"; fail=1; }
+fi
 # P5: any /clutch:watch @tag cron arms the set, a stale .poll included.
 for c in '*/15 8-21 * * *' '*/10 8-21 * * *' '7,37 8-21 * * *'; do
   owned1
