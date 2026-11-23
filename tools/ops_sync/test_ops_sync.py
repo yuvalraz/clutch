@@ -736,9 +736,13 @@ class People(unittest.TestCase):
         self.assertTrue(os.path.exists(s.path("opsview", "docs", "waits",
                                               ops_sync.enc_doc_id("mail:%s %s" % (canary, TAG)) + ".json")))
         s.run("--ack", *ack_args(rows, 1))
+        closed = load(s.path("opsview", "docs", "waits", wait_h + ".json"))
+        time.sleep(1.1)  # a later second, so a closed wait re-stamped every run shows up
         rc, out, _ = s.run()
         self.assertEqual((rc, out), (0, "OPS: %s\nOPS: unchanged\n" % URL))
-        self.assertEqual(load(s.path("opsview", "docs", "waits", wait_h + ".json"))["state"], "closed")
+        doc = load(s.path("opsview", "docs", "waits", wait_h + ".json"))
+        self.assertEqual(doc["state"], "closed")
+        self.assertEqual(doc["closed_at"], closed["closed_at"])
 
     def test_people_unreadable(self):
         s = Scratch(self)
