@@ -64,26 +64,27 @@ def ticket_of(slugs: list, texts: list) -> str | None:
     return None
 
 
+def guard_hit(value: str, guard_lines: list) -> bool:
+    """True when `value` holds a guard line or sits inside one."""
+    folded = value.casefold()
+    return any(g.casefold() in folded or (len(value) >= 16 and folded in g.casefold()) for g in guard_lines)
+
+
 def people_guard(doc: dict, guard_lines: list) -> int:
     """Blank every string in `doc` that holds a guard line or sits inside one; returns the count."""
-    guards = [g.casefold() for g in guard_lines]
-
-    def hit(value):
-        folded = value.casefold()
-        return any(g in folded or (len(value) >= 16 and folded in g) for g in guards)
 
     def walk(node):
         count = 0
         items = node.items() if isinstance(node, dict) else enumerate(node)
         for key, value in list(items):
-            if isinstance(value, str) and hit(value):
+            if isinstance(value, str) and guard_hit(value, guard_lines):
                 node[key] = None if key in NULLABLE else ""
                 count += 1
             elif isinstance(value, (dict, list)):
                 count += walk(value)
         return count
 
-    return walk(doc) if guards else 0
+    return walk(doc) if guard_lines else 0
 
 
 def iso(epoch: int) -> str:
@@ -115,10 +116,11 @@ def parse_worklog(lines: list, now: int) -> list:
     return entries
 
 
-def session_docs(entries: list) -> dict:
+def session_docs(entries: list, ident=enc_doc_id) -> dict:
     groups = {}
     for e in entries:
-        key = ("sessions", e["tag"] or enc_doc_id("repo:" + e["repo"]))
+        # A tag (@ + 8 hex) is shorter than any guard line, so it never holds people text.
+        key = ("sessions", e["tag"] or ident("repo:" + e["repo"]))
         groups.setdefault(key, []).append(e)
     docs = {}
     for key, group in groups.items():
@@ -143,7 +145,7 @@ def session_docs(entries: list) -> dict:
     return docs
 
 
-def wait_docs(open_wait_lines: list, previous_docs: dict, now: int) -> dict:
+def wait_docs(open_wait_lines: list, previous_docs: dict, now: int, ident=enc_doc_id) -> dict:
     docs = {}
     for line in open_wait_lines:
         fields = line.split()
@@ -153,7 +155,7 @@ def wait_docs(open_wait_lines: list, previous_docs: dict, now: int) -> dict:
         tag = fields[5] if len(fields) > 5 and TAG_RE.match(fields[5]) else None
         text = " ".join(fields[6:] if tag else fields[5:])[:200]
         opened = iso(int(fields[0]))
-        doc_id = enc_doc_id(ref + " " + tag if tag else ref)
+        doc_id = ident(ref + " " + tag if tag else ref)
         docs[("waits", doc_id)] = {
             "kind": "wait", "ref": ref, "wait_kind": ref.split(":", 1)[0], "tag": tag,
             "repo": fields[1], "baseline": fields[4], "text": text,
@@ -167,13 +169,15 @@ def wait_docs(open_wait_lines: list, previous_docs: dict, now: int) -> dict:
     return docs
 
 
-def build_docs(worklog_lines: list, open_wait_lines: list, sweep_record, previous_docs: dict, now: int) -> dict:
+def build_docs(worklog_lines: list, open_wait_lines: list, sweep_record, previous_docs: dict, now: int,
+               ident=enc_doc_id) -> dict:
     """{(collection, doc_id): document} for every session and wait to (re)write.
 
     `sweep_record` is the IF-6 record (S1b); unused until the sweep documents land.
+    `ident` maps a document's key to its id; sync passes one that hashes keys holding people text.
     """
-    docs = session_docs(parse_worklog(worklog_lines, now))
-    docs.update(wait_docs(open_wait_lines, previous_docs, now))
+    docs = session_docs(parse_worklog(worklog_lines, now), ident)
+    docs.update(wait_docs(open_wait_lines, previous_docs, now, ident))
     return docs
 
 
@@ -249,16 +253,18 @@ def read_worklog(home: str) -> tuple:
                               cwd=home, timeout=20, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
     except (OSError, subprocess.SubprocessError):
         raise Fail("worklog unreadable")
-    if proc.returncode == 1:
+    worklog = Path(home) / ".clutch" / "worklog.md"
+    # rc 1 also covers a dangling link; only a worklog that is truly absent means "none".
+    if proc.returncode == 1 and not os.path.lexists(worklog):
         return [], []
     if proc.returncode != 0:
         raise Fail("worklog unreadable")
     try:
-        raw = (Path(home) / ".clutch" / "worklog.md").read_bytes()
-    except FileNotFoundError:
-        return [], []
+        raw = worklog.read_bytes()
     except OSError:
-        raise Fail("worklog unreadable")
+        if os.path.lexists(worklog):
+            raise Fail("worklog unreadable")
+        return [], []
     lines = raw.decode("utf-8", "replace").splitlines()[-2000:]
     return lines, proc.stdout.decode("utf-8", "replace").splitlines()
 
@@ -291,8 +297,16 @@ def sync(home: str) -> int:
     now = int(time.time())
     state = load_state(base)
     previous = read_docs(docs_dir)
-    docs = build_docs(worklog_lines, open_lines, None, previous, now)
-    blanked = sum(people_guard(doc, guard) for doc in docs.values())
+    hashed = []
+
+    def ident(key):
+        if guard_hit(key, guard):
+            hashed.append(key)
+            return "~h" + hashlib.sha256(key.encode("utf-8")).hexdigest()[:40]
+        return enc_doc_id(key)
+
+    docs = build_docs(worklog_lines, open_lines, None, previous, now, ident)
+    blanked = len(hashed) + sum(people_guard(doc, guard) for doc in docs.values())
     if blanked:
         print("ops_sync: people-file text kept out of %d fields" % blanked, file=sys.stderr)
     try:

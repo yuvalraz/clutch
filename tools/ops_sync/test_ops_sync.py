@@ -412,6 +412,27 @@ class Sync(unittest.TestCase):
         self.assertTrue(err.startswith("ops_sync: "))
         self.assertFalse(os.path.exists(s.path("opsview")))
 
+    def test_worklog_dangling_link_is_unreadable(self):
+        # A dangling link is not "no worklog": reading it as empty would close every open wait.
+        s = Scratch(self)
+        s.config()
+        s.worklog(["%d demo-repo wait: gh:demo/app#5 b1 %s review" % (s.now - 100, TAG)])
+        self.assertEqual(s.run()[0], 0)
+        before = tree(s.path("opsview"))
+        os.remove(s.path("worklog.md"))
+        os.symlink(os.path.join(s.base, "gone.md"), s.path("worklog.md"))
+        rc, out, err = s.run()
+        self.assertEqual((rc, out, err), (1, "", "ops_sync: worklog unreadable\n"))
+        self.assertEqual(tree(s.path("opsview")), before)
+
+    def test_empty_worklog(self):
+        s = Scratch(self)
+        s.config()
+        s.worklog([])
+        self.assertEqual(os.path.getsize(s.path("worklog.md")), 0)
+        rc, out, err = s.run()
+        self.assertEqual((rc, out, err), (0, "OPS: %s\nOPS: unchanged\n" % URL, ""))
+
     def test_open_loops_timeout_is_exit_1(self):
         s = Scratch(self)
         self.fixture(s)
@@ -523,6 +544,20 @@ class Waits(unittest.TestCase):
                          ("open", "b2", iso(s.now - 100), None, iso(s.now - 100)))
 
 
+    def test_two_tags_waiting_on_one_ref(self):
+        s = Scratch(self)
+        s.config()
+        s.worklog(["%d demo-repo wait: gh:demo/app#5 b1 %s review" % (s.now - 300, TAG),
+                   "%d demo-repo wait: gh:demo/app#5 b1 %s review too" % (s.now - 200, TAG2)])
+        s.run()
+        other = "gh:demo~2Fapp~235~20~400f0f0f0f"
+        path = lambda d: s.path("opsview", "docs", "waits", d + ".json")
+        self.assertEqual((load(path(self.REF_ID))["state"], load(path(other))["state"]), ("open", "open"))
+        s.worklog(["%d demo-repo moved: gh:demo/app#5 %s merged" % (s.now - 100, TAG)], mode="a")
+        s.run()
+        self.assertEqual((load(path(self.REF_ID))["state"], load(path(other))["state"]), ("closed", "open"))
+
+
 class Ack(unittest.TestCase):
     def synced(self):
         s = Scratch(self)
@@ -622,6 +657,37 @@ class People(unittest.TestCase):
                 self.assertNotIn(canary, text)
         for canary in self.CANARIES:
             self.assertNotIn(canary, err.casefold())
+
+    def test_people_guard_doc_ids(self):
+        # A single-token canary in a wait ref and in a repo name never reaches an id or a path.
+        canary = "dana.canary@example.com"
+        s = Scratch(self)
+        s.config()
+        with open(s.path("people.md"), "w") as handle:
+            handle.write("- %s\n" % canary)
+        s.worklog(["%d %s on: planning" % (s.now - 20, canary),
+                   "%d demo-repo wait: mail:%s b1 %s reply" % (s.now - 10, canary, TAG)])
+        rc, out, err = s.run()
+        self.assertEqual(rc, 0)
+        rows = doc_lines(out)
+        self.assertEqual(sorted(c for c, _, _, _ in rows), ["sessions", "sessions", "waits"])
+        forms = (canary, ops_sync.enc_doc_id(canary), ops_sync.enc_doc_id(canary).replace("~", "%"))
+        for _, d, path, _ in rows:
+            self.assertRegex(d, ID_RE)
+            self.assertNotIn(canary, decode_id(d) or "")
+            for form in forms:
+                self.assertNotIn(form.casefold(), d.casefold())
+                self.assertNotIn(form.casefold(), path.casefold())
+        hashed = [d for _, d, _, _ in rows if d.startswith("~h")]
+        self.assertEqual(sorted(hashed), sorted([
+            "~h" + hashlib.sha256(("repo:" + canary).encode()).hexdigest()[:40],
+            "~h" + hashlib.sha256(("mail:%s %s" % (canary, TAG)).encode()).hexdigest()[:40]]))
+        # Two fields (repo, ref) and two ids.
+        self.assertEqual(err, "ops_sync: people-file text kept out of 4 fields\n")
+        # A second run keeps the same ids: the hashed wait stays open, not closed and re-keyed.
+        s.run("--ack", *ack_args(rows, 1))
+        rc, out, _ = s.run()
+        self.assertEqual((rc, out), (0, "OPS: %s\nOPS: unchanged\n" % URL))
 
     def test_people_unreadable(self):
         s = Scratch(self)
