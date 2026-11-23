@@ -676,5 +676,109 @@ class Static(unittest.TestCase):
         self.assertLessEqual(set(tools), set(ALLOWED_TOOLS))
 
 
+# ---- the page leg (S4b): render script, subscriptions, watches, states -------
+
+LINEAR_COPY = ("Reconnect Linear in claude.ai Settings → Connectors",
+               "Add Linear in claude.ai Settings → Connectors",
+               "Linear is not allowed for this page",
+               "Choose which Linear connector this page uses when it asks",
+               "Linear needs your approval for this page",
+               "Linear unavailable: tickets are grouped by id")
+PAGE_REQUIRED = ('claude.use("db")', 'claude.use("mcp")', 'orderBy("updated_at", "desc")', "limit(500)",
+                 '"Linear"', '"list_projects"', 'member: "me"', 'assignee: "me"', '"list_issues"', "get_initiative",
+                 "refetchInterval: 900000", "OPS_PROJECT_FIELDS", "OPS_ASSIGNED_FIELDS",
+                 "= 40;", "= 15;", "ops view unavailable", "ops view data has not arrived yet",
+                 "No initiative: link these projects to an initiative", "Outside your projects: initiative not read",
+                 "first 100 shown") + LINEAR_COPY
+# Verb-shaped tool names; any of them in the page must be one of the three reads.
+TOOL_NAME_RE = re.compile(r'"((?:list|get|save|create|update|delete|search|archive|remove)_[a-z_]+)"')
+ALLOWED_HOSTS = ("fonts.googleapis.com", "cdnjs.cloudflare.com")
+
+
+def render_block():
+    return script_block(page_source(), 'id="ops-render"')
+
+
+def without_demo(source):
+    return re.sub(r'<script type="application/json" id="demo-data">.*?</script>', "", source, flags=re.S)
+
+
+class Page(unittest.TestCase):
+    def test_page_static(self):
+        source = page_source()
+        render = render_block()
+        self.assertIsNotNone(render, "ops-render block missing")
+        missing = [text for text in PAGE_REQUIRED if text not in source]
+        self.assertEqual(missing, [])
+        # The four collections, each subscribed once through one loop.
+        self.assertIn('["builds", "sessions", "waits", "sweep"]', render)
+        self.assertIn('db.collection(c).orderBy("updated_at", "desc").limit(500).onSnapshot(', render)
+        self.assertEqual(render.count(".onSnapshot("), 1)
+        self.assertNotIn("meta/config", source)
+        self.assertIn("setTimeout(", render)
+        self.assertIn("10000", render)
+
+    def test_page_read_only(self):
+        source = page_source()
+        self.assertIsNotNone(render_block(), "ops-render block missing")
+        found = [text for text in PP8_BANNED + ("new Map", "new Set", "delete ", "<script src", "<link")
+                 if text in source]
+        self.assertEqual(found, [])
+        self.assertIn(".textContent = ", render_block())
+        hosts = set(re.findall(r"https://([^/\"')\s]+)", without_demo(source)))
+        self.assertLessEqual(hosts, set(ALLOWED_HOSTS))
+
+    def test_page_tool_allowlist(self):
+        source = page_source()
+        render = render_block()
+        self.assertIsNotNone(render, "ops-render block missing")
+        names = set(TOOL_NAME_RE.findall(source))
+        self.assertTrue(names)
+        self.assertLessEqual(names, set(ALLOWED_TOOLS))
+        servers = re.findall(r"(?:watchTool|callTool)\(\s*([^,]+),", render)
+        self.assertTrue(servers)
+        self.assertEqual(set(servers), {'"Linear"'})
+
+    def test_page_approval_button(self):
+        source = page_source()
+        self.assertEqual(source.count("callTool("), 1)
+        at = source.find("callTool(")
+        before = source[max(0, at - 900):at]
+        for text in ('"approval_required"', '"button"', '"Allow Linear"', ".disabled = true",
+                     'addEventListener("click"'):
+            self.assertIn(text, before)
+        self.assertRegex(source[at:at + 120], r"callTool\(\"Linear\", (\w+)\.tool, \1\.input\)")
+
+    def test_page_watch_once(self):
+        source = page_source()
+        render = render_block()
+        self.assertIsNotNone(render, "ops-render block missing")
+        self.assertEqual(source.count(".watchTool("), 3)
+        self.assertIn('.watchTool("Linear", "list_projects", ', render)
+        self.assertIn('{member: "me", fields: OPS_PROJECT_FIELDS}', render)
+        self.assertIn('.watchTool("Linear", "list_issues", ', render)
+        self.assertRegex(render, r'\{assignee: "me", [^}]*fields: OPS_ASSIGNED_FIELDS')
+        entry = re.search(r'\.watchTool\("Linear", (\w+)\.tool, \1\.input', render)
+        self.assertIsNotNone(entry, "the add loop's watch takes tool and input from the entry")
+        diff = render.find("watchDiff(Object.keys(table), ")
+        self.assertGreater(diff, 0, "render calls watchDiff over the table's keys")
+        data = render.rfind('ev.type === "data"', 0, diff)
+        self.assertGreater(data, 0)
+        self.assertNotIn("else", render[data:diff], "the diff runs only on a data delivery")
+        drop = render.find(".drop.forEach(", diff)
+        add = render.find(".add.forEach(", diff)
+        self.assertTrue(diff < drop < add < entry.start(), "drops unsubscribe before adds register")
+        self.assertIn("table = next;", render[entry.start():])
+        self.assertNotIn("watchDiff(", render[:diff])
+
+    def test_page_theme(self):
+        source = page_source()
+        for text in ("@media (prefers-color-scheme: dark)", ':root:not([data-theme="light"])',
+                     ':root[data-theme="dark"]', "prefers-reduced-motion", "max(16px", "#demo"):
+            self.assertTrue(text in source, text)
+        self.assertRegex(source, r"body \{[^}]*background: var\(--bg\)")
+        self.assertRegex(source, r"@media \(max-width: \d+px\) \{[^}]*svg\.edges \{ display: none")
+
+
 if __name__ == "__main__":
     unittest.main()

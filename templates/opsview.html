@@ -3,10 +3,140 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="claude:viewport-fit-sides" content="cover">
 <title>Ops view</title>
+<style>
+@import url("https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap");
+/* Top-down: objective bands hold initiative zones, zones hold project lanes, lanes hold ticket nodes;
+   the floor shows what moves now, the waits list everything still open. Edges are an SVG overlay. */
+:root {
+  --bg: #eef0f2; --panel: #ffffff; --ink: #1b2026; --muted: #5d6874; --line: #c9cfd6;
+  --accent: #d98a00; --accent-ink: #6b4300;
+  --done: #2f7d57; --active: #2563b8; --next: #b26a00; --gap: #b8323a; --super: #7b8591;
+  --band: #e3e8ee; --lane: #f4f6f8;
+  --display: "Barlow Condensed", "Arial Narrow", system-ui, sans-serif;
+  --body: "Inter", system-ui, -apple-system, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #15181c; --panel: #1d2127; --ink: #e6e9ed; --muted: #9aa4af; --line: #343b44;
+  --accent: #f0a020; --accent-ink: #f6c46a;
+  --done: #4fb585; --active: #5b9bf0; --next: #e09a3a; --gap: #e0626a; --super: #7f8a96;
+  --band: #1b2129; --lane: #22272e; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #15181c; --panel: #1d2127; --ink: #e6e9ed; --muted: #9aa4af; --line: #343b44;
+  --accent: #f0a020; --accent-ink: #f6c46a;
+  --done: #4fb585; --active: #5b9bf0; --next: #e09a3a; --gap: #e0626a; --super: #7f8a96;
+  --band: #1b2129; --lane: #22272e; color-scheme: dark }
+* { box-sizing: border-box }
+body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--body); line-height: 1.5;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 24px 48px }
+main { max-width: 1240px; margin: 0 auto; display: grid; grid-template-columns: minmax(0, 1fr); gap: 24px; overflow-wrap: anywhere }
+main * { min-width: 0 }
+h1, h2, h3 { font-family: var(--display); font-weight: 600; letter-spacing: .01em; margin: 0; text-wrap: balance }
+h1 { font-size: 2.4rem; line-height: 1.05 }
+h2 { font-size: 1.5rem }
+h3 { font-size: 1.25rem }
+p { margin: 0 }
+a { color: var(--active) }
+a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px }
+.eyebrow { font-family: var(--mono); font-size: .72rem; letter-spacing: .08em; text-transform: uppercase; color: var(--muted) }
+.mono { font-family: var(--mono); font-size: .78rem }
+.muted { color: var(--muted) }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 16px; display: grid; gap: 12px; min-width: 0 }
+
+/* header and notices */
+.head { display: grid; gap: 6px }
+.notices { display: grid; gap: 8px }
+.notice { border-left: 4px solid var(--gap); background: var(--panel); padding: 10px 14px; display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center }
+.notice.info { border-left-color: var(--accent) }
+.notice button { font: inherit; font-weight: 600; color: var(--panel); background: var(--ink); border: 0; border-radius: 4px; padding: 6px 12px; cursor: pointer }
+.notice button:disabled { opacity: .5; cursor: default }
+
+/* the floor */
+.floor { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px }
+.station { border: 2px solid var(--active); border-radius: 5px; padding: 8px 10px; display: grid; gap: 2px; background: color-mix(in srgb, var(--active) 5%, var(--panel)) }
+.station.waiting { border-color: var(--next); background: color-mix(in srgb, var(--next) 6%, var(--panel)) }
+.station.session { border-color: var(--done); background: color-mix(in srgb, var(--done) 5%, var(--panel)) }
+.col { display: grid; gap: 8px; align-content: start }
+.moves { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px }
+.moves li { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 2px 10px; font-size: .86rem }
+
+/* the map */
+.map { position: relative; display: grid; gap: 16px }
+svg.edges { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 2; overflow: visible }
+svg.edges path { fill: none; stroke: var(--muted); stroke-width: 1.5; opacity: .55 }
+svg.edges path.session { stroke-dasharray: 5 4 }
+svg.edges path.hot { stroke: var(--accent); stroke-width: 2.25; opacity: 1 }
+svg.edges path.dim { opacity: .12 }
+.band { border: 1px solid var(--line); border-radius: 6px; padding: 12px; display: grid; gap: 12px; background: var(--band) }
+.zone { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 12px; display: grid; gap: 10px; min-width: 0 }
+.zone.flagged { border: 2px dashed var(--gap) }
+.zone.flagged > .zone-head h3 { color: var(--gap) }
+.zone.outside { border-style: dashed }
+.zone-head { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline }
+.lane { display: grid; grid-template-columns: 180px minmax(0, 1fr); gap: 12px; align-items: start; padding: 10px; border-radius: 4px; background: var(--lane) }
+.lane-name { display: grid; gap: 2px; min-width: 0 }
+.lane-name strong { font-family: var(--display); font-size: 1.15rem; font-weight: 600; overflow-wrap: anywhere }
+.lane-name a, .lane-name small { font-family: var(--mono); font-size: .72rem }
+.lane-name small { color: var(--next) }
+.nodes { display: flex; flex-wrap: wrap; gap: 10px; min-width: 0 }
+.node { position: relative; z-index: 3; text-align: left; font: inherit; color: var(--ink); background: var(--panel); border: 2px solid var(--line); border-radius: 5px; padding: 6px 9px; cursor: pointer; display: grid; gap: 2px; width: 200px; max-width: 100% }
+.node .id { font-family: var(--mono); font-size: .7rem; color: var(--muted) }
+.node .t { font-size: .84rem; font-weight: 500; line-height: 1.25; overflow-wrap: anywhere }
+.node .st { font-family: var(--mono); font-size: .68rem; color: var(--muted) }
+.node.busy { border-color: var(--active) }
+.node[aria-pressed="true"] { box-shadow: 0 0 0 3px var(--accent) }
+.node.faded { opacity: .4 }
+.badges { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 2px }
+.badge { font-family: var(--mono); font-size: .66rem; padding: 0 6px; border-radius: 99px; border: 1px solid currentColor; overflow-wrap: normal }
+.badge.build { color: var(--active) } .badge.session { color: var(--done) } .badge.wait { color: var(--next) } .badge.sweep { color: var(--super) }
+.items { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px }
+.items li { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; font-size: .86rem }
+
+/* detail and waits */
+.detail { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) }
+.detail .meta { display: flex; flex-wrap: wrap; gap: 8px; align-items: baseline }
+.links { display: grid; gap: 6px; align-content: start }
+.links button { font: inherit; color: var(--active); background: none; border: 0; padding: 0; cursor: pointer; text-align: left; text-decoration: underline; text-underline-offset: 2px }
+.waits { list-style: none; margin: 0; padding: 0; display: grid }
+.waits li { display: grid; grid-template-columns: 120px minmax(0, 1.2fr) minmax(0, 2fr) minmax(0, 1fr) 130px; gap: 4px 12px; padding: 8px 0; border-top: 1px solid var(--line); font-size: .86rem; align-items: baseline }
+.waits li > * { min-width: 0; overflow-wrap: anywhere }
+footer { color: var(--muted); font-size: .78rem }
+@media (max-width: 820px) {
+  .floor, .detail { grid-template-columns: minmax(0, 1fr) }
+  .lane { grid-template-columns: minmax(0, 1fr) }
+  .waits li { grid-template-columns: 120px minmax(0, 1fr) }
+}
+@media (max-width: 820px) { svg.edges { display: none } }
+@media (prefers-reduced-motion: no-preference) { .node { transition: opacity .15s, box-shadow .15s } }
+</style>
 </head>
 <body>
-<main id="app"></main>
+<main id="app">
+  <header class="head">
+    <div class="eyebrow" id="live">Ops view</div>
+    <h1>Ops view</h1>
+    <p class="muted">What moves now, the map of your Linear work with builds, sessions, waits and open items on their tickets, and every open wait.</p>
+  </header>
+  <div class="notices" id="notices" role="status" aria-live="polite"></div>
+  <section class="panel" aria-labelledby="floor-h">
+    <div><div class="eyebrow">On the floor now</div><h2 id="floor-h">What is moving</h2></div>
+    <div class="floor" id="floor"></div>
+  </section>
+  <section class="panel" aria-labelledby="map-h">
+    <div><div class="eyebrow">Objectives, initiatives, projects, tickets</div><h2 id="map-h">Map</h2></div>
+    <div class="map" id="map"><svg class="edges" id="edges" aria-hidden="true"></svg><div id="zones" class="map"></div></div>
+  </section>
+  <section class="panel detail" id="detail" aria-live="polite" aria-label="Selected ticket"></section>
+  <section class="panel" aria-labelledby="waits-h">
+    <div><div class="eyebrow">Waits and open items</div><h2 id="waits-h">Everything still open</h2></div>
+    <ul class="waits" id="waits"></ul>
+  </section>
+  <footer id="foot">Read-only: this page reads Linear and the ops view data; it changes nothing.</footer>
+</main>
 
 <script type="application/json" id="demo-data">
 {
@@ -352,6 +482,469 @@ function opsModel(input) {
   return {zones: zones, noInitiative: noInitiative, outside: outside, other: other, unlinked: unlinked,
           floor: floor, waitsList: waitsList, edges: edges, lastChange: lastChange};
 }
+</script>
+
+<script id="ops-render">
+// Render, subscriptions and watches. Read-only: the one callTool is the Allow Linear button's.
+// Text goes in through textContent only; every object is rebuilt, never edited in place.
+(function () {
+  "use strict";
+  var WATCH = {refetchInterval: 900000};
+  var LINEAR_COPY = {
+    needs_reauth: "Reconnect Linear in claude.ai Settings → Connectors",
+    server_not_connected: "Add Linear in claude.ai Settings → Connectors",
+    not_in_manifest: "Linear is not allowed for this page",
+    selection_required: "Choose which Linear connector this page uses when it asks",
+    approval_required: "Linear needs your approval for this page"
+  };
+  var LINEAR_OTHER = "Linear unavailable: tickets are grouped by id";
+  // Authz denials retract that watch's data (mcp.d.ts); transient errors keep the last good payload.
+  var RETRACT = {needs_reauth: 1, server_not_connected: 1, not_in_manifest: 1, blocked_by_policy: 1,
+                 approval_required: 1, selection_required: 1};
+  var DEMO = location.hash.indexOf("#demo") === 0;
+  var state = {docs: {}, arrived: false, late: false, dbDown: false, mcpDown: false, linear: {}, errors: {},
+               asking: false, selected: null, now: null};
+  var table = {};  // project:/initiative: key -> that watch's Unsubscribe
+  var mcp = null;
+  var model = null, nodeEls = {}, drawn = 0;
+
+  function copyWith(obj, key, value) {
+    var next = {};
+    Object.keys(obj).forEach(function (k) { if (k !== key) next[k] = obj[k]; });
+    if (value !== undefined) next[key] = value;
+    return next;
+  }
+  function keep(obj, keys) {
+    var next = {};
+    keys.forEach(function (k) { if (Object.prototype.hasOwnProperty.call(obj, k)) next[k] = obj[k]; });
+    return next;
+  }
+  function el(tag, cls, text) {
+    var node = document.createElement(tag);
+    if (cls) node.className = cls;
+    if (text !== undefined && text !== null) node.textContent = String(text);
+    return node;
+  }
+  function link(url, text, cls) {
+    if (typeof url !== "string" || !/^https:\/\//.test(url)) return null;
+    var a = el("a", cls, text);
+    a.href = url;
+    a.target = "_blank";
+    a.rel = "noopener";
+    return a;
+  }
+  function append(parent, kids) {
+    kids.forEach(function (k) { if (k) parent.appendChild(k); });
+    return parent;
+  }
+  function when(v) {
+    var t = opsTime(v);
+    if (t === null) return "";
+    return new Date(t).toLocaleString([], {month: "short", day: "numeric", hour: "2-digit", minute: "2-digit"});
+  }
+
+  // ---- db: four subscriptions, each made once ----
+  function startDb(db) {
+    if (!db) {
+      state.dbDown = true;
+      render();
+      return;
+    }
+    ["builds", "sessions", "waits", "sweep"].forEach(function (c) {
+      db.collection(c).orderBy("updated_at", "desc").limit(500).onSnapshot(function (snap) {
+        state.docs = copyWith(state.docs, c, snap.docs.map(function (d) { return d.data(); }));
+        state.arrived = true;
+        state.late = false;
+        render();
+      }, function () {
+        state.dbDown = true;
+        render();
+      });
+    });
+    setTimeout(function () {
+      if (!state.arrived && !state.dbDown) {
+        state.late = true;
+        render();
+      }
+    }, 10000);
+  }
+
+  // ---- Linear: two list watches at start, per-id watches from watchDiff ----
+  function linearHandler(key, tool, input) {
+    return function (ev) {
+      if (ev.type === "data") {
+        state.linear = copyWith(state.linear, key, ev.result);
+        state.errors = copyWith(state.errors, key);
+        if (key === "projects") {
+          var diff = watchDiff(Object.keys(table), ev.result), next = {};
+          diff.drop.forEach(function (k) { table[k](); });
+          Object.keys(table).forEach(function (k) { if (diff.drop.indexOf(k) < 0) next[k] = table[k]; });
+          diff.add.forEach(function (a) {
+            next[a.key] = mcp.watchTool("Linear", a.tool, a.input, linearHandler(a.key, a.tool, a.input), WATCH);
+          });
+          table = next;
+          state.linear = keep(state.linear, ["projects", "assigned"].concat(Object.keys(table)));
+        }
+      } else {
+        var code = ev.error && ev.error.code;
+        if (RETRACT[code]) state.linear = copyWith(state.linear, key);
+        state.errors = copyWith(state.errors, key, {key: key, tool: tool, input: input, code: code});
+      }
+      render();
+    };
+  }
+
+  function startLinear(m) {
+    mcp = m;
+    if (!mcp) {
+      state.mcpDown = true;
+      render();
+      return;
+    }
+    var projectsIn = {member: "me", fields: OPS_PROJECT_FIELDS};
+    var assignedIn = {assignee: "me", state: "started", fields: OPS_ASSIGNED_FIELDS, limit: 100};
+    mcp.watchTool("Linear", "list_projects", projectsIn, linearHandler("projects", "list_projects", projectsIn), WATCH);
+    mcp.watchTool("Linear", "list_issues", assignedIn, linearHandler("assigned", "list_issues", assignedIn), WATCH);
+  }
+
+  function linearPayloads() {
+    var L = state.linear;
+    if (!L.projects && !L.assigned) return null;
+    var byProject = {}, byInitiative = {};
+    Object.keys(L).forEach(function (k) {
+      if (k.indexOf("project:") === 0) byProject[k.slice(8)] = L[k];
+      if (k.indexOf("initiative:") === 0) byInitiative[k.slice(11)] = L[k];
+    });
+    return {projects: L.projects || null, assigned: L.assigned || null, issuesByProject: byProject,
+            initiativesById: byInitiative};
+  }
+
+  // ---- notices: page states ----
+  function renderNotices(host, empty) {
+    host.replaceChildren();
+    if (state.dbDown) host.appendChild(el("p", "notice", "ops view unavailable"));
+    else if (state.late) host.appendChild(el("p", "notice info", "ops view data has not arrived yet"));
+    if (state.mcpDown) host.appendChild(el("p", "notice", LINEAR_OTHER));
+    var shown = {};
+    Object.keys(state.errors).forEach(function (k) {
+      var e = state.errors[k];
+      if (shown[e.code]) return;
+      shown[e.code] = 1;
+      var line = el("p", "notice", LINEAR_COPY[e.code] || LINEAR_OTHER);
+      if (e.code === "approval_required" && mcp) {
+        var b = el("button", null, "Allow Linear");
+        b.type = "button";
+        b.disabled = state.asking;
+        b.addEventListener("click", function () {
+          if (state.asking) return;
+          state.asking = true;
+          b.disabled = true;
+          var handler = linearHandler(e.key, e.tool, e.input);
+          mcp.callTool("Linear", e.tool, e.input).then(function (result) {
+            state.asking = false;
+            handler({type: "data", result: result});
+          }, function (error) {
+            state.asking = false;
+            handler({type: "error", error: error});
+          });
+        });
+        line.appendChild(b);
+      }
+      host.appendChild(line);
+    });
+    if (empty) host.appendChild(el("p", "notice info", "Nothing in motion: no builds, sessions, waits or Linear tickets to show."));
+  }
+
+  // ---- the floor ----
+  function renderFloor(host, floor) {
+    host.replaceChildren();
+    var builds = el("div", "col"), sessions = el("div", "col"), moves = el("div", "col");
+    builds.appendChild(el("div", "eyebrow", "Builds running or waiting"));
+    floor.builds.forEach(function (b) {
+      var d = b.doc;
+      append(builds, [append(el("div", "station" + (d.status === "waiting" ? " waiting" : "")), [
+        el("div", "eyebrow", (d.type || "build") + " · " + (d.status || "")),
+        el("strong", null, d.repo + (d.branch ? " · " + d.branch : "")),
+        el("span", "mono muted", b.id + (d.ticket ? " · " + d.ticket : ""))])]);
+    });
+    if (!floor.builds.length) builds.appendChild(el("p", "muted", "No build running."));
+    sessions.appendChild(el("div", "eyebrow", "Sessions in the last 4 h"));
+    floor.sessions.forEach(function (s) {
+      var d = s.doc;
+      append(sessions, [append(el("div", "station session"), [
+        el("div", "eyebrow", (d.tag || "untagged") + " · " + d.repo),
+        el("span", null, d.on || "no on: line"),
+        el("span", "mono muted", "last " + when(d.last_at) + (d.ticket ? " · " + d.ticket : ""))])]);
+    });
+    if (!floor.sessions.length) sessions.appendChild(el("p", "muted", "No session moved in 4 h."));
+    moves.appendChild(el("div", "eyebrow", "Latest moves"));
+    var list = el("ul", "moves");
+    floor.moves.forEach(function (m) {
+      append(list, [append(el("li"), [el("span", "mono muted", when(m.at)), el("span", null, m.text),
+                                      el("span"), el("span", "mono muted", m.session)])]);
+    });
+    moves.appendChild(floor.moves.length ? list : el("p", "muted", "No moves yet."));
+    append(host, [builds, sessions, moves]);
+  }
+
+  // ---- the map ----
+  function badge(item) {
+    var d = item.doc, label = item.kind;
+    if (item.kind === "build") label += " " + (d.status || "");
+    if (item.kind === "session") label += " " + (d.tag || d.repo);
+    if (item.kind === "wait") label += " " + (d.wait_kind || "");
+    if (item.kind === "sweep") label += " " + (d.item_kind || "");
+    return el("span", "badge " + item.kind, label);
+  }
+  function nodeButton(node) {
+    var b = el("button", "node" + (node.items.length ? " busy" : ""));
+    b.type = "button";
+    b.setAttribute("aria-pressed", String(state.selected === node.ticket));
+    append(b, [el("span", "id", node.ticket), node.title ? el("span", "t", node.title) : null,
+               node.state ? el("span", "st", node.state) : null]);
+    if (node.items.length) append(b, [append(el("span", "badges"), node.items.map(badge))]);
+    b.addEventListener("click", function () { select(node.ticket); });
+    if (!nodeEls[node.ticket]) nodeEls[node.ticket] = b;
+    return b;
+  }
+  function laneRow(lane) {
+    var name = append(el("div", "lane-name"), [el("strong", null, lane.name || lane.id), link(lane.url, "open in Linear"),
+                                                lane.truncated ? el("small", null, "first 100 shown") : null]);
+    var nodes = append(el("div", "nodes"), lane.nodes.map(nodeButton));
+    if (!lane.nodes.length) nodes.appendChild(el("span", "muted", "No tickets."));
+    return append(el("div", "lane"), [name, nodes]);
+  }
+  function zone(cls, eyebrow, title, url, lanes) {
+    var head = append(el("div", "zone-head"), [el("div", "eyebrow", eyebrow), el("h3", null, title), link(url, "open in Linear", "mono")]);
+    return append(el("section", "zone" + (cls ? " " + cls : "")), [head].concat(lanes.map(laneRow)));
+  }
+  function itemRow(item) {
+    var d = item.doc;
+    var what = d.title || d.text || d.on || d.branch || "";
+    return append(el("li"), [badge(item), el("span", "mono", item.id), el("span", null, what),
+                             d.ticket ? el("span", "mono muted", d.ticket) : null]);
+  }
+  function renderMap(host, m, linearOn) {
+    host.replaceChildren();
+    var bands = {};
+    m.zones.forEach(function (z) {
+      var box = zone(null, "Initiative", z.name || z.id, z.url, z.lanes);
+      if (!z.parent || !z.parent.id) {
+        host.appendChild(box);
+        return;
+      }
+      if (!bands[z.parent.id]) {
+        bands[z.parent.id] = append(el("section", "band"), [append(el("div", "zone-head"), [
+          el("div", "eyebrow", "Objective"), el("h3", null, z.parent.name || z.parent.id), link(z.parent.url, "open in Linear", "mono")])]);
+        host.appendChild(bands[z.parent.id]);
+      }
+      bands[z.parent.id].appendChild(box);
+    });
+    if (m.noInitiative.length) {
+      host.appendChild(zone("flagged", "Flagged", "No initiative: link these projects to an initiative", null, m.noInitiative));
+    }
+    if (m.outside.length) {
+      host.appendChild(zone("outside", "Assigned to you", "Outside your projects: initiative not read", null, m.outside));
+    }
+    if (m.other.length) {
+      var lane = {id: "other", name: linearOn ? "Not on this map" : "By ticket id", url: null,
+                  nodes: m.other.map(function (o) { return {ticket: o.ticket, title: null, state: null, url: null, items: o.items}; })};
+      host.appendChild(zone(null, linearOn ? "Tickets outside your Linear scope" : "Linear not read",
+                            linearOn ? "Other tickets" : "Tickets by id", null, [lane]));
+    }
+    if (m.unlinked.length) {
+      var box = append(el("section", "zone"), [append(el("div", "zone-head"), [el("div", "eyebrow", "No ticket"),
+                                                                              el("h3", null, "Not linked to a ticket")])]);
+      box.appendChild(append(el("ul", "items"), m.unlinked.map(itemRow)));
+      host.appendChild(box);
+    }
+  }
+
+  function near(ticket) {
+    var out = {};
+    out[ticket] = 1;
+    model.edges.forEach(function (e) {
+      if (e.from === ticket) out[e.to] = 1;
+      if (e.to === ticket) out[e.from] = 1;
+    });
+    return out;
+  }
+  function drawEdges() {
+    var svg = document.getElementById("edges"), box = document.getElementById("map").getBoundingClientRect();
+    svg.setAttribute("viewBox", "0 0 " + box.width + " " + box.height);
+    svg.replaceChildren();
+    if (!model) return;
+    model.edges.forEach(function (e) {
+      var a = nodeEls[e.from], b = nodeEls[e.to];
+      if (!a || !b) return;
+      var ra = a.getBoundingClientRect(), rb = b.getBoundingClientRect();
+      var fwd = rb.left >= ra.left;
+      var x1 = (fwd ? ra.right : ra.left) - box.left, y1 = ra.top + ra.height / 2 - box.top;
+      var x2 = (fwd ? rb.left : rb.right) - box.left, y2 = rb.top + rb.height / 2 - box.top;
+      var dx = Math.max(30, Math.abs(x2 - x1) / 2) * (x2 >= x1 ? 1 : -1);
+      var p = document.createElementNS("http://www.w3.org/2000/svg", "path");
+      p.setAttribute("d", "M" + x1 + "," + y1 + " C" + (x1 + dx) + "," + y1 + " " + (x2 - dx) + "," + y2 + " " + x2 + "," + y2);
+      var touches = state.selected === e.from || state.selected === e.to;
+      p.setAttribute("class", e.kind + (state.selected ? (touches ? " hot" : " dim") : ""));
+      svg.appendChild(p);
+    });
+  }
+
+  // ---- detail panel ----
+  function findNode(ticket) {
+    var hit = null;
+    function scan(lanes, where) {
+      lanes.forEach(function (l) {
+        l.nodes.forEach(function (n) { if (!hit && n.ticket === ticket) hit = {node: n, lane: l, where: where}; });
+      });
+    }
+    model.zones.forEach(function (z) { scan(z.lanes, z.name); });
+    scan(model.noInitiative, "No initiative");
+    scan(model.outside, "Outside your projects");
+    model.other.forEach(function (o) {
+      if (!hit && o.ticket === ticket) hit = {node: {ticket: o.ticket, items: o.items}, lane: null, where: "Other tickets"};
+    });
+    return hit;
+  }
+  function renderDetail(host) {
+    host.replaceChildren();
+    var hit = state.selected ? findNode(state.selected) : null;
+    if (!hit) {
+      host.appendChild(el("p", "muted", "Select a ticket to see its builds, sessions, waits, open items and connections."));
+      return;
+    }
+    var n = hit.node, left = el("div"), right = el("div", "links");
+    append(left, [el("div", "eyebrow", [hit.where, hit.lane && hit.lane.name].filter(Boolean).join(" · ")),
+                  el("h2", null, n.title || n.ticket),
+                  append(el("div", "meta"), [el("span", "mono", n.ticket), n.state ? el("span", "badge", n.state) : null,
+                                             link(n.url, "open in Linear", "mono")])]);
+    var items = append(el("ul", "items"), n.items.map(itemRow));
+    left.appendChild(n.items.length ? items : el("p", "muted", "Nothing placed on this ticket."));
+    right.appendChild(el("div", "eyebrow", "Connections"));
+    var any = false;
+    model.edges.forEach(function (e) {
+      if (e.from !== n.ticket && e.to !== n.ticket) return;
+      any = true;
+      var other = e.from === n.ticket ? e.to : e.from;
+      var rel = e.kind === "parent" ? (e.from === n.ticket ? "parent of" : "child of") : "same session as";
+      var b = el("button", null, rel + " " + other);
+      b.type = "button";
+      b.addEventListener("click", function () { select(other); });
+      right.appendChild(b);
+    });
+    if (!any) right.appendChild(el("p", "muted", "No connections."));
+    append(host, [left, right]);
+  }
+
+  // ---- waits list ----
+  function renderWaits(host, list) {
+    host.replaceChildren();
+    list.forEach(function (item) {
+      var d = item.doc;
+      var ref = item.kind === "wait" ? d.ref : link(d.ref, d.key) || el("span", null, d.key);
+      append(host, [append(el("li"), [badge(item), typeof ref === "string" ? el("span", "mono", ref) : ref,
+                                      el("span", null, d.text || d.title || ""),
+                                      el("span", "muted", d.waiting_on ? "on " + d.waiting_on : (d.ticket || d.state || "")),
+                                      el("span", "mono muted", when(d.updated_at))])]);
+    });
+    if (!list.length) host.appendChild(el("li", "muted", "No open waits or items."));
+  }
+
+  function select(ticket) {
+    state.selected = state.selected === ticket ? null : ticket;
+    render();
+    if (state.selected && nodeEls[state.selected]) nodeEls[state.selected].focus();
+  }
+
+  function render() {
+    var payloads = linearPayloads();
+    model = opsModel({builds: state.docs.builds, sessions: state.docs.sessions, waits: state.docs.waits,
+                      sweep: state.docs.sweep, linear: payloads ? normalizeLinear(payloads) : null,
+                      now: state.now || undefined});
+    nodeEls = {};
+    var floor = model.floor;
+    var empty = state.arrived && !model.zones.length && !model.noInitiative.length && !model.outside.length
+      && !model.other.length && !model.unlinked.length && !model.waitsList.length && !floor.builds.length
+      && !floor.sessions.length;
+    renderNotices(document.getElementById("notices"), empty);
+    renderFloor(document.getElementById("floor"), floor);
+    renderMap(document.getElementById("zones"), model, Boolean(payloads));
+    renderWaits(document.getElementById("waits"), model.waitsList);
+    renderDetail(document.getElementById("detail"));
+    if (state.selected) {
+      var close = near(state.selected);
+      Object.keys(nodeEls).forEach(function (t) { nodeEls[t].classList.toggle("faded", !close[t]); });
+    }
+    document.getElementById("live").textContent = (DEMO ? "Ops view · demo" : "Ops view · live")
+      + (model.lastChange ? " · last change " + when(model.lastChange) : "");
+    cancelAnimationFrame(drawn);
+    drawn = requestAnimationFrame(drawEdges);
+  }
+
+  // ---- #demo: the demo-data samples through a fake db and a fake mcp, into the same code ----
+  function demoClaude() {
+    var data = JSON.parse(document.getElementById("demo-data").textContent);
+    var flags = location.hash.slice(5);
+    var code = (flags.match(/linear=([a-z_]+)/) || [])[1] || null;
+    state.now = data.now;
+    function later(fn) { setTimeout(fn, 20); }
+    function answer(tool, input) {
+      var L = data.linear;
+      if (tool === "list_projects") return L.projects;
+      if (tool === "get_initiative") return opsOwn(L.initiativesById, input.query);
+      if (input.assignee) return L.assigned;
+      return opsOwn(L.issuesByProject, input.project) || {issues: [], hasNextPage: false};
+    }
+    var db = {collection: function (name) {
+      var q = {
+        orderBy: function () { return q; },
+        limit: function () { return q; },
+        onSnapshot: function (next) {
+          if (flags.indexOf("late") < 0) {
+            later(function () {
+              next({docs: (data[name] || []).map(function (d) { return {id: name, data: function () { return d; }}; }),
+                    metadata: {fromCache: false, hasPendingWrites: false}});
+            });
+          }
+          return function () {};
+        }
+      };
+      return q;
+    }};
+    var fakeMcp = {
+      watchTool: function (server, tool, input, handler) {
+        later(function () {
+          handler(code ? {type: "error", error: {code: code, message: "demo"}}
+                       : {type: "data", result: {content: [], payload: answer(tool, input)}});
+        });
+        return function () {};
+      },
+      callTool: function (server, tool, input) {
+        code = null;
+        return Promise.resolve({content: [], payload: answer(tool, input)});
+      }
+    };
+    return {use: function (name) {
+      if (name === "db") return Promise.resolve(flags.indexOf("nodb") >= 0 ? null : db);
+      return Promise.resolve(name === "mcp" ? fakeMcp : null);
+    }};
+  }
+
+  var claude = DEMO ? demoClaude() : (window.claude || null);
+  render();
+  if (!claude) {
+    startDb(null);
+    startLinear(null);
+  } else {
+    claude.use("db").then(startDb, function () { startDb(null); });
+    claude.use("mcp").then(startLinear, function () { startLinear(null); });
+  }
+  addEventListener("resize", function () {
+    cancelAnimationFrame(drawn);
+    drawn = requestAnimationFrame(drawEdges);
+  });
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(drawEdges);
+})();
 </script>
 </body>
 </html>
