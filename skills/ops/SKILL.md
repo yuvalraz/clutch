@@ -116,6 +116,7 @@ already closed. Leave both out of the situation and never propose them
 uninvited; the user's explicit ask wins over any claim. Empty output
 means no peer context, and the sweep goes on. A
 `/scripts/prelude.sh` not-found error means clutch is not loaded as a plugin: say so once and go on.
+Exit status 2 means the worklog is unreadable: say so in one line, never that there is no peer context, and the sweep goes on.
 A last line `OPS VIEW: on` says the ops view is on: it is never a move, a wait or a worklog line, and output that holds only that line is empty output.
 
 A `wait:` line is a wait loop: someone else's move, pending on something
@@ -433,12 +434,14 @@ One item per thing the sweep read that is live today: a PR waiting on a review, 
 `key` uses the wait-loop ref forms (`gh:<owner>/<repo>#<number>`, `slack:<channel>/<thread ts>`, `linear:<issue id>`), and `cal:<event id>` for a meeting.
 `title` is the item's own title, never message text; `waiting_on` is a display name or role as the item shows it, never anything from `~/.clutch/people.md`; `ticket` is the first ticket id in the PR's branch name or title, else null.
 The heredoc is quoted, so the items need JSON escaping only.
+A missing value is JSON null, never the string `"null"`.
+When the sweep skipped or failed to read any integration it normally reads, it does not record: push step 1 runs plain `opsview-sync.sh` (no `--sweep`) instead, so sessions and waits still push and the last full sweep record stays.
 Exit status 2 names on stderr what it refused: fix the items once and run it again; if that fails too, it is a push failure.
 
 <!-- opsview push -->
 The ops view push runs only after a read printed `OPS VIEW: on`:
 
-1. Run `sh "${CLAUDE_PLUGIN_ROOT}/scripts/opsview-sync.sh"`. In a sweep, the record run (see the record step above) is this step: it prints the same lines.
+1. Run `sh "${CLAUDE_PLUGIN_ROOT}/scripts/opsview-sync.sh"`. In a sweep, the record run (see the record step above) is this step: it prints the same lines; a sweep that does not record runs this plain line.
 2. `OPS: off`, or `OPS: unchanged` as the second line: the push is done.
 3. Otherwise the first line is `OPS: <url>`, and each `OPS_DOC: <collection> <doc_id> <file_path> [if_version=<n>]` line is one document. Load `ArtifactData` first when it is a deferred tool, then send every line in one `ArtifactData` call: action `batch`, `url` from the first line, one entry per line with `op` `set`, its `collection`, `doc_id` and `file_path`, and `if_version` only when the line ends with `if_version=<n>`.
 4. Then, for the documents the call wrote, if any, run `sh "${CLAUDE_PLUGIN_ROOT}/scripts/opsview-sync.sh" --ack <collection>/<doc_id>=<version>`, one argument per document, each with the `version` the result gave it; when the call wrote none, go to step 5.

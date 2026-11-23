@@ -465,7 +465,7 @@ ov_block() {
 <!-- opsview push -->
 The ops view push runs only after a read printed `OPS VIEW: on`:
 
-1. Run `sh "${CLAUDE_PLUGIN_ROOT}/scripts/opsview-sync.sh"`. In a sweep, the record run (see the record step above) is this step: it prints the same lines.
+1. Run `sh "${CLAUDE_PLUGIN_ROOT}/scripts/opsview-sync.sh"`. In a sweep, the record run (see the record step above) is this step: it prints the same lines; a sweep that does not record runs this plain line.
 2. `OPS: off`, or `OPS: unchanged` as the second line: the push is done.
 3. Otherwise the first line is `OPS: <url>`, and each `OPS_DOC: <collection> <doc_id> <file_path> [if_version=<n>]` line is one document. Load `ArtifactData` first when it is a deferred tool, then send every line in one `ArtifactData` call: action `batch`, `url` from the first line, one entry per line with `op` `set`, its `collection`, `doc_id` and `file_path`, and `if_version` only when the line ends with `if_version=<n>`.
 4. Then, for the documents the call wrote, if any, run `sh "${CLAUDE_PLUGIN_ROOT}/scripts/opsview-sync.sh" --ack <collection>/<doc_id>=<version>`, one argument per document, each with the `version` the result gave it; when the call wrote none, go to step 5.
@@ -505,6 +505,11 @@ fpin "$O" "OV record rules"             '`title` is the item'"'"'s own title, ne
 awk '/^### Ops view$/{f=1;next} /^### /{f=0} f' "$O" | grep -qxF 'The heredoc is quoted, so the items need JSON escaping only.' \
   || { echo "FAIL: OV record rules -- the quoted-heredoc sentence is not in Ops view"; fail=1; }
 fpin "$O" "OV record rules"             'Exit status 2 names on stderr what it refused: fix the items once and run it again; if that fails too, it is a push failure.'
+# A partial sweep never records: ops_sync would mark the integration it skipped present:false.
+awk '/^### Ops view$/{f=1;next} /^### /{f=0} f' "$O" | grep -qxF 'When the sweep skipped or failed to read any integration it normally reads, it does not record: push step 1 runs plain `opsview-sync.sh` (no `--sweep`) instead, so sessions and waits still push and the last full sweep record stays.' \
+  || { echo "FAIL: OV partial sweep -- the no-record rule is not in Ops view"; fail=1; }
+fpin "$O" "OV record null"              'A missing value is JSON null, never the string `"null"`.'
+fpin "$O" "sweep window unreadable"     'Exit status 2 means the worklog is unreadable: say so in one line, never that there is no peer context, and the sweep goes on.'
 awk '/^It is on when `~\/\.clutch\/opsview\.json` exists/{s=NR} /--sweep <<.OPS_SWEEP.$/{r=NR} /^<!-- opsview push -->$/{p=NR} END{exit !(s && r && p && s < r && r < p)}' "$O" \
   || { echo "FAIL: OV record step -- not between the on-switch sentence and the push block"; fail=1; }
 # The section sits before Session close.
@@ -756,7 +761,7 @@ RT='Or'"'"'s \"fix\" $HOME' awk '
     $0 = rl($0, "<state>", "review requested"); $0 = rl($0, "<name or role, or null>", "Or")
     print rl($0, "<ticket id or null>", "ENG-7") }' "$T/rec.tpl" > "$T/rec.sh"
 grep -q '<[a-z]' "$T/rec.sh" && { echo "FAIL: O-OV2 -- a placeholder is left unfilled: $(cat "$T/rec.sh")"; exit 1; }
-if [ ! -x /usr/bin/python3 ] || ! command -v python3 >/dev/null 2>&1; then
+if ! PY=$(command -v python3); then
   echo "SKIP: O-OV2 (no python3)"
 else
   OVURL='https://example.test/ops-view'
@@ -771,11 +776,17 @@ else
     [ "$RC" = 0 ] && [ "$(printf '%s\n' "$OUT" | head -n 1)" = "OPS: $OVURL" ] \
       && printf '%s\n' "$OUT" | grep -q '^OPS_DOC: sweep gh:o~2Fr~237 /' \
       || { echo "FAIL: O-OV2 [$sh] -- rc $RC: $OUT / $(cat "$T/rec.err")"; exit 1; }
-    /usr/bin/python3 -B -c 'import json, sys
+    "$PY" -B -c 'import json, sys
 it = json.load(open(sys.argv[1]))["items"]
 want = [{"key": "gh:o/r#7", "kind": "pr", "ref": "https://github.com/o/r/pull/7", "title": "Or'"'"'s \"fix\" $HOME", "state": "review requested", "waiting_on": "Or", "ticket": "ENG-7"}]
 sys.exit(0 if it == want else 1)' "$HOME/.clutch/sweep.json" \
       || { echo "FAIL: O-OV2 [$sh] -- sweep.json does not hold the item as written: $(cat "$HOME/.clutch/sweep.json" 2>&1)"; exit 1; }
+    # O-OV2c: a partial sweep's plain run (no --sweep) keeps the earlier sweep item present.
+    OUT=$(cd "$T/plain" && sh "$(cd "$HERE/.." && pwd)/scripts/opsview-sync.sh" 2>&1); RC=$?
+    PF=$(printf '%s\n' "$OUT" | awk '$1 == "OPS_DOC:" && $2 == "sweep" && $3 == "gh:o~2Fr~237" {print $4}')
+    [ "$RC" = 0 ] && [ -n "$PF" ] && "$PY" -B -c 'import json, sys
+sys.exit(0 if json.load(open(sys.argv[1])).get("present") is True else 1)' "$PF" \
+      || { echo "FAIL: O-OV2c [$sh] -- the plain run did not keep the sweep item present: rc $RC: $OUT"; exit 1; }
     # O-OV2b: the view off, the same snippet prints OPS: off and writes nothing.
     HOME="$T/ovr-off-$sh"; export HOME
     mkdir -p "$HOME/.clutch"
