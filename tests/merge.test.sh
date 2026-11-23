@@ -2,13 +2,18 @@
 # Merge gate. MG1-MG6 cover the merge list (### Merge under ## Ops in
 # ~/.clutch/rituals.md, read by clutch_merge_listed <owner>/<repo>: 0 listed,
 # 1 not, 2 unreadable): with no list merge.sh prints nothing, exits 0 and
-# calls no gh. MK1-MK22 (with MK3b and MK13b-MK13e) run scripts/merge.sh
+# calls no gh, even with an unreadable worklog (MG7). MK1-MK25 (with MK3b and
+# MK13b-MK13e) run scripts/merge.sh
 # @<tag> against a fake gh that applies the real --jq filter to a per-PR
 # GraphQL fixture through /usr/bin/jq: only an approved, CLEAN, open,
 # non-draft PR of the viewer's own, into the default branch, in a repo that
-# allows merge commits, is merged, with exactly
+# allows merge commits, is merged (with no review rule, only a writer's
+# approval counts: MK23), with exactly
 # "pr merge <n> --repo <o>/<r> --merge --match-head-commit <sha>"; the
-# re-read decides merged / did not merge / held; a failure is recorded per
+# re-read decides merged / did not merge / held; a read that shows the
+# viewer's own PR MERGED is a merged line with no merge call (MK16, MK11); a
+# watch dir that cannot be searched holds (MK24); the list is read once a
+# run (MK25); a failure is recorded per
 # (lowercased ref, sha) in ~/.clutch/watch/merge.failed and named once; every
 # gh call is bounded by a 1 s nap watchdog (CLUTCH_MERGE_WAIT, default 60);
 # stderr stays empty on every normal run. MU1-MU8 cover --unwatched and
@@ -55,8 +60,9 @@ is() {
   [ "$RC" = "$2" ] && [ "$OUT" = "$3" ] \
     || { echo "FAIL: $SHL $1 -- rc $RC stdout [$OUT], want rc $2 stdout [$3]"; fail=1; }
 }
-# tree: every path under ~/.clutch with its checksum, to prove what a run wrote.
-tree() { find "$HOME/.clutch" 2>/dev/null | sort | while read -r f; do [ -f "$f" ] && [ "$f" != "$MFF" ] && printf '%s\n' "$(cksum "$f" 2>/dev/null || echo "$f")" || printf '%s\n' "$f"; done; }
+# tree: every path under ~/.clutch with its checksum, to prove what a run wrote
+# (rituals.md left out when the fake gh makes it unreadable: MK25).
+tree() { find "$HOME/.clutch" 2>/dev/null | sort | while read -r f; do [ ! -f "$MFIX/rituals000" ] || [ "$f" != "$HOME/.clutch/rituals.md" ] || continue; [ -f "$f" ] && [ "$f" != "$MFF" ] && printf '%s\n' "$(cksum "$f" 2>/dev/null || echo "$f")" || printf '%s\n' "$f"; done; }
 # mr <args>: run the staged merge.sh from a non-git dir with the fake gh first
 # on PATH; OUT, RC, ERR, NGH. MSH the shell (sh), MWAIT CLUTCH_MERGE_WAIT,
 # MPATH another PATH. ML1: nothing under ~/.clutch changes but merge.failed
@@ -139,7 +145,7 @@ series() {
   base
   mr @0123abcd; ok "MK1 ready" 0 'gh:acme/web#7 @0123abcd merged' 3; merges "MK1" "$M7"
   R1=$(sed -n 1p "$MFIX/log")
-  case $R1 in "api graphql -f query=query("*'latestOpinionatedReviews(last:100){nodes{state}} reviewDecision'*" -f o=acme -f r=web -F n=7 --jq "*) ;;
+  case $R1 in "api graphql -f query=query("*'latestOpinionatedReviews(last:100){nodes{state}} writerReviews:latestOpinionatedReviews(writersOnly:true,last:100){nodes{state}} reviewDecision'*" -f o=acme -f r=web -F n=7 --jq "*) ;;
     *) echo "FAIL: $SHL MK1 -- read [$R1]"; fail=1 ;; esac
   case $R1 in *latestReviews*) echo "FAIL: $SHL MK1 -- read selects latestReviews"; fail=1 ;; esac
   [ "$(sort -u "$MFIX/cwd")" = / ] || { echo "FAIL: $SHL MK1 -- gh ran from [$(sort -u "$MFIX/cwd")], want /"; fail=1; }
@@ -153,7 +159,8 @@ series() {
   base "$MF_P.reviewDecision = null"
   mr @0123abcd; ok "MK4 no review rule, approved" 0 'gh:acme/web#7 @0123abcd merged' 3; merges "MK4" "$M7"
   none "MK5 review required" "$MF_P.reviewDecision = \"REVIEW_REQUIRED\""
-  none "MK5 no rule, no approval" "$MF_P.reviewDecision = null" "$MF_P.latestOpinionatedReviews.nodes = []"
+  none "MK5 no rule, no approval" "$MF_P.reviewDecision = null" "$MF_P.latestOpinionatedReviews.nodes = []" "$MF_P.writerReviews.nodes = []"
+  none "MK23 no rule, only a non-writer approved" "$MF_P.reviewDecision = null" "$MF_P.writerReviews.nodes = []"
   none "MK5 changes requested" "$MF_P.reviewDecision = \"CHANGES_REQUESTED\""
   none "MK6 someone else's PR" "$MF_P.author.login = \"pal\""
   none "MK6 no viewer, no author" '.data.viewer.login = null' "$MF_P.author = null"
@@ -179,6 +186,8 @@ series() {
   base; : > "$MFIX/queue"
   mr @0123abcd; ok "MK11 merge queue" 0 'gh:acme/web#7 @0123abcd held' 3
   [ ! -e "$MFF" ] || { echo "FAIL: $SHL MK11 -- recorded"; fail=1; }
+  mf_pr acme web 7 "$MF_P.state = \"MERGED\""
+  mr @0123abcd; ok "MK11 the queue merged it" 0 'gh:acme/web#7 @0123abcd merged' 1; merges "MK11 merged" ''
   base; : > "$MFIX/readfail"
   mr @0123abcd; ok "MK13 read fails" 0 '' 1; merges "MK13" ''
   mr --ready 'gh:acme/web#7'; ok "MK13 --ready" 2 '' 1
@@ -210,7 +219,10 @@ x' ''; do
   done
   mf_reset; mf_list '- acme/web'; mf_pr acme web 7; mf_wait 100 'slack:C1/123' @0123abcd
   mr @0123abcd; ok "MK15 non-gh wait" 0 '' 0
-  none "MK16 merged" "$MF_P.state = \"MERGED\""
+  base "$MF_P.state = \"MERGED\""
+  mr @0123abcd; ok "MK16 merged" 0 'gh:acme/web#7 @0123abcd merged' 1; merges "MK16 merged" ''
+  mr --ready 'gh:acme/web#7'; ok "MK16 merged --ready" 3 '' 1
+  none "MK16 someone else's, merged" "$MF_P.state = \"MERGED\"" "$MF_P.author.login = \"pal\""
   none "MK16 closed" "$MF_P.state = \"CLOSED\""
   none "MK16 no PR" "$MF_P = null"
   if [ "$ROOT" = 0 ]; then
@@ -220,6 +232,25 @@ x' ''; do
     mr @0123abcd; ok "MK20 record unreadable" 0 'gh:acme/web#7 @0123abcd held' 1; merges "MK20" ''
     mr --ready 'gh:acme/web#7'; ok "MK20 --ready" 2 '' 1
     chmod 644 "$MFF"
+    for rec in none "gh:acme/web#7 $S"; do
+      base; mkdir -p "$HOME/.clutch/watch"; [ "$rec" = none ] || printf '%s\n' "$rec" > "$MFF"; chmod 600 "$HOME/.clutch/watch"
+      mr @0123abcd; ok "MK24 watch dir not searchable [$rec]" 0 'gh:acme/web#7 @0123abcd held' 1; merges "MK24 [$rec]" ''
+      mr --ready 'gh:acme/web#7'; ok "MK24 --ready [$rec]" 2 '' 1
+      chmod 755 "$HOME/.clutch/watch"
+    done
+    base; mf_wait 90 'gh:acme/web#8' @0123abcd; mf_pr acme web 8; : > "$MFIX/rituals000"
+    mr @0123abcd; ok "MK25 list unreadable mid-run" 0 'gh:acme/web#7 @0123abcd merged
+gh:acme/web#8 @0123abcd merged' 6
+    chmod 644 "$HOME/.clutch/rituals.md"
+    for rit in none '## Ops\n\n### Merge\n\n### Windows\n- acme/web\n'; do
+      [ "$rit" = none ] && RL='no file' || RL='empty ### Merge'
+      mf_reset; mf_pr acme web 7; mf_wait 100 'gh:acme/web#7' @0123abcd
+      [ "$rit" = none ] || printf "$rit" > "$HOME/.clutch/rituals.md"
+      chmod 000 "$W"
+      mr @0123abcd; ok "MG7 no list, unreadable worklog [$RL] @tag" 0 '' 0
+      mr --unwatched; ok "MG7 no list, unreadable worklog [$RL] --unwatched" 0 '' 0
+      chmod 644 "$W"
+    done
   fi
   mf_reset; mf_list '- acme/web'; mf_pr Acme Web 7; mf_wait 100 'gh:Acme/Web#7.' @0123abcd
   mr @0123abcd; ok "MK18 mixed case" 0 'gh:Acme/Web#7 @0123abcd merged' 3
