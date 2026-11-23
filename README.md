@@ -384,7 +384,7 @@ starts its silent check with the shell, which asks permission each time. Add
 `Bash(sh */clutch/*/scripts/poll.sh*)` to `permissions.allow` in your Claude
 Code settings to skip that ask. From a local checkout, allow
 `Bash(sh <checkout>/scripts/poll.sh*)` instead.
-`Bash(sh */clutch/*/scripts/merge.sh*)` lets merges run without the shell's ask; leave it out and each merge asks you first.
+`Bash(sh */clutch/*/scripts/merge.sh*)` lets merges run without the shell's ask; leave it out and each merge pass asks you first.
 
 One exception, and it is deliberate: one optional file holds your day's facts
 and tool names. The core carries opinions; your day carries facts: which days

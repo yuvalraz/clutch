@@ -288,16 +288,16 @@ fpin "$R" "README: window opens"        'which opens on your next sweep'
 # --- merge list: the one merge without a yes is the watch's or the beat's
 # merge pass of the user's approved, clean PR in a listed repo; every other
 # merge, and every other L3 action, still waits for a yes.
-fpin "$C" "const: merge exception"      '(not their approved, clean PR in a merge-list repo) or a delete waits for a'
+fpin "$C" "const: merge exception"      '(not the merge pass of their approved, clean PR in a merge-list repo) or a delete waits for a'
 nom=$(tr -s '[:space:]' ' ' < "$C" | grep -c 'a merge or a delete waits')
 [ "$nom" = 0 ] || { echo "FAIL: const: old merge text gone -- 'a merge or a delete waits' is still there"; fail=1; }
-fpin "$O" "ops: merge pass only"        'The one merge without a yes is the watch'"'"'s or the beat'"'"'s merge pass, of your approved, clean PR in a repo your `### Merge` list names; ops itself never merges.'
-fpin "$O" "ops: merge list section"     'An optional `### Merge` list under `## Ops` names the repos the watch and the beat merge your approved, clean PRs in (see Delegation); ops never reads it, and it is not a missing key either.'
+fpin "$O" "ops: merge pass only"        'The one merge without a yes is the watch'"'"'s or the beat'"'"'s merge pass, of your approved, clean PR in a repo your `### Merge` list names; ops itself never merges without a yes.'
+fpin "$O" "ops: merge list section"     'An optional `### Merge` list under `## Ops` names the repos the watch and the beat merge your approved, clean PRs in (see Step 5); ops never reads it, and it is not a missing key either.'
 fpin "$R" "README: merge exception"     'Merges of your own approved, clean PRs in a repo your `### Merge` list names are the one exception: the watch and the beat merge them (see below).'
 fpin "$R" "README: merge reads list"    'Their merge pass, `scripts/merge.sh`, also reads the `### Merge` list in `~/.clutch/rituals.md`.'
 fpin "$R" "README: merge.failed marker" '`<tag>.woke`, `<tag>.polled` and `merge.failed` are the only things sessions write'
 fpin "$R" "README: merge network"       '`scripts/merge.sh`, the merge pass the watch and the beat run, calls `gh` and nothing else, and merges only PRs in the repos your `### Merge` list names.'
-fpin "$R" "README: merge allow rule"    '`Bash(sh */clutch/*/scripts/merge.sh*)` lets merges run without the shell'"'"'s ask; leave it out and each merge asks you first.'
+fpin "$R" "README: merge allow rule"    '`Bash(sh */clutch/*/scripts/merge.sh*)` lets merges run without the shell'"'"'s ask; leave it out and each merge pass asks you first.'
 # The handoff path: /clutch:intent ops must be able to invoke the skill, so
 # model invocation stays enabled (negative pin).
 if grep -q 'disable-model-invocation: true' "$O"; then
