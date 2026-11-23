@@ -6,21 +6,23 @@
 # reused pid, another tag's poller, malformed line). It never writes.
 # L12-L14 cover its beat mode (4 for a live poller whose line has no third
 # field beat). Y1-Y9 cover clutch_poll_young <@tag> (0 died young: a
-# well-formed .poll started under one round ago whose .woke is empty, absent
-# or older; 1 otherwise; it never writes).
-# M1-M25 with M5b, M11b, M12b, M12c, M20b, M20c, M22b and M24b-M24e run
+# well-formed .poll started under one round ago, not after now, whose .woke
+# is empty, absent or older; 1 otherwise; it never writes).
+# M1-M27 with M5b, M11b, M12b, M12c, M20b-M20d, M22b and M24b-M24e run
 # scripts/poll.sh @<tag> (the silent check) against a fake gh that applies the
 # real --jq filter to a per-PR GraphQL fixture through /usr/bin/jq, a fake
 # date for +%H and +%s and a fake sleep: quiet rounds print nothing, a move
 # prints "<ref> <what>" lines and the closing line after appending
 # <ref> <stamp> to .woke, 3 gh failures in a row print "<ref> unreadable" once
 # per wait line, every other exit prints the ended line, and a failed write
-# prints the stopped line. Bt1-Bt16 with Bt4b, Bt5b, Bt6b, Bt8b, Bt10b and Bt13b
-# cover the beat: with the tag's ops record there it peeks the beat window
+# prints the stopped line, under dash too (M20d); a gh that never answers is
+# killed after 60 s and counts as a failure (M27). Bt1-Bt17 with Bt4b, Bt5b,
+# Bt6b, Bt8b, Bt10b and Bt13b cover the beat: with the tag's ops record there it peeks the beat window
 # from 08:00 to 20:59, wakes on peer moves at most once an hour with
 # "Run /clutch:beat @<tag>." after a "beat <epoch>" mark, seeds a record with
 # no last line in a beat round (a failed seed retries next round), and
-# keeps running with no gh wait while the record is there.
+# keeps running with no gh wait while the record is there; the hourly cap
+# leaves out a last or beat mark after now (Bt17).
 # prelude.sh and poll.sh are staged into a scratch tree and run under a
 # scratch HOME. PRELUDE_SH and POLL_SH override the targets for replay or a
 # mutant copy. Silent on pass apart from PASS.
@@ -188,7 +190,7 @@ rec "$DEAD $((YN - 300))
 "; YSLEEP=abc; ychk "Y5 300 s old, round abc clamped to 600" '@0123abcd' 0
 unset YSLEEP
 rec "$DEAD $((YN + 1000))
-"; ychk "Y5 future start" '@0123abcd' 0
+"; ychk "Y5 future start" '@0123abcd' 1
 for c in '' "$DEAD" "$DEAD $YN x y" "0 $YN" "$DEAD 1234567890123" 'abc 1' "$DEAD 0$YN"; do
   rec "$c
 "; ychk "Y6 malformed [$c]" '@0123abcd' 1
@@ -219,6 +221,8 @@ cat > "$T/mbin/gh" <<'EOF'
 #!/bin/sh
 F=$HOME/../fix
 echo call >> "$F/log"
+# hang: a gh that never answers, as its own pid (exec), for that many seconds.
+[ -f "$F/hang" ] && { echo $$ > "$F/hangpid"; exec /bin/sleep "$(cat "$F/hang")"; }
 [ -f "$F/pollcopy.on" ] && cp "$HOME/.clutch/watch/0123abcd.poll" "$F/pollcopy"
 [ -f "$F/chmodwoke" ] && { rm -f "$F/chmodwoke"; chmod 400 "$HOME/.clutch/watch/0123abcd.woke"; }
 [ -f "$F/wokewo" ] && { rm -f "$F/wokewo"; chmod 200 "$HOME/.clutch/watch/0123abcd.woke"; }
@@ -297,10 +301,10 @@ fx() {
 cm() { printf '{"createdAt":"%s","author":{"__typename":"%s","login":"%s"}}' "$1" "$2" "$3"; }
 rv() { printf '{"state":"%s","submittedAt":"%s","author":{"__typename":"%s","login":"%s"}}' "$1" "$2" "$3" "$4"; }
 # pr <rounds> <tag>: run the poller; OUT, RC, ERR, NGH (gh calls). PBEAT
-# sets CLUTCH_BEAT, PSCRIPT another staged poll.sh.
+# sets CLUTCH_BEAT, PSCRIPT another staged poll.sh, PSH the shell (sh).
 pr() {
   : > "$FIX/log"
-  OUT=$(cd "$T/plain" && PATH="$T/mbin:$PATH" CLUTCH_BEAT=${PBEAT:-} CLUTCH_POLL_SLEEP=${PSLEEP:-0} CLUTCH_POLL_ROUNDS=$1 sh "${PSCRIPT:-$T/scripts/poll.sh}" "$2" 2>"$T/err")
+  OUT=$(cd "$T/plain" && PATH="$T/mbin:$PATH" CLUTCH_BEAT=${PBEAT:-} CLUTCH_POLL_SLEEP=${PSLEEP:-0} CLUTCH_POLL_ROUNDS=$1 "${PSH:-sh}" "${PSCRIPT:-$T/scripts/poll.sh}" "$2" 2>"$T/err")
   RC=$?
   ERR=$(cat "$T/err")
   NGH=$(grep -c '' "$FIX/log")
@@ -441,6 +445,24 @@ fi
 chmod -R u+rwx "$HOME/.clutch" 2>/dev/null; rm -rf "$HOME/.clutch"; rm -rf "$FIX"; mkdir -p "$FIX"
 pr 1 @0123abcd; ok "M20c no ~/.clutch" 0 "$STOP" 0
 [ ! -e "$HOME/.clutch" ] || { echo "FAIL: M20c -- ~/.clutch created"; fail=1; }
+# M20d: M20, M20b and M20c under dash, where a failed redirect on a special
+# builtin ends the shell: still the stopped line, never silence.
+if ! command -v dash >/dev/null 2>&1; then
+  echo "SKIP: M20d (no dash)"
+else
+  PSH=dash
+  if [ "$(id -u)" != 0 ]; then
+    own1; fx o_r_1 MERGED "$NEW" '' ''; mkdir -p "$HOME/.clutch/watch"; chmod 555 "$HOME/.clutch/watch"
+    pr 1 @0123abcd; chmod 755 "$HOME/.clutch/watch"; ok "M20d dash, watch dir not writable" 0 "$STOP" 0
+    for m in 000 200; do
+      own1; fx o_r_1 MERGED "$NEW" '' ''; mkdir -p "$HOME/.clutch/watch"; : > "$WF"; chmod "$m" "$WF"
+      pr 1 @0123abcd; chmod 644 "$WF"; ok "M20d dash, .woke mode $m" 0 "$STOP" 0
+    done
+  fi
+  chmod -R u+rwx "$HOME/.clutch" 2>/dev/null; rm -rf "$HOME/.clutch" "$FIX"; mkdir -p "$FIX"
+  pr 1 @0123abcd; ok "M20d dash, no ~/.clutch" 0 "$STOP" 0
+  unset PSH
+fi
 own1; madd 50 "proj wait: gh:o/r#2 $B0 @0123abcd pr two"; madd 40 "proj wait: gh:o/r#3 $B0 @0123abcd pr three"
 fx o_r_1 MERGED "$NEW" '' ''; fx o_r_2 OPEN "$NEW" "$(cm "$NEW" User al)" ''; fx o_r_3 OPEN "$B0" '' ''
 pr 1 @0123abcd; ok "M22 two moved" 0 "$(nl 'gh:o/r#1 merged' 'gh:o/r#2 comment' "$CLOSE")" 3
@@ -454,12 +476,26 @@ own1; fx o_r_1 MERGED "$NEW" '' ''; : > "$FIX/datefail"
 pr 1 @0123abcd; ok "M25 date fails" 0 "$ENDED" 0
 # M26: CLUTCH_POLL_SLEEP that is not 1-5 digits >= 1 sleeps 600 s, as
 # stop.sh reads a round; a valid one is kept.
-for nap in 0 00 abc 999999 30; do
+for nap in 0 00 abc 999999 100000 30 99999; do
   own1; fx o_r_1 OPEN "$B0" '' ''; rm -f "$FIX/sleeparg"
   PSLEEP=$nap; pr 2 @0123abcd; unset PSLEEP
-  want=600; [ "$nap" != 30 ] || want=30
+  want=600; case $nap in 30 | 99999) want=$nap ;; esac
   [ "$(cat "$FIX/sleeparg" 2>/dev/null)" = "$want" ] || { echo "FAIL: M26 [$nap] -- slept [$(cat "$FIX/sleeparg" 2>/dev/null)], want $want"; fail=1; }
 done
+# M27: a gh that never answers is killed after the watchdog (60 s; 1 s in a
+# staged copy), its own pid only, and counts as one gh failure: 3 in a row
+# wake unreadable.
+mkdir -p "$T/sgh"; cp "$T/scripts/prelude.sh" "$T/sgh/prelude.sh"
+sed 's|/bin/sleep 60 |/bin/sleep 1 |' "$T/scripts/poll.sh" > "$T/sgh/poll.sh"
+[ "$(grep -c '/bin/sleep 1 ' "$T/sgh/poll.sh")" = 1 ] || { echo "FAIL: M27 -- the staged copy has no 1 s watchdog"; fail=1; }
+own1; fx o_r_1 MERGED "$NEW" '' ''; echo 5 > "$FIX/hang"
+M27S=$(date +%s)
+PSCRIPT="$T/sgh/poll.sh"; pr 4 @0123abcd; unset PSCRIPT
+M27E=$(($(date +%s) - M27S))
+rm -f "$FIX/hang"
+ok "M27 hung gh times out" 0 "$(nl 'gh:o/r#1 unreadable' "$CLOSE")" 3
+[ "$M27E" -lt 12 ] || { echo "FAIL: M27 -- took ${M27E}s, want the 1 s watchdog per call"; fail=1; }
+! kill -0 "$(cat "$FIX/hangpid" 2>/dev/null)" 2>/dev/null || { echo "FAIL: M27 -- the hung gh is still running"; fail=1; }
 # M23: .poll is one line "<pid> <epoch> beat", pid the poller's own (the
 # suite unsets CLUTCH_BEAT, so the beat check is on; Bt12 owns the content).
 own1; fx o_r_1 OPEN "$B0" '' ''; : > "$FIX/pollcopy.on"
@@ -574,6 +610,12 @@ pr 2 @0123abcd; ok "Bt14 M12" 0 "$ENDED" 2
 own1; mkdir -p "$HOME/.clutch/watch"; printf 'beat %s\n' "$((NOW - 100))" > "$WF"
 pr 4 @0123abcd; ok "Bt14 M24" 0 "$(nl 'gh:o/r#1 unreadable' "$CLOSE")" 3
 pr 4 @0123abcd; ok "Bt14 M24 restart" 0 "$ENDED" 4
+# Bt17: a last line or beat mark newer than now (the clock stepped back) is
+# left out of the cap: the peer move since the newest last still wakes.
+mseed; opsrec "last $((NOW + 7200))" "last $((NOW - 7200))"; peer 600
+pr 1 @0123abcd; ok "Bt17 future last" 0 "$BEATL" 0
+mseed; opsrec "last $((NOW - 7200))"; peer 600; mkdir -p "$HOME/.clutch/watch"; printf 'beat %s\n' "$((NOW + 7200))" > "$WF"
+pr 1 @0123abcd; ok "Bt17 future beat mark" 0 "$BEATL" 0
 if [ "$(id -u)" = 0 ]; then
   echo "SKIP: Bt11, Bt15, Bt16 modes (root reads through chmod)"
 else
