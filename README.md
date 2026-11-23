@@ -139,6 +139,7 @@ only at one of those moments.
 4. **The ops view** (optional). `~/.clutch/opsview.json` turns it on: the ops session's beat and sweeps push sessions, waits and sweep items to your private Ops view page through `scripts/opsview-sync.sh`, which runs `tools/ops_sync/ops_sync.py`.
    `templates/opsview.html` is the page: it reads the Linear projects you are a member of, your assigned tickets and their initiatives, and flags a project with no initiative.
    A sweep that skipped or failed to read an integration it tried keeps the last sweep record and pushes only sessions and waits; a push that fails is said once, by a sweep, never by a beat.
+   An integration unavailable for a whole session loses its earlier sweep items from the page until a sweep reads it again.
    With the file absent nothing changes.
 
 The brain is a plain directory. Point it wherever you like, including inside a
@@ -346,7 +347,7 @@ When the tablet inbox has new pages or typed tasks, `/clutch:ops` files them: wo
 Some commands reach out, and only when you invoke them or a session's armed
 watch or beat fires one. `/clutch:fomo` fetches
 a banked link, and a spark, daydream, dream-spark, or ideate pass may run a web
-search. `/clutch:ops` and `/clutch:morning` check the integrations you named.
+search. `/clutch:ops` and `/clutch:morning` check the integrations you named, and with the ops view on `/clutch:ops` also pushes to your Ops view page.
 `/clutch:morning` and `/clutch:eod` run the prep command you set, and the
 extra and close-out steps you wrote can use your integrations.
 `/clutch:review` reads PRs and posts to one only on a yes.
@@ -354,7 +355,7 @@ extra and close-out steps you wrote can use your integrations.
 `/clutch:watch` checks the integrations its session's waits name, every 30
 minutes (every 10 with `CLUTCH_POLL=off`) or on its silent check's wake, until none is left.
 `scripts/poll.sh`, the silent check a session starts in the background while it holds PR waits or is an ops session, calls `gh` and nothing else.
-`/clutch:beat` checks the integrations its waits name, at most once an hour, on its silent check's wake (every hour with `CLUTCH_POLL=off`), while an ops session is open, and with the ops view on it sends what changed to your Ops view page in one `ArtifactData` call.
+`/clutch:beat` checks the integrations its waits name, at most once an hour, on its silent check's wake (every hour with `CLUTCH_POLL=off`), while an ops session is open, and with the ops view on it sends what changed to your Ops view page in one `ArtifactData` batch, plus one retry when a document is refused.
 An ops session's armed sweep sends `/clutch:ops re-sweep armed` at 08:37, 12:37 and 16:37, and only reads, plus the ops view push when it is on, until the session's ops record is gone.
 No hook script here touches the network, and you
 can verify it:
@@ -365,7 +366,7 @@ grep -rE 'curl|wget|/dev/tcp|nc ' scripts/
 
 That returns nothing.
 The one Python helper in `scripts/` sends nothing either: its test suite parses its imports and fails on any network module.
-`tools/ops_sync/ops_sync.py` sends nothing either: it writes local files, and its test suite fails on any network import; the model makes the one `ArtifactData` call.
+`tools/ops_sync/ops_sync.py` sends nothing either: it writes local files, and its test suite fails on any network import; the model makes the one `ArtifactData` batch, plus one retry when a document is refused.
 
 It is read-mostly and fails open, so it sits underneath whatever else you run.
 On a repo with stricter guardrails, the strictest rule wins: the
