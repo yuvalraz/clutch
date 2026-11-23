@@ -70,9 +70,9 @@ if [ "${CLUTCH_WATCH:-}" != off ]; then
               clutch_poll_alive "$WATCH_TAG"
               WATCH_RC=$?
               # Died young (clutch_poll_young): drop its .poll quietly and
-              # dedupe as rc 1; a failed rm keeps rc 3.
+              # dedupe as rc 1; a failed rm asks nothing (rc 0, no .polled).
               if [ "$WATCH_RC" = 3 ] && clutch_poll_young "$WATCH_TAG"; then
-                rm -f "$WATCH_FILE.poll" 2>/dev/null && WATCH_RC=1
+                rm -f "$WATCH_FILE.poll" 2>/dev/null && WATCH_RC=1 || WATCH_RC=0
               fi
               case $WATCH_RC in 1 | 3) ;; *) WATCH_RC=0 ;; esac
               WATCH_NEW=$WATCH_OWN
@@ -127,9 +127,10 @@ fi
 # (2) asks nothing; otherwise the ask is to start the poller once a day, and
 # once more after a poller that ran has ended (3, its .poll removed first,
 # even when asked today). A poller that died young (clutch_poll_young) has
-# its .poll dropped quietly, as with no .poll; a live poller without beat (a
-# 2.18.0 one, 4) is no beat and keeps its .poll. CLUTCH_POLL=off or an
-# unusable path keeps the 2.16.2 hourly ask byte for byte.
+# its .poll dropped quietly, as with no .poll (a failed drop asks nothing);
+# a live poller without beat (a 2.18.0 one, 4) is no beat and keeps its
+# .poll. CLUTCH_POLL=off or an unusable path keeps the 2.16.2 hourly ask
+# byte for byte.
 if [ "${CLUTCH_BEAT:-}" != off ] && [ "${CLUTCH_WATCH:-}" != off ]; then
   case $INPUT in
     *'"stop_hook_active":true'* | *'"stop_hook_active": true'*) ;;

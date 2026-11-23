@@ -8,7 +8,7 @@
 # field beat). Y1-Y9 cover clutch_poll_young <@tag> (0 died young: a
 # well-formed .poll started under one round ago, not after now, whose .woke
 # is empty, absent or older; 1 otherwise; it never writes).
-# M1-M27 with M5b, M11b, M12b, M12c, M20b-M20d, M22b and M24b-M24e run
+# M1-M27 with M5b, M11b, M12b, M12c, M20b-M20d, M22b, M24b-M24e and M27b run
 # scripts/poll.sh @<tag> (the silent check) against a fake gh that applies the
 # real --jq filter to a per-PR GraphQL fixture through /usr/bin/jq, a fake
 # date for +%H and +%s and a fake sleep: quiet rounds print nothing, a move
@@ -16,7 +16,8 @@
 # <ref> <stamp> to .woke, 3 gh failures in a row print "<ref> unreadable" once
 # per wait line, every other exit prints the ended line, and a failed write
 # prints the stopped line, under dash too (M20d); a gh that never answers is
-# killed after 60 s and counts as a failure (M27). Bt1-Bt17 with Bt4b, Bt5b,
+# killed after 60 s and counts as a failure (M27), and no gh returns at once
+# under sh and dash (M27b). Bt1-Bt17 with Bt4b, Bt5b,
 # Bt6b, Bt8b, Bt10b and Bt13b cover the beat: with the tag's ops record there it peeks the beat window
 # from 08:00 to 20:59, wakes on peer moves at most once an hour with
 # "Run /clutch:beat @<tag>." after a "beat <epoch>" mark, seeds a record with
@@ -301,10 +302,11 @@ fx() {
 cm() { printf '{"createdAt":"%s","author":{"__typename":"%s","login":"%s"}}' "$1" "$2" "$3"; }
 rv() { printf '{"state":"%s","submittedAt":"%s","author":{"__typename":"%s","login":"%s"}}' "$1" "$2" "$3" "$4"; }
 # pr <rounds> <tag>: run the poller; OUT, RC, ERR, NGH (gh calls). PBEAT
-# sets CLUTCH_BEAT, PSCRIPT another staged poll.sh, PSH the shell (sh).
+# sets CLUTCH_BEAT, PSCRIPT another staged poll.sh, PSH the shell (sh), PBIN
+# the fake bin dir ($T/mbin).
 pr() {
   : > "$FIX/log"
-  OUT=$(cd "$T/plain" && PATH="$T/mbin:$PATH" CLUTCH_BEAT=${PBEAT:-} CLUTCH_POLL_SLEEP=${PSLEEP:-0} CLUTCH_POLL_ROUNDS=$1 "${PSH:-sh}" "${PSCRIPT:-$T/scripts/poll.sh}" "$2" 2>"$T/err")
+  OUT=$(cd "$T/plain" && PATH="${PBIN:-$T/mbin}:$PATH" CLUTCH_BEAT=${PBEAT:-} CLUTCH_POLL_SLEEP=${PSLEEP:-0} CLUTCH_POLL_ROUNDS=$1 "${PSH:-sh}" "${PSCRIPT:-$T/scripts/poll.sh}" "$2" 2>"$T/err")
   RC=$?
   ERR=$(cat "$T/err")
   NGH=$(grep -c '' "$FIX/log")
@@ -486,8 +488,8 @@ done
 # staged copy), its own pid only, and counts as one gh failure: 3 in a row
 # wake unreadable.
 mkdir -p "$T/sgh"; cp "$T/scripts/prelude.sh" "$T/sgh/prelude.sh"
-sed 's|/bin/sleep 60 |/bin/sleep 1 |' "$T/scripts/poll.sh" > "$T/sgh/poll.sh"
-[ "$(grep -c '/bin/sleep 1 ' "$T/sgh/poll.sh")" = 1 ] || { echo "FAIL: M27 -- the staged copy has no 1 s watchdog"; fail=1; }
+sed 's|"$n" -lt 60 ]|"$n" -lt 1 ]|' "$T/scripts/poll.sh" > "$T/sgh/poll.sh"
+[ "$(grep -c '"$n" -lt 1 ]' "$T/sgh/poll.sh")" = 1 ] || { echo "FAIL: M27 -- the staged copy has no 1 s watchdog"; fail=1; }
 own1; fx o_r_1 MERGED "$NEW" '' ''; echo 5 > "$FIX/hang"
 M27S=$(date +%s)
 PSCRIPT="$T/sgh/poll.sh"; pr 4 @0123abcd; unset PSCRIPT
@@ -496,6 +498,34 @@ rm -f "$FIX/hang"
 ok "M27 hung gh times out" 0 "$(nl 'gh:o/r#1 unreadable' "$CLOSE")" 3
 [ "$M27E" -lt 12 ] || { echo "FAIL: M27 -- took ${M27E}s, want the 1 s watchdog per call"; fail=1; }
 ! kill -0 "$(cat "$FIX/hangpid" 2>/dev/null)" 2>/dev/null || { echo "FAIL: M27 -- the hung gh is still running"; fail=1; }
+# M27b: no gh on PATH (rc 127 at once, the race window widest) returns at
+# once on every call, under sh and dash: the watchdog's kill never waits out
+# its sleep, and no watchdog sleep outlives its call by more than 1 s. The
+# staged copy marks the watchdog's sleep (.00427), counted by that marker and
+# never killed.
+mkdir -p "$T/sgq" "$T/nogh"; cp "$T/scripts/prelude.sh" "$T/sgq/prelude.sh"
+cp "$T/mbin/date" "$T/mbin/sleep" "$T/nogh/"
+sed 's|/bin/sleep \([0-9][0-9]*\)\([ ;]\)|/bin/sleep \1.00427\2|' "$T/scripts/poll.sh" > "$T/sgq/poll.sh"
+[ "$(grep -c '/bin/sleep [0-9]*\.00427' "$T/sgq/poll.sh")" = 1 ] || { echo "FAIL: M27b -- the staged copy has no marked watchdog sleep"; fail=1; }
+M27P=$PATH
+for sh27 in /bin/sh /bin/dash; do
+  [ -x "$sh27" ] || { echo "SKIP: M27b $sh27 (not installed)"; continue; }
+  M27S=$(date +%s)
+  i=0
+  while [ "$i" -lt 10 ]; do
+    own1
+    PATH=/usr/bin:/bin:/usr/sbin:/sbin PSH=$sh27 PSCRIPT="$T/sgq/poll.sh" PBIN="$T/nogh"
+    pr 3 @0123abcd
+    PATH=$M27P; unset PSH PSCRIPT PBIN
+    ok "M27b $sh27 no gh [$i]" 0 "$(nl 'gh:o/r#1 unreadable' "$CLOSE")" 0
+    i=$((i + 1))
+  done
+  M27E=$(($(date +%s) - M27S))
+  [ "$M27E" -lt 20 ] || { echo "FAIL: M27b $sh27 -- 30 gh calls with no gh took ${M27E}s"; fail=1; }
+done
+/bin/sleep 2
+M27L=$(ps -A -o args= | grep -c '^/bin/sleep [0-9]*\.00427$')
+[ "$M27L" = 0 ] || { echo "FAIL: M27b -- $M27L watchdog sleeps outlived their call by 2 s"; fail=1; }
 # M23: .poll is one line "<pid> <epoch> beat", pid the poller's own (the
 # suite unsets CLUTCH_BEAT, so the beat check is on; Bt12 owns the content).
 own1; fx o_r_1 OPEN "$B0" '' ''; : > "$FIX/pollcopy.on"

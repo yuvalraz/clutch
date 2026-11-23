@@ -61,7 +61,9 @@ ISO='[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]:[0-9][0-9]:[0-9][0-9]
 ghq() {
   gh api graphql -f query="$Q" -f o="$OWNER" -f r="$REPO" -F n="$NUM" --jq "$F" </dev/null &
   GHQ_P=$!
-  ( trap 'kill "$GHQ_S"; exit 0' TERM; /bin/sleep 60 & GHQ_S=$!; wait "$GHQ_S" && kill "$GHQ_P" ) >/dev/null &
+  # 1 s naps, no trap: a kill lands on the default TERM action at any point,
+  # and at most one 1 s sleep outlives it.
+  ( n=0; while [ "$n" -lt 60 ]; do /bin/sleep 1; n=$((n + 1)); done; kill "$GHQ_P" ) >/dev/null &
   GHQ_K=$!
   wait "$GHQ_P"
   GHQ_RC=$?

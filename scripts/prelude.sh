@@ -325,7 +325,7 @@ clutch_poll_alive() {
 # Did <@tag>'s ended silent check die young? 0 when its .poll first line is
 # well-formed ("<pid> <start>[ <third>]", start of at most 12 digits), the
 # start is under one round ago (poll.sh's sleep: CLUTCH_POLL_SLEEP when 1-5
-# digits >= 1, else 600 s; a future start reads as young) and it never woke
+# digits >= 1, else 600 s; a start after now is not young) and it never woke
 # (.woke empty or absent, or .poll newer than .woke; equal mtimes on a
 # non-empty .woke count as a wake), say killed by a Bash timeout or a
 # headless exit. 1 otherwise, an unreadable .poll or a date failure included.

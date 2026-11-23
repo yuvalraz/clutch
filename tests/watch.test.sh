@@ -687,8 +687,7 @@ for nap in 99999 100000; do
   if [ "$nap" = 99999 ]; then quiet "P3k CLUTCH_POLL_SLEEP=$nap"; else is "P3k CLUTCH_POLL_SLEEP=$nap" 0 "$WPOLL"; fi
 done
 # P3l: a young death whose .poll cannot be removed (~/.clutch/watch 555) is
-# not read as dropped: rc 3 stands and the ask stops at the failed rm: quiet,
-# .poll left.
+# not read as dropped and asks nothing: quiet, .poll left, no wait recorded.
 if [ "$(id -u)" = 0 ]; then
   echo "SKIP: P3l (root writes through chmod)"
 else
@@ -701,6 +700,10 @@ else
   chmod 755 "$HOME/.clutch/watch"
   quiet "P3l young .poll not removable"
   [ -e "$PP" ] || { echo "FAIL: P3l -- .poll removed"; fail=1; }
+  # The failed drop asked nothing, so it recorded nothing: once the dir is
+  # writable the wait is still asked.
+  stp "$PL1" "$IN"
+  is "P3l asked after the dir is writable" 0 "$WPOLL"
 fi
 # P5: any /clutch:watch @tag cron arms the set, a stale .poll included.
 for c in '*/15 8-21 * * *' '*/10 8-21 * * *' '7,37 8-21 * * *'; do
