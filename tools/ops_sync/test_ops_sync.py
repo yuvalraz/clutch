@@ -262,6 +262,10 @@ class ParseWorklog(unittest.TestCase):
         self.assertEqual(docs[("sessions", TAG)]["ticket"], "DEMO-9")
         self.assertEqual(docs[("sessions", "repo:alpha")]["on"], "untagged in alpha")
 
+    def test_wait_ref_that_strips_empty_has_no_doc(self):
+        now = 1_800_000_000
+        self.assertEqual(ops_sync.wait_docs(["%d demo-repo wait: ,;: b1 reply" % (now - 10)], {}, now), {})
+
 
 # --- CLI seam --------------------------------------------------------------
 
@@ -688,6 +692,53 @@ class People(unittest.TestCase):
         s.run("--ack", *ack_args(rows, 1))
         rc, out, _ = s.run()
         self.assertEqual((rc, out), (0, "OPS: %s\nOPS: unchanged\n" % URL))
+
+    def test_people_guard_docs_already_on_disk(self):
+        # Docs written before the guard line existed never go out under their old id or content.
+        canary = "dana.canary@example.com"
+        s = Scratch(self)
+        s.config()
+        s.worklog(["%d %s on: planning" % (s.now - 60, canary),
+                   "%d demo-repo wait: mail:%s b1 %s reply" % (s.now - 50, canary, TAG),
+                   "%d demo-repo wait: gh:demo/app#5 b1 %s ping %s" % (s.now - 40, TAG2, canary)])
+        s.run()
+        s.worklog(["%d demo-repo moved: gh:demo/app#5 %s merged" % (s.now - 30, TAG2)], mode="a")
+        s.run()
+        clean_id = "gh:demo~2Fapp~235~20~400f0f0f0f"
+        self.assertIn(canary, load(s.path("opsview", "docs", "waits", clean_id + ".json"))["text"])
+        with open(s.path("people.md"), "w") as handle:
+            handle.write("- %s\n" % canary)
+        s.worklog(["%d demo-repo moved: mail:%s %s answered" % (s.now - 20, canary, TAG)], mode="a")
+        rc, out, err = s.run()
+        self.assertEqual(rc, 0)
+        rows = doc_lines(out)
+        forms = [f.casefold() for f in (canary, ops_sync.enc_doc_id(canary),
+                                        ops_sync.enc_doc_id(canary).replace("~", "%"))]
+        for _, d, path, _ in rows:
+            with open(path, encoding="utf-8") as handle:
+                text = handle.read().casefold()
+            self.assertNotIn(canary, (decode_id(d) or "").casefold())
+            for form in forms:
+                self.assertNotIn(form, d.casefold())
+                self.assertNotIn(form, path.casefold())
+                self.assertNotIn(form, text)
+        ids = {(c, d) for c, d, _, _ in rows}
+        wait_h = "~h" + hashlib.sha256(("mail:%s %s" % (canary, TAG)).encode()).hexdigest()[:40]
+        self.assertIn(("sessions", "~h" + hashlib.sha256(("repo:" + canary).encode()).hexdigest()[:40]), ids)
+        self.assertIn(("waits", wait_h), ids)
+        self.assertIn(("waits", clean_id), ids)
+        self.assertEqual(load(s.path("opsview", "docs", "waits", wait_h + ".json"))["state"], "closed")
+        self.assertEqual(load(s.path("opsview", "docs", "waits", clean_id + ".json"))["text"], "")
+        match = re.fullmatch(r"ops_sync: people-file text kept out of ([0-9]+) fields\n", err)
+        self.assertIsNotNone(match, err)
+        self.assertGreaterEqual(int(match.group(1)), 3)
+        # The old files stay on disk (no delete path) and never come back.
+        self.assertTrue(os.path.exists(s.path("opsview", "docs", "waits",
+                                              ops_sync.enc_doc_id("mail:%s %s" % (canary, TAG)) + ".json")))
+        s.run("--ack", *ack_args(rows, 1))
+        rc, out, _ = s.run()
+        self.assertEqual((rc, out), (0, "OPS: %s\nOPS: unchanged\n" % URL))
+        self.assertEqual(load(s.path("opsview", "docs", "waits", wait_h + ".json"))["state"], "closed")
 
     def test_people_unreadable(self):
         s = Scratch(self)

@@ -51,6 +51,12 @@ def enc_doc_id(key: str) -> str:
     return out
 
 
+def dec_doc_id(doc_id: str) -> str:
+    """The key behind an IF-2 id ("~" only ever starts an escape); a hash id decodes to itself."""
+    raw = re.sub(rb"~([0-9A-F]{2})", lambda m: bytes([int(m.group(1), 16)]), doc_id.encode("utf-8"))
+    return raw.decode("utf-8", "replace")
+
+
 def ticket_of(slugs: list, texts: list) -> str | None:
     """IF-3: the first ticket id in the slugs, then in the texts."""
     for pattern, values in ((SLUG_RE, slugs), (TEXT_RE, texts)):
@@ -152,6 +158,8 @@ def wait_docs(open_wait_lines: list, previous_docs: dict, now: int, ident=enc_do
         if len(fields) < 5 or not fields[0].isdigit() or fields[2] != "wait:":
             continue
         ref = fields[3].rstrip(",;:.\r")
+        if not ref:
+            continue  # an empty ref has no id; never write a doc named ""
         tag = fields[5] if len(fields) > 5 and TAG_RE.match(fields[5]) else None
         text = " ".join(fields[6:] if tag else fields[5:])[:200]
         opened = iso(int(fields[0]))
@@ -299,16 +307,32 @@ def sync(home: str) -> int:
     previous = read_docs(docs_dir)
     hashed = []
 
+    def hash_id(key):
+        return "~h" + hashlib.sha256(key.encode("utf-8")).hexdigest()[:40]
+
     def ident(key):
         if guard_hit(key, guard):
             hashed.append(key)
-            return "~h" + hashlib.sha256(key.encode("utf-8")).hexdigest()[:40]
+            return hash_id(key)
         return enc_doc_id(key)
 
-    docs = build_docs(worklog_lines, open_lines, None, previous, now, ident)
+    def id_hit(doc_id):
+        return guard_hit(doc_id, guard) or guard_hit(dec_doc_id(doc_id), guard)
+
+    # Docs on disk may predate a guard line. A hit id is re-keyed to its hash id and a hit value
+    # blanked, so a stale wait closes, and any doc goes out, only in its guarded form.
+    known = {key: doc for key, doc in previous.items() if not id_hit(key[1])}
+    carried = {key: json.loads(dump(doc)) for key, doc in known.items()
+               if isinstance(doc, dict) and people_guard(json.loads(dump(doc)), guard)}
+    for (collection, doc_id), doc in previous.items():
+        if (collection, doc_id) not in known and isinstance(doc, dict):
+            key = (collection, hash_id(dec_doc_id(doc_id)))
+            if key not in known:
+                carried.setdefault(key, json.loads(dump(doc)))
+    docs = build_docs(worklog_lines, open_lines, None, {**known, **carried}, now, ident)
+    for key, doc in carried.items():
+        docs.setdefault(key, doc)
     blanked = len(hashed) + sum(people_guard(doc, guard) for doc in docs.values())
-    if blanked:
-        print("ops_sync: people-file text kept out of %d fields" % blanked, file=sys.stderr)
     try:
         for (collection, doc_id), doc in docs.items():
             data = dump(doc)
@@ -321,13 +345,22 @@ def sync(home: str) -> int:
     for (collection, doc_id), doc in read_docs(docs_dir).items():
         path = docs_dir / collection / (doc_id + ".json")
         try:
-            digest = hashlib.sha256(path.read_bytes()).hexdigest()
+            raw = path.read_bytes()
         except OSError:
             continue
+        # The guard covers what is emitted, not only what this run built: a file whose id or
+        # content holds people text stays on disk (no delete path) and never becomes OPS_DOC.
+        if (id_hit(doc_id) or guard_hit(raw.decode("utf-8", "replace"), guard)
+                or isinstance(doc, dict) and people_guard(doc, guard)):
+            blanked += 1
+            continue
+        digest = hashlib.sha256(raw).hexdigest()
         key = collection + "/" + doc_id
         if digest != state["acked"].get(key):
             stamp = doc.get("updated_at") if isinstance(doc, dict) else None
             changed.append((stamp if isinstance(stamp, str) else "", key, collection, doc_id, path))
+    if blanked:
+        print("ops_sync: people-file text kept out of %d fields" % blanked, file=sys.stderr)
     changed.sort(reverse=True)
     lines = ["OPS: " + url]
     for _, key, collection, doc_id, path in changed[:BATCH]:
