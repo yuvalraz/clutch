@@ -125,7 +125,7 @@ if tr -s '[:space:]' ' ' < "$O" | grep -qF 'sends this same line'; then
   echo "FAIL: ops: armed sweep -- still says the armed sweep sends the hand-typed line"; fail=1
 fi
 # README: the armed sweep is described as it runs.
-tr -s '[:space:]' ' ' < "$R" | grep -qF 'The armed sweep only reads and speaks: it keeps the session'"'"'s mode, and the actions and posts your delegation policy pre-approves wait for a sweep you type.' \
+tr -s '[:space:]' ' ' < "$R" | grep -qF 'The armed sweep only reads and speaks, plus the ops view push when it is on: it keeps the session'"'"'s mode, and the actions and posts your delegation policy pre-approves wait for a sweep you type.' \
   || { echo "FAIL: README: armed sweep -- the read-only, mode-keeping sentence is missing"; fail=1; }
 if tr -s '[:space:]' ' ' < "$R" | grep -qF 'the same read-only sweep you can ask for'; then
   echo "FAIL: README: armed sweep -- still calls it the same sweep you can ask for"; fail=1
@@ -506,7 +506,7 @@ awk '/^### Ops view$/{f=1;next} /^### /{f=0} f' "$O" | grep -qxF 'The heredoc is
   || { echo "FAIL: OV record rules -- the quoted-heredoc sentence is not in Ops view"; fail=1; }
 fpin "$O" "OV record rules"             'Exit status 2 names on stderr what it refused: fix the items once and run it again; if that fails too, it is a push failure.'
 # A partial sweep never records: ops_sync would mark the integration it skipped present:false.
-awk '/^### Ops view$/{f=1;next} /^### /{f=0} f' "$O" | grep -qxF 'When the sweep skipped or failed to read any integration it normally reads, it does not record: push step 1 runs plain `opsview-sync.sh` (no `--sweep`) instead, so sessions and waits still push and the last full sweep record stays.' \
+awk '/^### Ops view$/{f=1;next} /^### /{f=0} f' "$O" | grep -qxF 'When the sweep skipped or failed to read an integration it tried to read this sweep, it does not record: push step 1 runs plain `opsview-sync.sh` (no `--sweep`) instead, so sessions and waits still push and the last full sweep record stays. An integration that is not set up, or is unavailable all session, is not skipped here, so it never blocks the record.' \
   || { echo "FAIL: OV partial sweep -- the no-record rule is not in Ops view"; fail=1; }
 fpin "$O" "OV record null"              'A missing value is JSON null, never the string `"null"`.'
 fpin "$O" "sweep window unreadable"     'Exit status 2 means the worklog is unreadable: say so in one line, never that there is no peer context, and the sweep goes on.'
@@ -578,6 +578,20 @@ fpin "$R" "README safe: ops reads"      'Ops also reads the tablet inbox under `
 fpin "$R" "README safe: waiting file"   'before today'"'"'s focus file exists, work lines wait in `<state dir>/tablet.md` and move into that file once it does'
 fpin "$R" "README safe: ops writes"     '`/clutch:ops` files them: work lines into today'"'"'s focus file (or, with no focus file set, `~/.clutch/personal.md`)'
 fpin "$R" "README safe: helper imports" 'its test suite parses its imports and fails on any network module'
+# The ops view (2.19.0): the README names the item, the push, the reads, the writes and the allow rule.
+fpin "$R" "README: ops view item"       '4. **The ops view** (optional). `~/.clutch/opsview.json` turns it on: the ops session'"'"'s beat and sweeps push sessions, waits and sweep items to your private Ops view page through `scripts/opsview-sync.sh`, which runs `tools/ops_sync/ops_sync.py`.'
+fpin "$R" "README: ops view off"        'With the file absent nothing changes.'
+fpin "$R" "README: ops view partial"    'A sweep that skipped or failed to read an integration it tried keeps the last sweep record and pushes only sessions and waits; a push that fails is said once, by a sweep, never by a beat.'
+fpin "$R" "README: beat push"           '`/clutch:beat` checks the integrations its waits name, at most once an hour, on its silent check'"'"'s wake (every hour with `CLUTCH_POLL=off`), while an ops session is open, and with the ops view on it sends what changed to your Ops view page in one `ArtifactData` batch, plus one retry when a document is refused.'
+fpin "$R" "README: ops_sync sends nothing" '`tools/ops_sync/ops_sync.py` sends nothing either: it writes local files, and its test suite fails on any network import; the model makes the one `ArtifactData` batch, plus one retry when a document is refused.'
+fpin "$R" "README: ops push"            '`/clutch:ops` and `/clutch:morning` check the integrations you named, and with the ops view on `/clutch:ops` also pushes to your Ops view page.'
+fpin "$R" "README: ops view unavailable" 'An integration unavailable for a whole session loses its earlier sweep items from the page until a sweep reads it again.'
+fpin "$R" "README: ops view reads"      'With the ops view on (`~/.clutch/opsview.json` exists), the ops session'"'"'s beat and sweeps also read that file, and `~/.clutch/people.md` to keep its lines out of what they send.'
+fpin "$R" "README: ops view writes"     'With the ops view on, the ops session'"'"'s beat and sweeps also write `~/.clutch/opsview/` and `~/.clutch/sweep.json` without a command, and send what changed to your private Ops view page; a write cut short can leave `~/.clutch/.sweep.json.tmp` or a dot-named `.tmp` file under `~/.clutch/opsview/`, which the next run overwrites.'
+fpin "$R" "README: opsview allow rule"  'With the ops view on, the beat and sweeps also run `scripts/opsview-sync.sh`: allow `Bash(sh */clutch/*/scripts/opsview-sync.sh*)`, or `Bash(sh <checkout>/scripts/opsview-sync.sh*)` from a checkout, the same way.'
+if tr -s '[:space:]' ' ' < "$R" | grep -qE 'and only reads, until|armed sweep only reads and speaks:'; then
+  echo "FAIL: README: armed sweep -- still says it only reads, with no ops view push"; fail=1
+fi
 
 # --- local mirror of the private-vocab, intent, F and G wording gates.
 # Same regex strings as de-private.test.sh; rc 1 = clean, 0 = leak,

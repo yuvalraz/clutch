@@ -435,7 +435,7 @@ One item per thing the sweep read that is live today: a PR waiting on a review, 
 `title` is the item's own title, never message text; `waiting_on` is a display name or role as the item shows it, never anything from `~/.clutch/people.md`; `ticket` is the first ticket id in the PR's branch name or title, else null.
 The heredoc is quoted, so the items need JSON escaping only.
 A missing value is JSON null, never the string `"null"`.
-When the sweep skipped or failed to read any integration it normally reads, it does not record: push step 1 runs plain `opsview-sync.sh` (no `--sweep`) instead, so sessions and waits still push and the last full sweep record stays.
+When the sweep skipped or failed to read an integration it tried to read this sweep, it does not record: push step 1 runs plain `opsview-sync.sh` (no `--sweep`) instead, so sessions and waits still push and the last full sweep record stays. An integration that is not set up, or is unavailable all session, is not skipped here, so it never blocks the record.
 Exit status 2 names on stderr what it refused: fix the items once and run it again; if that fails too, it is a push failure.
 
 <!-- opsview push -->
