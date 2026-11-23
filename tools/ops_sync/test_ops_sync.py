@@ -686,6 +686,9 @@ class People(unittest.TestCase):
         self.assertEqual(sorted(hashed), sorted([
             "~h" + hashlib.sha256(("repo:" + canary).encode()).hexdigest()[:40],
             "~h" + hashlib.sha256(("mail:%s %s" % (canary, TAG)).encode()).hexdigest()[:40]]))
+        # IF-5: a guarded wait ref is "", never null (only a sweep's ref is nullable).
+        wait = [path for c, _, path, _ in rows if c == "waits"][0]
+        self.assertEqual(load(wait)["ref"], "")
         # Two fields (repo, ref) and two ids.
         self.assertEqual(err, "ops_sync: people-file text kept out of 4 fields\n")
         # A second run keeps the same ids: the hashed wait stays open, not closed and re-keyed.
@@ -872,6 +875,8 @@ class ValidateSweep(unittest.TestCase):
             ({"items": [item(state=None)]}, "sweep: items[0].state"),
             ({"items": [item(waiting_on=7)]}, "sweep: items[0].waiting_on"),
             ({"items": [item(ticket=12)]}, "sweep: items[0].ticket"),
+            ({"items": [item("a\ud800b")]}, "sweep: items[0].key"),
+            ({"items": [item(title="a\ud800b")]}, "sweep: items[0].title"),
             ({"items": [item(), "not an object"]}, "sweep: items[1]"),
             ({"items": [item("k%d" % i) for i in range(101)]}, "sweep: items"),
             ({"items": {}}, "sweep: items"),
@@ -1025,6 +1030,7 @@ class SweepCli(unittest.TestCase):
             (b"[" * 200000, "ops_sync: sweep: not JSON\n"),
             (json.dumps([item()]).encode(), "ops_sync: sweep: not an object\n"),
             (b" " * (1 << 20) + b"{}", "ops_sync: sweep: input over 1 MiB\n"),
+            (json.dumps({"items": [item(title="a\ud800b")]}).encode(), "ops_sync: sweep: items[0].title\n"),
             (b'{"items": []}', None),
         ]
         for data, want in cases:
@@ -1079,6 +1085,14 @@ class SweepCli(unittest.TestCase):
         # An unreadable record marks nothing gone.
         for _, _, path, _ in doc_lines(out):
             self.assertIs(load(path)["present"], True)
+        # A swept_at iso() cannot format, or a lone surrogate, is a bad record, not a crash.
+        for raw in ('{"swept_at": %d, "items": []}' % (1 << 62), '{"swept_at": -1, "items": []}',
+                    '{"swept_at": 1, "items": [{"key": "a\\ud800b", "kind": "pr", "title": "t", "state": "s"}]}'):
+            with self.subTest(raw=raw):
+                with open(s.path("sweep.json"), "w") as handle:
+                    handle.write(raw)
+                rc, _, err = s.run()
+                self.assertEqual((rc, err), (0, "ops_sync: sweep record ignored\n"))
 
     def test_people_guard_sweep_key(self):
         s = Scratch(self)

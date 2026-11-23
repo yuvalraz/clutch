@@ -30,7 +30,8 @@ SLUG_RE = re.compile(r"(?<![A-Za-z0-9])([A-Za-z]{2,6})-([0-9]{1,6})(?![A-Za-z0-9
 TEXT_RE = re.compile(r"(?<![A-Za-z0-9-])([A-Z]{2,6})-([0-9]{1,6})(?![A-Za-z0-9])")
 NOT_TICKETS = ("CVE", "GPT", "HTTP", "ISO", "PEP", "RFC", "SHA", "UTF", "OD", "IF", "RP")
 # Schema fields that hold null rather than "" when the people guard blanks them.
-NULLABLE = frozenset(("tag", "on", "on_at", "ticket", "closed_at", "ref", "waiting_on"))
+NULLABLE = frozenset(("tag", "on", "on_at", "ticket", "closed_at"))
+SWEEP_NULLABLE = NULLABLE | {"ref", "waiting_on"}
 SWEEP_MAX = 1 << 20
 SWEEP_KINDS = ("pr", "slack", "meeting", "linear", "other")
 SWEEP_CUTS = (("title", 120), ("state", 40), ("waiting_on", 60))
@@ -83,7 +84,7 @@ def guard_hit(value: str, guard_lines: list) -> bool:
     return any(g.casefold() in folded or (len(value) >= 16 and folded in g.casefold()) for g in guard_lines)
 
 
-def people_guard(doc: dict, guard_lines: list) -> int:
+def people_guard(doc: dict, guard_lines: list, nullable=NULLABLE) -> int:
     """Blank every string in `doc` that holds a guard line or sits inside one; returns the count."""
 
     def walk(node):
@@ -91,7 +92,7 @@ def people_guard(doc: dict, guard_lines: list) -> int:
         items = node.items() if isinstance(node, dict) else enumerate(node)
         for key, value in list(items):
             if isinstance(value, str) and guard_hit(value, guard_lines):
-                node[key] = None if key in NULLABLE else ""
+                node[key] = None if key in nullable else ""
                 count += 1
             elif isinstance(value, (dict, list)):
                 count += walk(value)
@@ -216,6 +217,12 @@ def validate_sweep(obj: dict) -> list:
         for name, ok in checks:
             if not ok:
                 raise Fail("%s.%s" % (where, name), 2)
+        for name, value in out.items():
+            try:
+                if value is not None:
+                    value.encode("utf-8")
+            except UnicodeEncodeError:  # a lone surrogate would crash dump()
+                raise Fail("%s.%s" % (where, name), 2)
         for name, cut in SWEEP_CUTS:
             if out[name] is not None:
                 out[name] = out[name][:cut]
@@ -267,6 +274,7 @@ def dump(obj) -> bytes:
 
 def write_atomic(path: Path, data: bytes):
     path.parent.mkdir(parents=True, exist_ok=True)
+    # shortcut: a failed replace leaves .<name>.tmp behind (no deletes here); add it to the write set.
     tmp = path.parent / ("." + path.name + ".tmp")
     with open(tmp, "wb") as handle:
         handle.write(data)
@@ -367,7 +375,8 @@ def read_sweep(home: str):
         return None
     try:
         record = json.loads(path.read_bytes().decode("utf-8"))
-        if not isinstance(record, dict) or set(record) != {"swept_at", "items"} or type(record["swept_at"]) is not int:
+        if not isinstance(record, dict) or set(record) != {"swept_at", "items"} or type(record["swept_at"]) is not int \
+                or not 0 <= record["swept_at"] < 1 << 40:
             raise ValueError
         return {"swept_at": record["swept_at"], "items": validate_sweep({"items": record["items"]})}
     except (OSError, ValueError, RecursionError, Fail):
@@ -408,7 +417,7 @@ def sync(home: str, sweep_items=None) -> int:
         for item in record["items"]:
             item = dict(item)
             key = item.pop("key")
-            blanked += people_guard(item, guard)
+            blanked += people_guard(item, guard, SWEEP_NULLABLE)
             item.update(key="" if guard_hit(key, guard) else key, id_key=key)
             items.append(item)
         record = {"swept_at": record["swept_at"], "items": items}
@@ -441,7 +450,9 @@ def sync(home: str, sweep_items=None) -> int:
     docs = build_docs(worklog_lines, open_lines, record, {**known, **carried}, now, ident)
     for key, doc in carried.items():
         docs.setdefault(key, doc)
-    blanked += len(hashed) + sum(people_guard(doc, guard) for doc in docs.values())
+    blanked += len(hashed) + sum(
+        people_guard(doc, guard, SWEEP_NULLABLE if collection == "sweep" else NULLABLE)
+        for (collection, _), doc in docs.items())
     try:
         for (collection, doc_id), doc in docs.items():
             data = dump(doc)
