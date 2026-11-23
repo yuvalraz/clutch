@@ -19,8 +19,15 @@ First check that this session is still an ops session, `@<tag>` replaced by the 
 sh -c '. "${CLAUDE_PLUGIN_ROOT}/scripts/prelude.sh" && clutch_ops_record "@<tag>"'
 ```
 
-Exit status 1 with no error text means its ops record is gone: cancel the recurring task in this session's own task list whose prompt is exactly `/clutch:beat @<tag>`, reply with exactly `Not an ops session now; the beat stopped.` and write nothing.
-Any other outcome goes on to the read; the check never writes.
+Exit status 1 with no error text means its ops record is gone: cancel the recurring task in this session's own task list whose prompt is exactly `/clutch:beat @<tag>`, reply with exactly `Not an ops session now; the beat stopped.` and write nothing. Any other outcome goes on to the read; the check never writes.
+
+Then run the merge pass, before the read. It needs no yes: the `### Merge` list is the user's standing yes for this merge; every other outward action still waits for its usual yes.
+
+```sh
+sh "${CLAUDE_PLUGIN_ROOT}/scripts/merge.sh" --unwatched
+```
+
+Append each `merged` line first, exactly as printed, its tag kept when it has one, as the text of a `moved:` line with the constitution's worklog snippet: the merge pass's lines keep their tag, so a dead tag's line closes only that tag's wait. Name a `did not merge` line once and write nothing for it. Keep the `held` lines in view for the read. Exit status 0 with no output: nothing merged. Any other outcome: say once that the merge pass cannot run. A merged PR is what moved: its one smallest move is the bookkeeping after a merge, such as the ticket, named and not done, since it waits for its usual yes.
 
 Read with this line, `@<tag>` replaced by the argument:
 
@@ -28,13 +35,10 @@ Read with this line, `@<tag>` replaced by the argument:
 sh -c '. "${CLAUDE_PLUGIN_ROOT}/scripts/prelude.sh" && L=$(clutch_beat_window "@<tag>") || exit; [ -z "$L" ] || printf "%s\n" "$L" | LC_ALL=C cut -c1-300'
 ```
 
-Each line is a wait no session's tag owns, `<epoch> <repo> wait: <kind>:<ref> <baseline> <text>`, or a move another session logged since the last beat, `<epoch> <repo> moved: <text>`.
-Unlike the session-start Worklog block, the beat's read is for the reply: name a peer's `moved:` line.
-Exit status 0 with empty output, or exit status 1 with no error text, means nothing to read: reply `No change.`
-Any other outcome, error text included: say once that the beat cannot read the worklog, and stay silent about it on later beats.
+Each line is a wait no session's tag owns, `<epoch> <repo> wait: <kind>:<ref> <baseline> <text>`, or a move another session logged since the last beat, `<epoch> <repo> moved: <text>`. Unlike the session-start Worklog block, the beat's read is for the reply: name a peer's `moved:` line.
+Exit status 0 with empty output, or exit status 1 with no error text, means nothing to read: reply `No change.` With the merge pass's `merged` lines, that is not `No change.` Any other outcome, error text included: say once that the beat cannot read the worklog, and stay silent about it on later beats.
 
-A `moved:` line already moved: name it, never read its thing again.
-Skip a `moved:` line this session wrote itself, such as a loop it closed or a wait an earlier beat closed.
+A `moved:` line already moved: name it, never read its thing again. Skip a `moved:` line this session wrote itself, such as a loop it closed or a wait an earlier beat closed.
 
 Read each wait once, by its kind, against its baseline. Only this counts as movement:
 
@@ -46,13 +50,9 @@ Read each wait once, by its kind, against its baseline. Only this counts as move
 - dd: a monitor state other than the baseline.
 
 A wait that moved: append its `moved:` line first, with the constitution's worklog snippet, verb `moved:` and text `<kind>:<ref> <what moved>`. Copy the ref exactly from its `wait:` line, as its own token followed by a space, with no tag after it.
-A beat never holds a wait again and never removes itself while its ops record is there: it ends with the session.
+A beat never holds a wait again and never removes itself while its ops record is there: it ends with the session. The one exception: an untagged wait the merge pass printed `held` for that also moved gets a fresh untagged `wait:` line right after its `moved:` line, text `<kind>:<ref> <new baseline> <text>`.
 
 Then reply in at most two lines, plus the drift line when it applies: what moved, naming at most two movements, the ones nearest the day's work, and one smallest move. An outward action waits for its usual yes.
-When what moved sits off the day's focuses, one more line names what moved and the focus it sits beside, such as `<what moved> sits beside <focus>.` When what moved converges with the focuses, nothing more.
-The focuses are the ones this ops session's sweep read from today's focus file; with none in view, nothing more.
-With nothing moved there is no drift line: `No change.` stays the whole reply.
-When nothing moved, reply with exactly `No change.` and nothing more: an empty reply gets prompted for one.
-The reply answers the beat's prompt, so it is not an uninvited line.
-A tool that is not reachable keeps its wait open: name it once, then stay silent about it.
-Never count, never say how long anything has waited, and never name something that did not move.
+When what moved sits off the day's focuses, one more line names what moved and the focus it sits beside, such as `<what moved> sits beside <focus>.` When what moved converges with the focuses, nothing more. The focuses are the ones this ops session's sweep read from today's focus file; with none in view, nothing more. With nothing moved there is no drift line: `No change.` stays the whole reply.
+When nothing moved, reply with exactly `No change.` and nothing more: an empty reply gets prompted for one. The reply answers the beat's prompt, so it is not an uninvited line.
+A tool that is not reachable keeps its wait open: name it once, then stay silent about it. Never count, never say how long anything has waited, and never name something that did not move.
