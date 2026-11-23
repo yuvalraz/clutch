@@ -47,7 +47,14 @@ fpin "$WS" "MWP4 outcome lines"       'It prints at most one line per owned wait
 fpin "$WS" "MWP5 merged is a move"    "A \`merged\` line is that wait's move: append its \`moved:\` line first, with the constitution's worklog snippet, verb \`moved:\` and the line exactly as printed as its text, and do not read that wait again."
 fpin "$WS" "MWP6 W6 bookkeeping"      "Being a move, it gets the session's own standing rules like any merge, such as the bookkeeping after a merge; an outward step there still waits for its usual yes."
 fpin "$WS" "MWP7 did not merge, held" 'A `did not merge` line is named once and writes nothing; a `held` line needs nothing.'
-fpin "$WS" "MWP8 cannot run"          'Exit status 0 with no output means nothing merged. Any other outcome: say once that the merge pass cannot run.'
+MWP7B='A `did not merge` line or the cannot-run line is part of the reply even when nothing else moved, so that reply is not `No change.`'
+fpin "$WS" "MWP7b reply is not No change" "$MWP7B"
+MWP8='Exit status 0 with no output means nothing merged. Any other outcome: say once that the merge pass cannot run, and stay silent about it on later ticks.'
+fpin "$WS" "MWP8 cannot run"          "$MWP8"
+# MWP7c: the did-not-merge rule, the cannot-run rule and the reply rule share one physical line.
+A='A `did not merge` line is named once and writes nothing' B=$MWP8 C=$MWP7B awk '
+  index($0, ENVIRON["A"]) && index($0, ENVIRON["B"]) && index($0, ENVIRON["C"]) { f = 1 }
+  END { exit !f }' "$WS" || { echo "FAIL: MWP7c did-not-merge, cannot-run and reply rules not on one line"; fail=1; }
 fpin "$WS" "MWP9 line 13"             'It is not an ops tick: no sweep, and no config read beyond the `### Merge` list its merge pass checks.'
 
 # rl1 <string> <from> <to>: the first <from> replaced by <to>, literally.
