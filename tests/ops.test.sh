@@ -263,7 +263,8 @@ fpin "$O" "window: empty or error"      'Empty output or an error: no window is 
 fpin "$O" "window: no stored queue"     'No draft is kept between windows: each window reads fresh, so there is no pending list.'
 fpin "$O" "window: after situation"     'In the sweep, the window screen follows the situation, and approving it is the one smallest move.'
 fpin "$O" "window: not in a tick"       'A tick never runs the window.'
-fpin "$O" "deleg: does-not send"        'Send anything without a yes, or write to any integration without one beyond the L2 actions and Auto posts your policy lists'
+fpin "$O" "deleg: does-not send"        '- Send anything without a yes, or write to any integration without one beyond the L2 actions and Auto posts your policy lists and the ops view push (see Ops view)'
+fpin "$O" "ops: no in-session list"     '- Produce a dashboard, a report, or a list for later in the session (the ops view is the user'"'"'s own page; see Ops view)'
 nwi=$(grep -c 'Write to any integration, or send anything, without a yes' "$O")
 [ "$nwi" = 0 ] || { echo "FAIL: ops -- still has the old does-not send line ($nwi hit)"; fail=1; }
 
@@ -396,7 +397,8 @@ fpin "$BS" "BT3 what sends it"          '`/clutch:beat @<tag>` is what an ops se
 fpin "$BS" "BT3 wake"                   'A wake from the session'"'"'s silent check holds `Run /clutch:beat @<tag>.`, alone or after the watch'"'"'s lines: run this skill once for that tag.'
 fpin "$BS" "BT4 no gear"                'It sets no gear, no focus and no mode: the session keeps the rules it had.'
 fpin "$BS" "BT4b not a sweep"           'It is not a sweep or a tick: no sweep, no config read.'
-fpin "$BS" "BT5 read line"              'sh -c '"'"'. "${CLAUDE_PLUGIN_ROOT}/scripts/prelude.sh" && L=$(clutch_beat_window "@<tag>") || exit; [ -z "$L" ] || printf "%s\n" "$L" | LC_ALL=C cut -c1-300'"'"
+fpin "$BS" "BT5 read line"              'sh -c '"'"'. "${CLAUDE_PLUGIN_ROOT}/scripts/prelude.sh" && L=$(clutch_beat_window "@<tag>") || exit; [ -z "$L" ] || printf "%s\n" "$L" | LC_ALL=C cut -c1-300; R=$?; [ ! -f "$HOME/.clutch/opsview.json" ] || echo "OPS VIEW: on"; exit $R'"'"
+fpin "$BS" "BT-OV beat line"            'A last line `OPS VIEW: on` is never a move, a wait or a worklog line, and output that holds only it is empty output; with it, after any `moved:` lines and before the reply, run the ops view push once: the steps between the `<!-- opsview push -->` markers in the ops skill'"'"'s `### Ops view`, which, when not in view, you find by those markers under the plugin'"'"'s skills folder.'
 fpin "$BS" "BT6 line shapes"            'Each line is a wait no session'"'"'s tag owns, `<epoch> <repo> wait: <kind>:<ref> <baseline> <text>`, or a move another session logged since the last beat, `<epoch> <repo> moved: <text>`.'
 fpin "$BS" "BT6b read is for the reply" 'Unlike the session-start Worklog block, the beat'"'"'s read is for the reply: name a peer'"'"'s `moved:` line.'
 fpin "$BS" "BT7 nothing to read"        'Exit status 0 with empty output, or exit status 1 with no error text, means nothing to read: reply `No change.`'
@@ -440,6 +442,50 @@ if printf '%s\n' "$DRIFT" | grep -iwqE 'still|yet|overdue|behind|late|again|[0-9
 fi
 nbs_l=$(grep -c '' "$BS")
 [ "$nbs_l" -lt 60 ] || { echo "FAIL: BT-size beat skill is $nbs_l lines, want under 60"; fail=1; }
+
+# --- the ops view: the framing, the on-switch and the push block, held once
+# in the ops skill; the beat points to it by its markers (one line above).
+pin  "$O" "OV section"                  '^### Ops view$'
+fpin "$O" "OV framing"                  'The ops view is a page the user opens: a dashboard by the user'"'"'s choice (2026-11-23), never a line in the session.'
+fpin "$O" "OV framing rules hold"       'No in-session line points at it uninvited, and every rule above about lists, counts and dashboards still governs what the session says.'
+fpin "$O" "OV on-switch"                'It is on when `~/.clutch/opsview.json` exists; with it off, nothing in this section runs.'
+# A function, not cat inside $(): bash 3.2 misparses the block's lone quote there.
+ov_block() {
+  cat <<'OVEOF'
+<!-- opsview push -->
+The ops view push runs only after a read printed `OPS VIEW: on`:
+
+1. Run `sh "${CLAUDE_PLUGIN_ROOT}/scripts/opsview-sync.sh"`. In a sweep, the record run (see the record step above) is this step: it prints the same lines.
+2. `OPS: off`, or `OPS: unchanged` as the second line: the push is done.
+3. Otherwise the first line is `OPS: <url>`, and each `OPS_DOC: <collection> <doc_id> <file_path> [if_version=<n>]` line is one document. Load `ArtifactData` first when it is a deferred tool, then send every line in one `ArtifactData` call: action `batch`, `url` from the first line, one entry per line with `op` `set`, its `collection`, `doc_id` and `file_path`, and `if_version` only when the line ends with `if_version=<n>`.
+4. Then run `sh "${CLAUDE_PLUGIN_ROOT}/scripts/opsview-sync.sh" --ack <collection>/<doc_id>=<version>`, one argument per document the call wrote, each with the `version` the result gave it.
+5. Documents the call did not write: send them once more in one `batch`; a document refused on its version first takes `if_version` from one `get` of it, and the rest keep their line's `if_version`. Ack what that wrote.
+6. Any other failure (a non-zero exit, `ArtifactData` cannot be loaded, the call or the retry fails, a result with no `version`): in a beat, run `sh "${CLAUDE_PLUGIN_ROOT}/scripts/opsview-sync.sh" --failed '<one-line reason>'` and say nothing about the push, whatever that run prints and even when it fails. In a sweep, run the same line with `--failed --speak`; on `OPS: say`, or when that run itself fails, say one line after the situation, outside its seven lines: the ops view stopped updating, and why. On `OPS: quiet`, say nothing. Escape ' as '\''.
+7. A push that succeeds is never named. A beat's reply never names the push and is the reply it would be without it: `No change.` stays exact.
+<!-- /opsview push -->
+OVEOF
+}
+OV_BLOCK=$(ov_block)
+while IFS= read -r ovl; do
+  [ -z "$ovl" ] || fpin "$O" "OV push steps" "$ovl"
+done <<OVEOF
+$OV_BLOCK
+OVEOF
+OV_HAVE=$(awk '/^<!-- opsview push -->$/{f=1} f; /^<!-- \/opsview push -->$/{exit}' "$O")
+[ "$OV_HAVE" = "$OV_BLOCK" ] || { echo "FAIL: OV push steps -- the block between the markers differs from the pinned block"; fail=1; }
+fpin "$O" "OV push beat silent"         'in a beat, run `sh "${CLAUDE_PLUGIN_ROOT}/scripts/opsview-sync.sh" --failed '"'"'<one-line reason>'"'"'` and say nothing about the push, whatever that run prints and even when it fails.'
+fpin "$O" "OV push sweep speaks"        'In a sweep, run the same line with `--failed --speak`; on `OPS: say`, or when that run itself fails, say one line after the situation, outside its seven lines: the ops view stopped updating, and why.'
+fpin "$O" "OV push failed run"          'or when that run itself fails, say one line after the situation'
+fpin "$O" "OV push quiet"               'On `OPS: quiet`, say nothing.'
+# OV block once: one skill holds the push block, the ops skill, once.
+OV_FILES=$(grep -rlxF '<!-- opsview push -->' "$HERE/../skills")
+[ "$OV_FILES" = "$HERE/../skills/ops/SKILL.md" ] || { echo "FAIL: OV block once -- held by: $OV_FILES"; fail=1; }
+for ovm in '<!-- opsview push -->' '<!-- /opsview push -->'; do
+  [ "$(grep -cxF -- "$ovm" "$O")" = 1 ] || { echo "FAIL: OV block once -- $ovm is not in the ops skill exactly once"; fail=1; }
+done
+# The section sits before Session close.
+awk '/^### Ops view$/{v=NR} /^### Session close$/{c=NR} END{exit !(v && c && v < c)}' "$O" \
+  || { echo "FAIL: OV section -- not before ### Session close"; fail=1; }
 
 # --- the tablet inbox: the sweep claims, reads, sorts and routes it once
 pin  "$O" "tablet: section"             '^### Tablet inbox$'
