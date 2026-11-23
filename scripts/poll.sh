@@ -16,8 +16,13 @@
 # "<pid> <start epoch>[ beat]" (read by clutch_poll_alive; beat while the
 # beat check is on) and <tag8>.woke, append-only "<ref> <stamp>" wake marks,
 # so the same evidence wakes once, "unreadable <ref> <wait epoch>" marks, so
-# one wait line wakes unreadable at most once, and "beat <epoch>" marks for
-# the hourly cap; they never hold back a later move of that ref.
+# one wait line wakes unreadable at most once, "mergeable <ref> <sha>" marks,
+# so one head sha wakes mergeable at most once, and "beat <epoch>" marks for
+# the hourly cap; they never hold back a later move of that ref. A gh wait in
+# a repo on the merge list whose read shows no move asks merge.sh --ready
+# (skipped when merge.sh is missing): a ready PR wakes "<ref> mergeable". In a
+# beat round the same check over clutch_unwatched_loops wakes the beat, past
+# the hourly cap.
 # It never writes the worklog; it writes the record only to seed a missing
 # last line, in a beat round, retried each round until it lands.
 
@@ -73,6 +78,20 @@ ghq() {
 }
 Q='query($o:String!,$r:String!,$n:Int!){viewer{login} repository(owner:$o,name:$r){pullRequest(number:$n){state updatedAt comments(last:50){nodes{createdAt author{__typename login}}} reviews(last:50){nodes{state submittedAt author{__typename login}}}}}}'
 
+GW='$4 ~ /^gh:/ {
+    r = $4; sub(/[,;:.\r]+$/, "", r); x = substr(r, 4)
+    if (x !~ /^[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+#[0-9]+$/) next
+    split(x, a, /[\/#]/); print r, a[1], a[2], a[3], $5, $1 }'
+MS=$(dirname "$0")/merge.sh
+# mready <ref>: rc 0, head sha in MR_SHA, when merge.sh says the listed PR is
+# ready and .woke, readable (else the dedupe cannot be checked), holds no
+# mergeable mark for that sha. stdin from /dev/null: merge.sh never eats a list.
+mready() {
+  [ -f "$MS" ] || return 1
+  MR_SHA=$(sh "$MS" --ready "$1" </dev/null) || return 1
+  [ -r "$WF" ] && ! LC_ALL=C grep -qxF "mergeable $1 $MR_SHA" "$WF"
+}
+
 R=0
 # One line per in-window gh failure; an answer drops the ref's lines.
 FAILS=""
@@ -93,10 +112,7 @@ while [ "$R" -lt "$MAX" ]; do
   case $HR in 0[89] | 1[0-9] | 2[01]) ;; *) continue ;; esac
   # One line per well-formed gh wait: ref owner repo number baseline epoch;
   # the ref loses a trailing ,;:. or CR as the worklog scan does.
-  WAITS=$(printf '%s\n' "$OWN" | LC_ALL=C awk '$4 ~ /^gh:/ {
-    r = $4; sub(/[,;:.\r]+$/, "", r); x = substr(r, 4)
-    if (x !~ /^[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+#[0-9]+$/) next
-    split(x, a, /[\/#]/); print r, a[1], a[2], a[3], $5, $1 }')
+  WAITS=$(printf '%s\n' "$OWN" | LC_ALL=C awk "$GW")
   WAKE=""
   MARKS=""
   while read -r REF OWNER REPO NUM BASE EPOCH; do
@@ -136,8 +152,16 @@ $REF"
     GOT=$(printf '%s\n' "$GOT" | head -n 1)
     STAMP=${GOT##* }
     WHAT=${GOT% *}
-    case $STAMP in $ISO) ;; *) continue ;; esac
-    case $WHAT in merged | closed | comment | review\ [A-Z]*) ;; *) continue ;; esac
+    case $STAMP in $ISO) ;; *) WHAT="" ;; esac
+    case $WHAT in merged | closed | comment | review\ [A-Z]*) ;; *)
+      # No move: a ready PR on the merge list wakes mergeable.
+      mready "$REF" || continue
+      WAKE="$WAKE$REF mergeable
+"
+      MARKS="${MARKS}mergeable $REF $MR_SHA
+"
+      continue ;;
+    esac
     WAKE="$WAKE$REF $WHAT
 "
     MARKS="$MARKS$REF $STAMP
@@ -156,7 +180,19 @@ EOF
       case $BN in '' | *[!0-9]*) ;; *)
         # BL: 0 the record holds a last line, 1 it holds none, else no beat.
         BL=2
-        ! clutch_ops_record "$TAG" || { LC_ALL=C grep -q '^last [0-9][0-9]*$' "$BF"; BL=$?; }
+        if clutch_ops_record "$TAG"; then
+          LC_ALL=C grep -q '^last [0-9][0-9]*$' "$BF"; BL=$?
+          # A ready PR on the merge list that no live check reads wakes the
+          # beat, past the hourly cap, with no beat mark.
+          while read -r UR _; do
+            [ -n "$UR" ] && mready "$UR" || continue
+            BW=1
+            MARKS="${MARKS}mergeable $UR $MR_SHA
+"
+          done <<EOF
+$([ ! -f "$MS" ] || clutch_unwatched_loops | LC_ALL=C awk "$GW")
+EOF
+        fi
         # No last line means an empty window: seed one and skip this round's
         # peek; a failed seed retries next round.
         if [ "$BL" = 1 ]; then
