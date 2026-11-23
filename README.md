@@ -93,8 +93,10 @@ only at one of those moments.
   holds such waits and no watch is told to arm a watch once per new wait, and once more after its silent check ends.
   When every wait is a PR, the watch is a silent check that the session starts in the background:
   it reads the PRs every 10 minutes from 08:00 to 21:59 and wakes the session only when one
-  merged, closed, or got a review or comment from someone other than you or a bot,
+  merged, closed, got a review or comment from someone other than you or a bot,
+  became ready to merge in a repo your `### Merge` list names (`mergeable`),
   or gh failed on one 3 reads in a row (`unreadable`).
+  Each watch tick also merges your own approved, clean PRs in those repos with a merge commit.
   A silent check that ends within 10 minutes of its start, before any wake, leaves those waits unwatched until a new wait is logged; it is not asked for again.
   Otherwise the watch is `/clutch:watch @<tag>` every 30 minutes from 08:07 to 21:37,
   one `No change.` line unless one of its waits moved, gone once none is left.
@@ -105,7 +107,9 @@ only at one of those moments.
   `/clutch:beat @<tag>`, at most once an hour from 08:00 to 20:59, only when another
   session logged a move. The beat reads the moves other sessions logged since the
   last beat and the waits no session's tag owns, and says `No change.` unless
-  something moved. When what moved sits off the day's
+  something moved.
+  The beat also merges your approved, clean PRs in a repo your `### Merge` list names for waits no live silent check reads, before its read, and its silent check wakes it for one sooner than the hour.
+  When what moved sits off the day's
   focuses, it names the focus it sits beside. After the beat's ask, the session is
   told, once a day, to arm a sweep: `/clutch:ops re-sweep armed` at 08:37, 12:37 and 16:37.
   The armed sweep only reads and speaks, plus the ops view push when it is on: it keeps the session's mode, and the actions
@@ -356,7 +360,7 @@ extra and close-out steps you wrote can use your integrations.
 `/clutch:investigate` reads what the pointer names and sends a reply only on a yes.
 `/clutch:watch` checks the integrations its session's waits name, every 30
 minutes (every 10 with `CLUTCH_POLL=off`) or on its silent check's wake, until none is left.
-`scripts/poll.sh`, the silent check a session starts in the background while it holds PR waits or is an ops session, calls `gh` and nothing else.
+`scripts/poll.sh`, the silent check a session starts in the background while it holds PR waits or is an ops session, calls `gh`, and `scripts/merge.sh --ready` for a PR in your `### Merge` list, and nothing else.
 `scripts/merge.sh`, the merge pass the watch and the beat run, calls `gh` and nothing else, and merges only PRs in the repos your `### Merge` list names.
 `/clutch:beat` checks the integrations its waits name, at most once an hour, on its silent check's wake (every hour with `CLUTCH_POLL=off`), while an ops session is open, and with the ops view on it sends what changed to your Ops view page in one `ArtifactData` batch, plus one retry when a document is refused.
 An ops session's armed sweep sends `/clutch:ops re-sweep armed` at 08:37, 12:37 and 16:37, and only reads, plus the ops view push when it is on, until the session's ops record is gone.

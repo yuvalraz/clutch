@@ -7,9 +7,9 @@ argument-hint: "@<tag>"
 
 # Beat
 
-`/clutch:beat @<tag>` is what an ops session's armed beat sends: the session's silent check, at most once an hour from 08:00 to 20:59 when another session moved, or an older hourly task.
+`/clutch:beat @<tag>` is the line an ops session's armed beat runs: the session's silent check prints it at most once an hour from 08:00 to 20:59 when another session moved, or sooner when a PR wait no live silent check reads can merge, and an older hourly task sends it.
 It sets no gear, no focus and no mode: the session keeps the rules it had.
-It is not a sweep or a tick: no sweep, no config read.
+It is not a sweep or a tick: no sweep, and no config read beyond the `### Merge` list its merge pass checks.
 
 A wake from the session's silent check holds `Run /clutch:beat @<tag>.`, alone or after the watch's lines: run this skill once for that tag.
 

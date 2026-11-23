@@ -360,7 +360,6 @@ wait
 T0=$(date +%s); MWAIT=2; mr --ready 'gh:acme/web#7'; unset MWAIT; TE=$(($(date +%s) - T0))
 ok "MR3 [2]" 2 '' 1
 [ "$TE" -lt 6 ] || { echo "FAIL: MR3 [2] -- took ${TE}s, want the 2 s watchdog"; fail=1; }
-kill "$(cat "$MFIX/hangpid" 2>/dev/null)" 2>/dev/null
 rm -f "$MFIX/hang"
 
 # --- MK13e: no gh on PATH (rc 127 at once, the kill race widest): 30 --ready
