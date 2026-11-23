@@ -413,6 +413,24 @@ When the user says an unsure item is work, or a filed item sits in the wrong buc
 A personal or unsure item never goes to the state dir, the fomo pool or any integration.
 A tick never reads the tablet inbox.
 
+### Ops view
+
+The ops view is a page the user opens: a dashboard by the user's choice (2026-11-23), never a line in the session.
+No in-session line points at it uninvited, and every rule above about lists, counts and dashboards still governs what the session says.
+It is on when `~/.clutch/opsview.json` exists; with it off, nothing in this section runs.
+
+<!-- opsview push -->
+The ops view push runs only after a read printed `OPS VIEW: on`:
+
+1. Run `sh "${CLAUDE_PLUGIN_ROOT}/scripts/opsview-sync.sh"`. In a sweep, the record run (see the record step above) is this step: it prints the same lines.
+2. `OPS: off`, or `OPS: unchanged` as the second line: the push is done.
+3. Otherwise the first line is `OPS: <url>`, and each `OPS_DOC: <collection> <doc_id> <file_path> [if_version=<n>]` line is one document. Load `ArtifactData` first when it is a deferred tool, then send every line in one `ArtifactData` call: action `batch`, `url` from the first line, one entry per line with `op` `set`, its `collection`, `doc_id` and `file_path`, and `if_version` only when the line ends with `if_version=<n>`.
+4. Then, for the documents the call wrote, if any, run `sh "${CLAUDE_PLUGIN_ROOT}/scripts/opsview-sync.sh" --ack <collection>/<doc_id>=<version>`, one argument per document, each with the `version` the result gave it; when the call wrote none, go to step 5.
+5. Documents the call did not write: send them once more in one `batch`; a document refused on its version first takes `if_version` from one `get` of it, and the rest keep their line's `if_version`. Ack what that wrote, if anything.
+6. Any other failure (a non-zero exit, `ArtifactData` cannot be loaded, the call or the retry fails, a result with no `version`): in a beat, run `sh "${CLAUDE_PLUGIN_ROOT}/scripts/opsview-sync.sh" --failed '<one-line reason>'` and say nothing about the push, whatever that run prints and even when it fails. In a sweep, run the same line with `--failed --speak`; on `OPS: say`, or when that run itself fails, say one line after the situation, outside its seven lines: the ops view stopped updating, and why. On `OPS: quiet`, say nothing. Escape ' as '\''.
+7. A push that succeeds is never named. A beat's reply never names the push and is the reply it would be without it: `No change.` stays exact.
+<!-- /opsview push -->
+
 ### Session close
 
 `/clutch:eod` owns the day's close: the retro, tomorrow's focuses, the fun
@@ -433,8 +451,8 @@ and the one open loop with its next move. Nothing else is written.
 ## What this skill does NOT do
 
 - Fire on its own, re-sweep on its own (the session's armed sweep is a request that only reads), or watch anything in the background
-- Send anything without a yes, or write to any integration without one beyond the L2 actions and Auto posts your policy lists
-- Produce a dashboard, a report, or a list for later
+- Send anything without a yes, or write to any integration without one beyond the L2 actions and Auto posts your policy lists and the ops view push (see Ops view)
+- Produce a dashboard, a report, or a list for later in the session (the ops view is the user's own page; see Ops view)
 - Count unread, waiting, overdue, or missed anything
 - Write code or design anything: that is a build session
 - Scaffold config, guess paths, or invent integrations

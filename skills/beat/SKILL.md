@@ -25,13 +25,14 @@ Any other outcome goes on to the read; the check never writes.
 Read with this line, `@<tag>` replaced by the argument:
 
 ```sh
-sh -c '. "${CLAUDE_PLUGIN_ROOT}/scripts/prelude.sh" && L=$(clutch_beat_window "@<tag>") || exit; [ -z "$L" ] || printf "%s\n" "$L" | LC_ALL=C cut -c1-300'
+sh -c '. "${CLAUDE_PLUGIN_ROOT}/scripts/prelude.sh" && L=$(clutch_beat_window "@<tag>") || exit; [ -z "$L" ] || printf "%s\n" "$L" | LC_ALL=C cut -c1-300; R=$?; [ ! -f "$HOME/.clutch/opsview.json" ] || echo "OPS VIEW: on"; exit $R'
 ```
 
 Each line is a wait no session's tag owns, `<epoch> <repo> wait: <kind>:<ref> <baseline> <text>`, or a move another session logged since the last beat, `<epoch> <repo> moved: <text>`.
 Unlike the session-start Worklog block, the beat's read is for the reply: name a peer's `moved:` line.
 Exit status 0 with empty output, or exit status 1 with no error text, means nothing to read: reply `No change.`
 Any other outcome, error text included: say once that the beat cannot read the worklog, and stay silent about it on later beats.
+A last line `OPS VIEW: on` is never a move, a wait or a worklog line, and output that holds only it is empty output; with it, after any `moved:` lines and before the reply, run the ops view push once: the steps between the `<!-- opsview push -->` markers in the ops skill's `### Ops view`, which, when not in view, you find by those markers under the plugin's skills folder.
 
 A `moved:` line already moved: name it, never read its thing again.
 Skip a `moved:` line this session wrote itself, such as a loop it closed or a wait an earlier beat closed.
