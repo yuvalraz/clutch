@@ -311,7 +311,7 @@ fpin "$R" "README: three verbs"      '`on:` claim or `wait:` loop'
 # is told to arm a watch, once per new wait and once more after its silent
 # check ends (the stale .poll restart), never that the user is asked.
 fpin "$R" "README: told once per wait"  'is told to arm a watch once per new wait, and once more after its silent check ends'
-fpin "$R" "README: young-death limit"  'A silent check that keeps ending early, before its first wake, leaves those waits unwatched until a new wait is logged; it is not asked for again.'
+fpin "$R" "README: young-death limit"  'A silent check that ends within 10 minutes of its start, before any wake, leaves those waits unwatched until a new wait is logged; it is not asked for again.'
 fpin "$R" "README: unreadable wake"     'or gh failed on one 3 reads in a row (`unreadable`)'
 fpin "$R" "README: poll off"            '`CLUTCH_POLL=off` keeps the 10-minute watch for every kind.'
 fpin "$R" "README: poll allow rule"     '`Bash(sh */clutch/*/scripts/poll.sh*)`'
