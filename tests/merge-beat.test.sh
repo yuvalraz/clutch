@@ -45,6 +45,10 @@ fpin "MY-pin empty"     'Exit status 0 with no output: nothing merged.'
 fpin "MY-pin other"     'Any other outcome: say once that the merge pass cannot run.'
 fpin "MY-pin bookkeeping" 'A merged PR is what moved: its one smallest move is the bookkeeping after a merge, such as the ticket, named and not done, since it waits for its usual yes.'
 fpin "MY-pin ADR-4"     'The one exception: an untagged wait the merge pass printed `held` for that also moved gets a fresh untagged `wait:` line right after its `moved:` line, text `<kind>:<ref> <new baseline> <text>`.'
+NMR='A `did not merge` line or the cannot-run line is part of the reply even when nothing else moved, so that reply is not `No change.`'
+fpin "MY-pin not merged reply" "$NMR"
+grep -F 'Name a `did not merge` line once' "$BS" | grep -F 'say once that the merge pass cannot run.' | grep -qF "$NMR" \
+  || F "MY-pin not merged reply -- not on the merge pass's outcome line"
 grep -F 'means nothing to read: reply `No change.`' "$BS" | grep -qF 'With the merge pass'"'"'s `merged` lines, that is not `No change.`' \
   || F "MY-pin line 33 -- the merge sentence is not on BT7's line"
 grep -F 'A beat never holds a wait again and never removes itself while its ops record is there: it ends with the session.' "$BS" | grep -qF 'The one exception: an untagged wait' \

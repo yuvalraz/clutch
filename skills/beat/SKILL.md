@@ -27,7 +27,7 @@ Then run the merge pass, before the read. It needs no yes: the `### Merge` list 
 sh "${CLAUDE_PLUGIN_ROOT}/scripts/merge.sh" --unwatched
 ```
 
-Append each `merged` line first, exactly as printed, its tag kept when it has one, as the text of a `moved:` line with the constitution's worklog snippet: the merge pass's lines keep their tag, so a dead tag's line closes only that tag's wait. Name a `did not merge` line once and write nothing for it. Keep the `held` lines in view for the read. Exit status 0 with no output: nothing merged. Any other outcome: say once that the merge pass cannot run. A merged PR is what moved: its one smallest move is the bookkeeping after a merge, such as the ticket, named and not done, since it waits for its usual yes.
+Append each `merged` line first, exactly as printed, its tag kept when it has one, as the text of a `moved:` line with the constitution's worklog snippet: the merge pass's lines keep their tag, so a dead tag's line closes only that tag's wait. Name a `did not merge` line once and write nothing for it. Keep the `held` lines in view for the read. Exit status 0 with no output: nothing merged. Any other outcome: say once that the merge pass cannot run. A merged PR is what moved: its one smallest move is the bookkeeping after a merge, such as the ticket, named and not done, since it waits for its usual yes. A `did not merge` line or the cannot-run line is part of the reply even when nothing else moved, so that reply is not `No change.`
 
 Read with this line, `@<tag>` replaced by the argument:
 
