@@ -32,7 +32,8 @@ PRELUDE=$(dirname "$0")/prelude.sh
 # once the dedupe read and the .polled append worked, right before the ask
 # prints. A dead poller that started under one round ago (poll.sh's sleep,
 # CLUTCH_POLL_SLEEP when 1-5 digits >= 1, else 600 s) and never woke (an
-# empty .woke, or its .poll newer than .woke) died young, say killed by a Bash timeout or a headless exit: its .poll is
+# empty .woke, or its .poll newer than .woke) died young (clutch_poll_young),
+# say killed by a Bash timeout or a headless exit: its .poll is
 # dropped quietly and the dedupe applies as with no .poll, so a poller that
 # keeps dying young is asked for once, not at every stop.
 # A set with any other wait is asked the 30-minute watch through <tag8> and
@@ -68,28 +69,11 @@ if [ "${CLUTCH_WATCH:-}" != off ]; then
             if [ "$WATCH_KIND" = poll ]; then
               clutch_poll_alive "$WATCH_TAG"
               WATCH_RC=$?
-              if [ "$WATCH_RC" = 3 ]; then
-                # A round is poll.sh's own sleep, read the same way.
-                WATCH_NAP=${CLUTCH_POLL_SLEEP:-600}
-                case $WATCH_NAP in [1-9] | [1-9][0-9] | [1-9][0-9][0-9] | [1-9][0-9][0-9][0-9] | [1-9][0-9][0-9][0-9][0-9]) ;; *) WATCH_NAP=600 ;; esac
-                # clutch_poll_alive's well-formed rule, the start capped at 12
-                # digits: a malformed .poll has no start and is never young.
-                WATCH_START=$(LC_ALL=C awk 'NR == 1 && (NF == 2 || NF == 3) && $1 ~ /^[1-9][0-9]*$/ && $2 ~ /^[1-9][0-9]*$/ && length($2) <= 12 { print $2 }' "$WATCH_FILE.poll" 2>/dev/null)
-                WATCH_NOW=$(date +%s 2>/dev/null)
-                # Died young: started under a round ago and never woke (an
-                # empty .woke, or its .poll newer than .woke; equal mtimes on a
-                # non-empty .woke count as a wake). Drop its .poll quietly and
-                # dedupe as rc 1.
-                case $WATCH_START.$WATCH_NOW in
-                  *[!0-9.]* | .* | *.) ;;
-                  *)
-                    if [ $((WATCH_NOW - WATCH_START)) -lt "$WATCH_NAP" ] 2>/dev/null &&
-                      { [ ! -s "$WATCH_FILE.woke" ] || [ "$WATCH_FILE.poll" -nt "$WATCH_FILE.woke" ]; }; then
-                      rm -f "$WATCH_FILE.poll" 2>/dev/null
-                      WATCH_RC=1
-                    fi
-                    ;;
-                esac
+              # Died young (clutch_poll_young): drop its .poll quietly and
+              # dedupe as rc 1.
+              if [ "$WATCH_RC" = 3 ] && clutch_poll_young "$WATCH_TAG"; then
+                rm -f "$WATCH_FILE.poll" 2>/dev/null
+                WATCH_RC=1
               fi
               case $WATCH_RC in 1 | 3) ;; *) WATCH_RC=0 ;; esac
               WATCH_NEW=$WATCH_OWN
@@ -139,6 +123,14 @@ fi
 # (`/clutch:ops re-sweep armed`, no tag) the same way, once a local day, with
 # its own "sweep asked <YYYY-MM-DD>" line. A cron whose whole prompt is the
 # hand-typed `/clutch:ops re-sweep` counts as armed too: never armed twice.
+# The silent check (the watch gate's poll.sh path rule): a live poller whose
+# .poll carries beat (clutch_poll_alive beat 0) arms the beat, a cannot-tell
+# (2) asks nothing; otherwise the ask is to start the poller once a day, and
+# once more after a poller that ran has ended (3, its .poll removed first,
+# even when asked today). A poller that died young (clutch_poll_young) has
+# its .poll dropped quietly, as with no .poll; a live poller without beat (a
+# 2.18.0 one, 4) is no beat and keeps its .poll. CLUTCH_POLL=off or an
+# unusable path keeps the 2.16.2 hourly ask byte for byte.
 if [ "${CLUTCH_BEAT:-}" != off ] && [ "${CLUTCH_WATCH:-}" != off ]; then
   case $INPUT in
     *'"stop_hook_active":true'* | *'"stop_hook_active": true'*) ;;
@@ -148,13 +140,43 @@ if [ "${CLUTCH_BEAT:-}" != off ] && [ "${CLUTCH_WATCH:-}" != off ]; then
         [ -f "$BEAT_FILE" ] &&
         BEAT_DAY=$(date +%Y-%m-%d 2>/dev/null) && [ -n "$BEAT_DAY" ]; then
         grep -qx "asked $BEAT_DAY" "$BEAT_FILE" 2>/dev/null
-        if [ "$?" = 1 ]; then
+        BEAT_G=$?
+        if [ "$BEAT_G" != 2 ]; then
           case $INPUT in
             *"\"prompt\":\"/clutch:beat $BEAT_TAG\""* | *"\"prompt\": \"/clutch:beat $BEAT_TAG\""*) ;;
             *)
-              { printf 'asked %s\n' "$BEAT_DAY" >> "$BEAT_FILE"; } 2>/dev/null &&
-                printf '{"decision":"block","reason":"This ops session has no beat. Arm one now with CronCreate, schedule `7 8-20 * * *`, recurring, prompt `/clutch:beat %s`, then end the turn. If the user said not to arm a beat, just end the turn."}\n' "$BEAT_TAG" &&
-                exit 0
+              BEAT_RC=old
+              BEAT_DIR=$(dirname "$0")
+              BEAT_POLL="$HOME/.clutch/watch/${BEAT_TAG#@}.poll"
+              if [ "${CLUTCH_POLL:-}" != off ] && [ -f "$BEAT_DIR/poll.sh" ]; then
+                case $BEAT_DIR in
+                  /*[!ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789._/~+-]*) ;;
+                  /*)
+                    clutch_poll_alive "$BEAT_TAG" beat
+                    BEAT_RC=$?
+                    if [ "$BEAT_RC" = 3 ] && clutch_poll_young "$BEAT_TAG"; then
+                      rm -f "$BEAT_POLL" 2>/dev/null
+                      BEAT_RC=1
+                    fi
+                    ;;
+                esac
+              fi
+              case $BEAT_RC in
+                old)
+                  [ "$BEAT_G" = 1 ] &&
+                    { printf 'asked %s\n' "$BEAT_DAY" >> "$BEAT_FILE"; } 2>/dev/null &&
+                    printf '{"decision":"block","reason":"This ops session has no beat. Arm one now with CronCreate, schedule `7 8-20 * * *`, recurring, prompt `/clutch:beat %s`, then end the turn. If the user said not to arm a beat, just end the turn."}\n' "$BEAT_TAG" &&
+                    exit 0
+                  ;;
+                1 | 3 | 4)
+                  # 3: a poller that ran has ended: ask again even when asked today.
+                  { [ "$BEAT_RC" = 3 ] || [ "$BEAT_G" = 1 ]; } &&
+                    { [ "$BEAT_RC" != 3 ] || rm -f "$BEAT_POLL" 2>/dev/null; } &&
+                    { [ "$BEAT_G" = 0 ] || { printf 'asked %s\n' "$BEAT_DAY" >> "$BEAT_FILE"; } 2>/dev/null; } &&
+                    printf '{"decision":"block","reason":"This ops session has no beat. Start `sh %s/poll.sh %s` with the Bash tool'\''s run_in_background, then end the turn: it stays silent until another session moves. If the user said not to arm a beat, just end the turn."}\n' "$BEAT_DIR" "$BEAT_TAG" &&
+                    exit 0
+                  ;;
+              esac
               ;;
           esac
         fi

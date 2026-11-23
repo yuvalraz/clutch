@@ -4,11 +4,16 @@
 # is /clutch:beat @<tag8> is blocked once a local day with the arming step;
 # "asked <YYYY-MM-DD>" lands in the record before the block prints. The watch
 # gate keeps priority (B5). Every failure falls through: no block (B6-B10).
-# CLUTCH_BEAT=off skips it (B11). B-scrub pins the brain scrub line.
+# CLUTCH_BEAT=off skips it (B11). B1-B13 and SW1-SW9 run under
+# CLUTCH_POLL=off (the 2.16.2 asks). PB1-PB14 with PB3b, PB9b, PB10b, PB11b,
+# PB11c, PB14b-PB14d run the silent-check beat gate (BPOLL, the poller's
+# .poll and the young-death drop) in default mode. B-scrub pins the brain
+# scrub line.
 # H1-H14 cover clutch_beat_window (the untagged open waits, then the newest
 # 20 moved: lines after the record's last epoch and at or before now - 120
 # whose field 5 is not the tag; "last <now - 120>" appended to an existing
-# record before printing; unreadable state is rc 2). R1 runs the
+# record before printing; unreadable state is rc 2). H-peek1-H-peek5 cover
+# its peek mode (the moved: lines only, nothing appended). R1 runs the
 # beat skill's read line, R2 the ops Step 0 record snippet under sh and
 # zsh -f (its tag guard against '@', '@../x', '@a/b' and an unguarded
 # mutant), R3 the beat skill's moved: text through the constitution snippet.
@@ -20,7 +25,7 @@
 # BEAT_SKILL, OPS_SKILL and CONST_FILE override the targets for replay
 # against a historical version. Silent on pass apart from PASS.
 set -u
-unset CLUTCH_BEAT CLUTCH_WATCH CLUTCH_POLL CLUTCH_INVESTIGATE CLUTCH_PLAIN CLUTCH_GUESS CLAUDE_PLUGIN_ROOT
+unset CLUTCH_BEAT CLUTCH_WATCH CLUTCH_POLL CLUTCH_POLL_SLEEP CLUTCH_INVESTIGATE CLUTCH_PLAIN CLUTCH_GUESS CLAUDE_PLUGIN_ROOT
 
 HERE=$(cd "$(dirname "$0")" && pwd)
 P=${PRELUDE_SH:-$HERE/../scripts/prelude.sh}
@@ -128,6 +133,11 @@ docin() {
   printf '{"session_id":"%s","transcript_path":"/t/x.jsonl","cwd":"/c","hook_event_name":"Stop","stop_hook_active":false,"last_assistant_message":"%s","background_tasks":[],"session_crons":%s}' "$ID" "$1" "$2"
 }
 
+# B1-B13 and SW1-SW9 test the 2.16.2 beat ask (BOLD): CLUTCH_POLL=off.
+# The PB block below runs the silent-check beat gate in default mode.
+CLUTCH_POLL=off
+export CLUTCH_POLL
+
 # B1: ops record, nothing armed: the block line, valid JSON, asked today
 # recorded, and no breadcrumb on this stop.
 rec
@@ -197,9 +207,14 @@ asked B4b 1
 
 # B5: an owned wait with no watch and an ops record: the watch block first,
 # no ask; the next stop (fingerprint recorded) brings the beat block. Under
-# CLUTCH_POLL=off the watch block is the 2.16.2 */10 ask; unset, the
-# silent-check ask (WPOLL) takes its place.
+# CLUTCH_POLL=off these are the 2.16.2 */10 and BOLD asks; unset, the
+# silent-check asks (WPOLL, then BPOLL) take their place.
 WPOLL='{"decision":"block","reason":"This session holds open wait loops and no watch. Start `sh '"$T"'/scripts/poll.sh @0123abcd` with the Bash tool'"'"'s run_in_background, then end the turn: it stays silent until a wait moves. If the user said not to watch them, just end the turn."}'
+BPOLL='{"decision":"block","reason":"This ops session has no beat. Start `sh '"$T"'/scripts/poll.sh @0123abcd` with the Bash tool'"'"'s run_in_background, then end the turn: it stays silent until another session moves. If the user said not to arm a beat, just end the turn."}'
+bpolled() {
+  [ "$RC" = 0 ] && [ "$OUT" = "$BPOLL" ] \
+    || { echo "FAIL: $1 -- rc $RC stdout [$OUT], want rc 0 and the silent-check beat block line"; fail=1; }
+}
 for pm in off ''; do
   rec
   : > "$W"
@@ -212,10 +227,11 @@ for pm in off ''; do
   [ "$RC" = 0 ] && [ "$OUT" = "$WANT" ] || { echo "FAIL: B5 [$pm] -- first stop rc $RC [$OUT], want the watch block"; fail=1; }
   asked "B5 first [$pm]" 0
   stp "$T/run" "$IN"
-  blocked "B5 second [$pm]"
+  if [ "$pm" = off ]; then blocked "B5 second [$pm]"; else bpolled "B5 second [$pm]"; fi
   asked "B5 second [$pm]" 1
-  unset CLUTCH_POLL
 done
+CLUTCH_POLL=off
+export CLUTCH_POLL
 
 # B6: stop_hook_active true, either spacing: quiet, record unchanged.
 for a in '"stop_hook_active":true' '"stop_hook_active": true'; do
@@ -424,6 +440,131 @@ if [ "$(id -u)" != 0 ]; then
   quiet "SW9 unwritable"
   chmod 644 "$BF"
 fi
+
+# --- PB1-PB14: the beat gate with the silent check (default mode, the
+# staged scripts dir holds poll.sh). Armed by a /clutch:beat @<tag> cron or a
+# live poller whose .poll line carries beat (clutch_poll_alive beat 0); else
+# BPOLL once a day through "asked <day>". A dead poller that woke (rc 3, not
+# young) has its .poll removed and BPOLL asked even when asked today; one
+# that died young (clutch_poll_young 0) is dropped quietly and the gate goes
+# on as with no .poll. A live poller without beat (a 2.18.0 poller, rc 4) is
+# no beat and keeps its .poll. An unreadable record asks nothing.
+unset CLUTCH_POLL
+PF="$HOME/.clutch/watch/0123abcd.poll"
+WK="$HOME/.clutch/watch/0123abcd.woke"
+DD="$HOME/.clutch/watch/0123abcd"
+WCRON30='{"decision":"block","reason":"This session holds open wait loops and no watch. Arm one now with CronCreate, schedule `7,37 8-21 * * *`, recurring, prompt `/clutch:watch @0123abcd`, then end the turn. If the user said not to watch them, just end the turn."}'
+mkdir -p "$T/stub"
+printf 'sleep 120\n' > "$T/stub/poll.sh"
+LIVE=$( ( sh "$T/stub/poll.sh" @0123abcd </dev/null >/dev/null 2>&1 & echo $! ) )
+DEAD=$( ( true </dev/null >/dev/null 2>&1 & echo $! ) )
+trap 'kill "$LIVE" 2>/dev/null; chmod -R u+rwx "$T" 2>/dev/null; rm -rf "$T"' EXIT
+sleep 1
+# prec <pid> [start] [third]: .poll holding "<pid> <start>[ <third>]"; the
+# start defaults to now (young); OLD is 700 s ago, over one round: not young.
+prec() { mkdir -p "$HOME/.clutch/watch"; printf '%s %s%s\n' "$1" "${2:-$(date +%s)}" "${3:+ $3}" > "$PF"; }
+OLD=$(($(date +%s) - 700))
+nopoll() { [ ! -e "$PF" ] || { echo "FAIL: $1 -- .poll left: $(cat "$PF")"; fail=1; }; }
+samepoll() { [ "$(cat "$PF" 2>/dev/null)" = "$2" ] || { echo "FAIL: $1 -- .poll [$(cat "$PF" 2>/dev/null)], want [$2] unchanged"; fail=1; }; }
+# ownrec: the owned lines recorded in <file>, read through the staged prelude.
+ownrec() { (cd "$T/plain" && . "$T/scripts/prelude.sh" && clutch_owned_loops @0123abcd) > "$1"; }
+
+# PB1: ops record, no cron, no poller: BPOLL, asked today recorded.
+rec; fresh "$SF"; stp "$T/run" "$IN"
+bpolled PB1; asked PB1 1
+# PB2: a live poller whose line carries beat: no beat ask, the sweep follows.
+rec; prec "$LIVE" '' beat; fresh "$SF"; stp "$T/run" "$IN"
+sblocked PB2; asked PB2 0
+# PB3: asked today, a dead .poll started two rounds ago: removed, BPOLL.
+rec "asked $TODAY"; prec "$DEAD" "$OLD"; fresh "$SF"; stp "$T/run" "$IN"
+bpolled PB3; nopoll PB3; asked PB3 1
+# PB3b: the next stop: quiet for the beat, then the sweep as usual.
+stp "$T/run" "$IN"
+sblocked PB3b; asked PB3b 1
+# PB4: an old /clutch:beat @tag cron arms the beat; a stale .poll is not read.
+rec; prec "$DEAD" "$OLD"; PB_P=$(cat "$PF"); fresh "$SF"; stp "$T/run" "$(crons '/clutch:beat @0123abcd')"
+quiet PB4; asked PB4 0; samepoll PB4 "$PB_P"
+# PB5: CLUTCH_POLL=off: BOLD byte for byte; a stale .poll left as it is.
+rec; prec "$DEAD" "$OLD"; PB_P=$(cat "$PF"); fresh "$SF"
+CLUTCH_POLL=off; export CLUTCH_POLL; stp "$T/run" "$IN"; unset CLUTCH_POLL
+blocked PB5; asked PB5 1; samepoll PB5 "$PB_P"
+# PB7: an owned gh wait, no poller: the watch gate's WPOLL first, then BPOLL.
+rec; add 100 'proj wait: gh:o/r#1 b1 @0123abcd pr one'; fresh "$SF"
+stp "$T/run" "$IN"; [ "$RC" = 0 ] && [ "$OUT" = "$WPOLL" ] || { echo "FAIL: PB7 first -- rc $RC [$OUT], want WPOLL"; fail=1; }
+stp "$T/run" "$IN"; bpolled "PB7 second"; asked PB7 1
+# PB8: no poll.sh beside stop.sh: BOLD.
+mkdir -p "$T/nopoll"; cp "$T/scripts/prelude.sh" "$T/scripts/stop.sh" "$T/nopoll/"
+rec; fresh "$SF"
+OUT=$(cd "$T/run" && printf '%s' "$IN" | GIT_CEILING_DIRECTORIES=$T sh "$T/nopoll/stop.sh" 2>/dev/null); RC=$?
+blocked PB8; asked PB8 1
+# PB10: gh + slack waits all recorded in <tag8>, asked today, a stale .poll
+# that is not young: the watch gate is quiet and leaves .poll; the beat gate
+# removes it and asks BPOLL.
+rec "asked $TODAY"; add 100 'proj wait: gh:o/r#1 b1 @0123abcd pr one'; add 90 'proj wait: slack:C1/123 b1 @0123abcd thread'
+ownrec "$DD"; prec "$DEAD" "$OLD"; fresh "$SF"; stp "$T/run" "$IN"
+bpolled PB10; nopoll PB10; asked PB10 1
+# PB10b: as PB10 but the slack line is new: stop 1 WCRON30 with .poll and
+# the record untouched; stop 2 BPOLL.
+rec "asked $TODAY"; add 100 'proj wait: gh:o/r#1 b1 @0123abcd pr one'; ownrec "$DD"
+add 90 'proj wait: slack:C1/123 b1 @0123abcd thread'; prec "$DEAD" "$OLD"; PB_P=$(cat "$PF"); PB_R=$(cat "$BF"); fresh "$SF"
+stp "$T/run" "$IN"; [ "$RC" = 0 ] && [ "$OUT" = "$WCRON30" ] || { echo "FAIL: PB10b first -- rc $RC [$OUT], want WCRON30"; fail=1; }
+samepoll "PB10b first" "$PB_P"; [ "$(cat "$BF")" = "$PB_R" ] || { echo "FAIL: PB10b first -- record changed: $(cat "$BF")"; fail=1; }
+stp "$T/run" "$IN"; bpolled "PB10b second"; nopoll "PB10b second"
+# PB11: gh-only waits, a stale .poll that is not young, asked today: stop 1
+# WPOLL (the watch gate removes .poll); stop 2 with a live poller whose line
+# carries beat: no beat ask, the sweep follows.
+rec "asked $TODAY"; add 100 'proj wait: gh:o/r#1 b1 @0123abcd pr one'; prec "$DEAD" "$OLD"; fresh "$SF"
+stp "$T/run" "$IN"; [ "$RC" = 0 ] && [ "$OUT" = "$WPOLL" ] || { echo "FAIL: PB11 first -- rc $RC [$OUT], want WPOLL"; fail=1; }
+nopoll "PB11 first"
+prec "$LIVE" '' beat; stp "$T/run" "$IN"; sblocked "PB11 second"; asked PB11 1
+# PB11b: as PB11 with no poller started: stop 2 quiet for the beat (the sweep
+# follows); the next day's first stop asks BPOLL.
+rec "asked $TODAY"; add 100 'proj wait: gh:o/r#1 b1 @0123abcd pr one'; prec "$DEAD" "$OLD"; fresh "$SF"
+stp "$T/run" "$IN"; [ "$OUT" = "$WPOLL" ] || { echo "FAIL: PB11b first -- [$OUT], want WPOLL"; fail=1; }
+stp "$T/run" "$IN"; sblocked "PB11b second"; asked "PB11b second" 1
+printf 'last %s\nasked 2000-01-01\n' "$NOW" > "$BF"
+stp "$T/run" "$IN"; bpolled "PB11b next day"; asked "PB11b next day" 1
+# PB11c: as PB11b with no asked today: stop 2 BPOLL.
+rec; add 100 'proj wait: gh:o/r#1 b1 @0123abcd pr one'; prec "$DEAD" "$OLD"; fresh "$SF"
+stp "$T/run" "$IN"; [ "$OUT" = "$WPOLL" ] || { echo "FAIL: PB11c first -- [$OUT], want WPOLL"; fail=1; }
+stp "$T/run" "$IN"; bpolled "PB11c second"; asked PB11c 1
+# PB12: a live 2.18.0 poller (no beat field), not asked today: BPOLL, asked
+# recorded, .poll untouched. PB13: asked today: quiet for the beat.
+rec; prec "$LIVE"; PB_P=$(cat "$PF"); fresh "$SF"; stp "$T/run" "$IN"
+bpolled PB12; asked PB12 1; samepoll PB12 "$PB_P"
+rec "asked $TODAY"; prec "$LIVE"; fresh "$SF"; stp "$T/run" "$IN"
+sblocked PB13; asked PB13 1; samepoll PB13 "$PB_P"
+# PB14: no owned waits, asked today, a dead .poll started now, empty .woke:
+# died young, dropped quietly; the sweep follows.
+rec "asked $TODAY"; prec "$DEAD"; : > "$WK"; fresh "$SF"; stp "$T/run" "$IN"
+sblocked PB14; nopoll PB14; asked PB14 1
+# PB14b: as PB14 but .woke appended after .poll (the poller woke): BPOLL.
+rec "asked $TODAY"; prec "$DEAD"; touch -t 200001010000 "$PF"; printf 'beat %s\n' "$NOW" > "$WK"; fresh "$SF"; stp "$T/run" "$IN"
+bpolled PB14b; nopoll PB14b; asked PB14b 1
+# PB14c: gh-only waits recorded in .polled, asked today, a dead young .poll:
+# the watch gate drops it quietly, the beat gate reads rc 1: the sweep follows.
+rec "asked $TODAY"; add 100 'proj wait: gh:o/r#1 b1 @0123abcd pr one'; ownrec "$DD.polled"; prec "$DEAD"; fresh "$SF"; stp "$T/run" "$IN"
+sblocked PB14c; nopoll PB14c; asked PB14c 1
+# PB14d: as PB14 with no asked today: .poll gone, BPOLL, asked recorded.
+rec; prec "$DEAD"; : > "$WK"; fresh "$SF"; stp "$T/run" "$IN"
+bpolled PB14d; nopoll PB14d; asked PB14d 1
+if [ "$(id -u)" = 0 ]; then
+  echo "SKIP: PB6 PB9 PB9b (root reads and writes through chmod)"
+else
+  # PB6: liveness cannot tell (.poll unreadable): no beat ask, the sweep follows.
+  rec; prec "$LIVE" '' beat; chmod 000 "$PF"; fresh "$SF"; stp "$T/run" "$IN"
+  chmod 644 "$PF"; sblocked PB6; asked PB6 0
+  # PB9: the .poll of a poller that woke cannot be removed (~/.clutch/watch
+  # 555): no beat ask; the record stays writable, so the sweep asks.
+  rec; prec "$DEAD" "$OLD"; chmod 555 "$HOME/.clutch/watch"; fresh "$SF"; stp "$T/run" "$IN"
+  chmod 755 "$HOME/.clutch/watch"; sblocked PB9; asked PB9 0
+  [ -e "$PF" ] || { echo "FAIL: PB9 -- .poll removed"; fail=1; }
+  # PB9b: the record unreadable (grep rc 2) with a stale .poll: no beat ask,
+  # .poll bytes unchanged, no sweep ask.
+  rec; prec "$DEAD" "$OLD"; PB_P=$(cat "$PF"); chmod 000 "$BF"; fresh "$SF"; stp "$T/run" "$IN"
+  chmod 644 "$BF"; quiet PB9b; asked PB9b 0; samepoll PB9b "$PB_P"
+fi
+kill "$LIVE" 2>/dev/null
 
 # B-scrub: brain.test.sh's sibling runs clear CLUTCH_BEAT and BEAT_SKILL, and
 # the silent check's CLUTCH_POLL* switches and POLL_SH override.
@@ -662,6 +803,56 @@ rm -f "$T/tailn"
 OUT=$(cd "$T/plain" && PATH="$T/bin:$PATH" && export PATH && . "$T/scripts/prelude.sh" && clutch_beat_window '@0123abcd' 2>/dev/null); RC=$?
 rm -f "$T/bin/tail"
 is H14 2 ''
+
+# --- H-peek1-H-peek5: clutch_beat_window <@tag> peek prints only the
+# window's moved: lines, never the waits, and never appends last; same rc.
+bwp() {
+  OUT=$(cd "$T/plain" && . "$T/scripts/prelude.sh" && clutch_beat_window "$1" peek 2>"$T/err"); RC=$?
+  ERR=$(cat "$T/err")
+}
+seed
+add 900 'proj wait: gh:o/r#9 b1 plain'
+add 500 'proj moved: gh:o/r#1 @0123abcd own'
+add 400 'proj moved: gh:o/r#2 @ffffffff other'
+mkrec "last $((NOW - 1000))"
+RB=$(cat "$BF")
+bwp '@0123abcd'
+is H-peek1 0 "$(wl 400 'proj moved: gh:o/r#2 @ffffffff other')"
+[ "$(cat "$BF")" = "$RB" ] || { echo "FAIL: H-peek1 -- record changed: $(cat "$BF")"; fail=1; }
+bwp '@0123abcd'
+is "H-peek1 again" 0 "$(wl 400 'proj moved: gh:o/r#2 @ffffffff other')"
+seed
+add 900 'proj wait: gh:o/r#9 b1 plain'
+add 500 'proj moved: gh:o/r#1 @0123abcd own'
+mkrec "last $((NOW - 1000))"
+bwp '@0123abcd'
+is H-peek2 0 ''
+seed
+add 400 'proj moved: gh:o/r#2 @ffffffff other'
+mkrec 'asked 2000-01-01'
+bwp '@0123abcd'
+is H-peek3 0 ''
+[ "$(cat "$BF")" = 'asked 2000-01-01' ] || { echo "FAIL: H-peek3 -- record changed: $(cat "$BF")"; fail=1; }
+if [ "$(id -u)" != 0 ]; then
+  seed
+  add 400 'proj moved: gh:o/r#2 @ffffffff other'
+  mkrec "last $((NOW - 1000))"
+  chmod 000 "$W"; bwp '@0123abcd'; chmod 644 "$W"
+  is "H-peek4 unreadable worklog" 2 ''
+  chmod 222 "$BF"; bwp '@0123abcd'; chmod 644 "$BF"
+  is "H-peek4 unreadable record" 2 ''
+  [ "$(cat "$BF")" = "last $((NOW - 1000))" ] || { echo "FAIL: H-peek4 -- record changed: $(cat "$BF")"; fail=1; }
+  # A read-only record peeks fine: peek never writes.
+  chmod 444 "$BF"; bwp '@0123abcd'; chmod 644 "$BF"
+  is "H-peek4 read-only record" 0 "$(wl 400 'proj moved: gh:o/r#2 @ffffffff other')"
+fi
+rm -rf "$HOME/.clutch"
+bwp '@0123abcd'
+is "H-peek5 none" 1 ''
+mkrec "last $((NOW - 1000))"
+bwp '@0123abcd'
+is "H-peek5 record" 1 ''
+[ "$(lastn)" = 1 ] || { echo "FAIL: H-peek5 -- record changed: $(cat "$BF")"; fail=1; }
 
 # --- R1: the beat skill's one read line, the plugin root replaced by the
 # staged tree and @<tag> filled, prints what the helper prints and passes

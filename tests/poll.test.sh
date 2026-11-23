@@ -4,6 +4,10 @@
 # third field): 0 alive (kill -0 passes and ps -ww names poll.sh @<tag8> at
 # the end), 1 no record (proven absent), 2 cannot tell, 3 ended (dead or
 # reused pid, another tag's poller, malformed line). It never writes.
+# L12-L14 cover its beat mode (4 for a live poller whose line has no third
+# field beat). Y1-Y9 cover clutch_poll_young <@tag> (0 died young: a
+# well-formed .poll started under one round ago whose .woke is empty, absent
+# or older; 1 otherwise; it never writes).
 # M1-M25 with M5b, M11b, M12b, M12c, M20b, M20c, M22b and M24b-M24e run
 # scripts/poll.sh @<tag> (the silent check) against a fake gh that applies the
 # real --jq filter to a per-PR GraphQL fixture through /usr/bin/jq, a fake
@@ -11,7 +15,12 @@
 # prints "<ref> <what>" lines and the closing line after appending
 # <ref> <stamp> to .woke, 3 gh failures in a row print "<ref> unreadable" once
 # per wait line, every other exit prints the ended line, and a failed write
-# prints the stopped line.
+# prints the stopped line. Bt1-Bt16 with Bt4b, Bt5b, Bt6b, Bt8b, Bt10b and Bt13b
+# cover the beat: with the tag's ops record there it peeks the beat window
+# from 08:00 to 20:59, wakes on peer moves at most once an hour with
+# "Run /clutch:beat @<tag>." after a "beat <epoch>" mark, seeds a record with
+# no last line in a beat round (a failed seed retries next round), and
+# keeps running with no gh wait while the record is there.
 # prelude.sh and poll.sh are staged into a scratch tree and run under a
 # scratch HOME. PRELUDE_SH and POLL_SH override the targets for replay or a
 # mutant copy. Silent on pass apart from PASS.
@@ -124,6 +133,81 @@ rec "$LONGP $NOW
 rec "$LIVE $NOW beat
 "; chk "L11 2.17.1 line" '@0123abcd' 0
 
+# --- L12-L14: clutch_poll_alive <@tag> beat: 0 only when the live poller's
+# line carries the third field beat, 4 for a live poller without it.
+pab() { OUT=$(cd "$T/plain" && . "$T/scripts/prelude.sh" && clutch_poll_alive "$1" beat 2>&1); RC=$?; }
+chkb() {
+  B=$(snap); pab "$2"; is "$1" "$3" ''
+  [ "$(snap)" = "$B" ] || { echo "FAIL: $1 -- the reader changed ~/.clutch"; fail=1; }
+}
+rec "$LIVE $NOW beat
+"; chkb "L12 beat mode, beat line" '@0123abcd' 0
+rec "$LIVE $NOW
+"; chkb "L13 beat mode, 2.18.0 line" '@0123abcd' 4
+rec "$LIVE $NOW other
+"; chkb "L13 beat mode, another third field" '@0123abcd' 4
+rec "$DEAD $NOW beat
+"; chkb "L14 beat mode, dead pid" '@0123abcd' 3
+rm -f "$PF"; chkb "L14 beat mode, no .poll" '@0123abcd' 1
+if [ "$(id -u)" != 0 ]; then
+  rec "$LIVE $NOW beat
+"; chmod 000 "$PF"; chkb "L14 beat mode, unreadable .poll" '@0123abcd' 2; chmod 644 "$PF"
+fi
+
+# --- Y1-Y9: clutch_poll_young <@tag>: 0 when .poll names a poller that died
+# young (well-formed line, start under one round ago by the CLUTCH_POLL_SLEEP
+# clamp, .woke empty or absent or older than .poll), 1 otherwise. Every case
+# checks the ~/.clutch tree is unchanged (Y9: it writes nothing).
+WY="$HOME/.clutch/watch/0123abcd.woke"
+mkdir -p "$T/ybin"
+printf '#!/bin/sh\nexit 1\n' > "$T/ybin/date"; chmod 755 "$T/ybin/date"
+# py <tag>: the helper, CLUTCH_POLL_SLEEP=$YSLEEP when set, date from $YPATH.
+py() {
+  OUT=$(cd "$T/plain" && if [ -n "${YSLEEP:-}" ]; then CLUTCH_POLL_SLEEP=$YSLEEP; export CLUTCH_POLL_SLEEP; fi &&
+    PATH="${YPATH:-}$PATH" && . "$T/scripts/prelude.sh" && clutch_poll_young "$1" 2>&1); RC=$?
+}
+ychk() {
+  B=$(snap); py "$2"; is "$1" "$3" ''
+  [ "$(snap)" = "$B" ] || { echo "FAIL: $1 Y9 -- the helper changed ~/.clutch"; fail=1; }
+}
+YN=$(date +%s)
+rec "$DEAD $YN
+"; ychk "Y1 no .woke" '@0123abcd' 0
+: > "$WY"; ychk "Y1 empty .woke" '@0123abcd' 0
+printf 'gh:o/r#1 x\n' > "$WY"; touch -t 200001010000 "$WY"; ychk "Y2 .woke older" '@0123abcd' 0
+rec "$DEAD $YN
+"; printf 'gh:o/r#1 x\n' > "$WY"; touch -t 200001010000 "$PF"; ychk "Y3 .woke newer" '@0123abcd' 1
+touch -t 200001010000 "$WY"; ychk "Y4 equal mtimes" '@0123abcd' 1
+rec "$DEAD $((YN - 600))
+"; ychk "Y5 600 s old, default round" '@0123abcd' 1
+rec "$DEAD $((YN - 20))
+"; YSLEEP=30; ychk "Y5 20 s old, round 30" '@0123abcd' 0
+rec "$DEAD $((YN - 40))
+"; ychk "Y5 40 s old, round 30" '@0123abcd' 1
+rec "$DEAD $((YN - 300))
+"; YSLEEP=abc; ychk "Y5 300 s old, round abc clamped to 600" '@0123abcd' 0
+unset YSLEEP
+rec "$DEAD $((YN + 1000))
+"; ychk "Y5 future start" '@0123abcd' 0
+for c in '' "$DEAD" "$DEAD $YN x y" "0 $YN" "$DEAD 1234567890123" 'abc 1' "$DEAD 0$YN"; do
+  rec "$c
+"; ychk "Y6 malformed [$c]" '@0123abcd' 1
+done
+rec "$DEAD $YN beat
+"; ychk "Y7 third field" '@0123abcd' 0
+rm -f "$PF"; ychk "Y8 no .poll" '@0123abcd' 1
+rec "$DEAD $YN
+"
+for tg in '@a/b' '' '@0123abc'; do
+  ychk "Y8 bad tag [$tg]" "$tg" 1
+done
+YPATH="$T/ybin:"; ychk "Y8 date fails" '@0123abcd' 1; unset YPATH
+OUT=$(cd "$T/plain" && HOME='' && . "$T/scripts/prelude.sh" && clutch_poll_young '@0123abcd' 2>&1); RC=$?
+is "Y8 empty HOME" 1 ''
+if [ "$(id -u)" != 0 ]; then
+  chmod 000 "$PF"; ychk "Y8 unreadable .poll" '@0123abcd' 1; chmod 644 "$PF"
+fi
+
 # --- M1-M25: scripts/poll.sh @<tag>
 FIX=$T/fix
 mkdir -p "$FIX" "$T/mbin"
@@ -163,18 +247,29 @@ cat > "$T/mbin/date" <<'EOF'
 #!/bin/sh
 F=$HOME/../fix
 if [ "$*" = '+%H' ]; then
+  # hmode: chmod .woke to that mode on the first +%H call (after the start check).
+  [ -f "$F/hmode" ] && { chmod "$(cat "$F/hmode")" "$HOME/.clutch/watch/0123abcd.woke"; rm -f "$F/hmode"; }
   if [ -s "$F/hseq" ]; then head -n 1 "$F/hseq"; sed 1d "$F/hseq" > "$F/hseq.t"; mv "$F/hseq.t" "$F/hseq"; exit 0; fi
   cat "$F/hour" 2>/dev/null || echo 12; exit 0
 fi
 [ "$*" = '+%s' ] && [ -f "$HOME/../fix/datefail" ] && exit 1
+# skew: seconds added to +%s (the fake sleep sets it, to step the clock).
+[ "$*" = '+%s' ] && [ -f "$F/skew" ] && { echo $(($(/bin/date +%s) + $(cat "$F/skew"))); exit 0; }
 exec /bin/date "$@"
 EOF
-# Fake sleep: counts calls, keeps its last argument; call N restores the worklog when $FIX/sleepfix.N exists.
+# Fake sleep: counts calls, keeps its last argument; call N restores the
+# worklog when $FIX/sleepfix.N exists, the ops record when $FIX/sleepbf.N
+# exists, and appends $FIX/sleepadd.N to the worklog; it waits while
+# $FIX/sleephold exists; $FIX/skew.N becomes the fake date's clock skew.
 cat > "$T/mbin/sleep" <<'EOF'
 #!/bin/sh
 F=$HOME/../fix
 c=$(cat "$F/sleeps" 2>/dev/null || echo 0); c=$((c + 1)); echo "$c" > "$F/sleeps"; echo "$1" > "$F/sleeparg"
 [ -f "$F/sleepfix.$c" ] && chmod 644 "$HOME/.clutch/worklog.md"
+[ -f "$F/sleepbf.$c" ] && chmod 644 "$HOME/.clutch/watch/0123abcd.beat"
+[ -f "$F/sleepadd.$c" ] && cat "$F/sleepadd.$c" >> "$HOME/.clutch/worklog.md"
+[ -f "$F/skew.$c" ] && cp "$F/skew.$c" "$F/skew"
+while [ -f "$F/sleephold" ]; do /bin/sleep 0.1; done
 exit 0
 EOF
 chmod 755 "$T/mbin/gh" "$T/mbin/date" "$T/mbin/sleep"
@@ -201,10 +296,11 @@ fx() {
 }
 cm() { printf '{"createdAt":"%s","author":{"__typename":"%s","login":"%s"}}' "$1" "$2" "$3"; }
 rv() { printf '{"state":"%s","submittedAt":"%s","author":{"__typename":"%s","login":"%s"}}' "$1" "$2" "$3" "$4"; }
-# pr <rounds> <tag>: run the poller; OUT, RC, ERR, NGH (gh calls).
+# pr <rounds> <tag>: run the poller; OUT, RC, ERR, NGH (gh calls). PBEAT
+# sets CLUTCH_BEAT, PSCRIPT another staged poll.sh.
 pr() {
   : > "$FIX/log"
-  OUT=$(cd "$T/plain" && PATH="$T/mbin:$PATH" CLUTCH_POLL_SLEEP=${PSLEEP:-0} CLUTCH_POLL_ROUNDS=$1 sh "$T/scripts/poll.sh" "$2" 2>"$T/err")
+  OUT=$(cd "$T/plain" && PATH="$T/mbin:$PATH" CLUTCH_BEAT=${PBEAT:-} CLUTCH_POLL_SLEEP=${PSLEEP:-0} CLUTCH_POLL_ROUNDS=$1 sh "${PSCRIPT:-$T/scripts/poll.sh}" "$2" 2>"$T/err")
   RC=$?
   ERR=$(cat "$T/err")
   NGH=$(grep -c '' "$FIX/log")
@@ -364,18 +460,131 @@ for nap in 0 00 abc 999999 30; do
   want=600; [ "$nap" != 30 ] || want=30
   [ "$(cat "$FIX/sleeparg" 2>/dev/null)" = "$want" ] || { echo "FAIL: M26 [$nap] -- slept [$(cat "$FIX/sleeparg" 2>/dev/null)], want $want"; fail=1; }
 done
-# M23: .poll is one line "<pid> <epoch>", pid the poller's own.
+# M23: .poll is one line "<pid> <epoch> beat", pid the poller's own (the
+# suite unsets CLUTCH_BEAT, so the beat check is on; Bt12 owns the content).
 own1; fx o_r_1 OPEN "$B0" '' ''; : > "$FIX/pollcopy.on"
 (cd "$T/plain" && PATH="$T/mbin:$PATH" CLUTCH_POLL_SLEEP=0 CLUTCH_POLL_ROUNDS=1 exec sh "$T/scripts/poll.sh" @0123abcd >/dev/null 2>&1) &
 MP=$!
 wait "$MP"
 PC=$(cat "$FIX/pollcopy" 2>/dev/null)
 case $PC in
-  "$MP "[0-9]*) E=${PC#"$MP "}; case $E in *[!0-9]*) echo "FAIL: M23 -- .poll [$PC]"; fail=1 ;; esac
+  "$MP "[0-9]*" beat") E=${PC#"$MP "}; E=${E% beat}; case $E in *[!0-9]*) echo "FAIL: M23 -- .poll [$PC]"; fail=1 ;; esac
     [ "$E" -ge "$NOW" ] || { echo "FAIL: M23 -- epoch $E before the run"; fail=1; } ;;
-  *) echo "FAIL: M23 -- .poll [$PC], want [$MP <epoch>]"; fail=1 ;;
+  *) echo "FAIL: M23 -- .poll [$PC], want [$MP <epoch> beat]"; fail=1 ;;
 esac
 [ "$(grep -c '' "$FIX/pollcopy" 2>/dev/null)" = 1 ] || { echo "FAIL: M23 -- .poll is not one line"; fail=1; }
+
+# --- Bt1-Bt16: the poller beats while the tag's ops record is there: from
+# 08:00 to 20:59 it peeks the beat window (clutch_beat_window peek) and wakes
+# with "Run /clutch:beat @<tag>." on peer moves, at most once an hour (the
+# newer of the record's newest last and the newest .woke beat mark), after
+# appending "beat <now - 120>" to .woke.
+BFR="$HOME/.clutch/watch/0123abcd.beat"
+BEATL='Run /clutch:beat @0123abcd.'
+opsrec() { mkdir -p "$HOME/.clutch/watch"; printf '%s\n' "$@" > "$BFR"; }
+peer() { madd "$1" 'proj moved: gh:o/r#7 @ffffffff peer'; }
+own() { madd "$1" 'proj moved: gh:o/r#8 @0123abcd own'; }
+slack1() { madd 100 'proj wait: slack:C1/123 b1 @0123abcd thread'; }
+beats() { grep -c '^beat [0-9][0-9]*$' "$WF" 2>/dev/null; }
+sleeps() { cat "$FIX/sleeps" 2>/dev/null || echo 0; }
+
+mseed; opsrec "last $((NOW - 7200))"; peer 600
+pr 3 @0123abcd; ok "Bt1 beat-only wake" 0 "$BEATL" 0
+[ "$(beats)" = 1 ] || { echo "FAIL: Bt1 -- .woke [$(cat "$WF" 2>/dev/null)], want one beat mark"; fail=1; }
+BM=$(sed -n 's/^beat \([0-9][0-9]*\)$/\1/p' "$WF" 2>/dev/null)
+[ "${BM:-0}" -ge $((NOW - 120)) ] || { echo "FAIL: Bt1 -- beat mark [$BM] is not now - 120"; fail=1; }
+# Bt13: a restart (no last appended) in the same hour does not wake the beat again.
+pr 3 @0123abcd; ok "Bt13 restart, mark under an hour old" 0 "$ENDED" 0
+[ "$(beats)" = 1 ] || { echo "FAIL: Bt13 -- .woke [$(cat "$WF")], want one beat mark"; fail=1; }
+mseed; opsrec "last $((NOW - 7200))"; peer 600; mkdir -p "$HOME/.clutch/watch"; printf 'beat %s\n' "$((NOW - 7200))" > "$WF"
+pr 3 @0123abcd; ok "Bt13b beat mark 2 h old" 0 "$BEATL" 0
+mseed; opsrec "last $((NOW - 1200))"; peer 600
+pr 2 @0123abcd; ok "Bt2 last 20 min ago" 0 "$ENDED" 0
+mseed; opsrec "last $((NOW - 7200))"
+pr 2 @0123abcd; ok "Bt3 no peer move" 0 "$ENDED" 0
+mseed; opsrec 'asked 2000-01-01'; peer 600
+pr 2 @0123abcd; ok "Bt4 no last: seeded, no wake" 0 "$ENDED" 0
+[ "$(grep -c '^last [0-9][0-9]*$' "$BFR")" = 1 ] || { echo "FAIL: Bt4 -- record [$(cat "$BFR")], want one last line"; fail=1; }
+# Bt4b: the seed fails in round 1 (no worklog, rc 1) and retries: round 2
+# seeds (no wake in its seeding round), round 3, an hour later by the clock,
+# wakes once on the peer move logged after the seed.
+mseed; rm -f "$W"; opsrec 'asked 2000-01-01'
+printf '%s proj moved: gh:o/r#7 @ffffffff peer\n' "$((NOW + 3600))" > "$FIX/sleepadd.1"; echo 7200 > "$FIX/skew.2"
+pr 3 @0123abcd; ok "Bt4b failed seed retried, then a wake" 0 "$BEATL" 0
+[ "$(grep -c '^last [0-9][0-9]*$' "$BFR")" = 1 ] || { echo "FAIL: Bt4b -- record [$(cat "$BFR")], want one last line"; fail=1; }
+[ "$(sleeps)" = 2 ] || { echo "FAIL: Bt4b -- slept $(sleeps) times, want 2 (woke in round 3)"; fail=1; }
+own1; fx o_r_1 OPEN "$B0" '' ''; opsrec "last $((NOW - 7200))"; peer 600; RB=$(cat "$BFR"); : > "$FIX/pollcopy.on"
+PBEAT=off; pr 2 @0123abcd; unset PBEAT; ok "Bt5 CLUTCH_BEAT=off" 0 "$ENDED" 2
+[ "$(cat "$BFR")" = "$RB" ] || { echo "FAIL: Bt5 -- record changed: $(cat "$BFR")"; fail=1; }
+case $(cat "$FIX/pollcopy" 2>/dev/null) in
+  *[!0-9\ ]* | *' '*' '* | '') echo "FAIL: Bt5 -- .poll [$(cat "$FIX/pollcopy" 2>/dev/null)], want the two-field line"; fail=1 ;;
+esac
+own1; fx o_r_1 OPEN "$B0" '' ''; opsrec 'asked 2000-01-01'
+PBEAT=off; pr 1 @0123abcd; unset PBEAT; ok "Bt5 CLUTCH_BEAT=off, no last" 0 "$ENDED" 1
+[ "$(cat "$BFR")" = 'asked 2000-01-01' ] || { echo "FAIL: Bt5 -- record seeded under off: $(cat "$BFR")"; fail=1; }
+mseed; slack1; opsrec "last $((NOW - 7200))"; peer 600
+PBEAT=off; pr 3 @0123abcd; unset PBEAT; ok "Bt5b CLUTCH_BEAT=off, no gh waits" 0 "$ENDED" 0
+[ "$(sleeps)" = 0 ] || { echo "FAIL: Bt5b -- ran $(sleeps) more rounds, want the ended line in round 1"; fail=1; }
+mseed; slack1; peer 600
+pr 3 @0123abcd; ok "Bt6 no record, no gh waits" 0 "$ENDED" 0
+[ "$(sleeps)" = 0 ] || { echo "FAIL: Bt6 -- ran $(sleeps) more rounds, want the ended line in round 1"; fail=1; }
+# Bt6b: clutch_ops_record cannot tell (rc 2): a staged prelude whose helper says so.
+mkdir -p "$T/s6b"; cp "$T/scripts/poll.sh" "$T/s6b/poll.sh"
+{ cat "$T/scripts/prelude.sh"; echo 'clutch_ops_record() { return 2; }'; } > "$T/s6b/prelude.sh"
+mseed; slack1
+PSCRIPT="$T/s6b/poll.sh"; pr 3 @0123abcd; unset PSCRIPT; ok "Bt6b record cannot tell" 0 "$ENDED" 0
+[ "$(sleeps)" = 2 ] || { echo "FAIL: Bt6b -- slept $(sleeps) times, want 2 (ran to the cap)"; fail=1; }
+own1; fx o_r_1 OPEN "$B0" '' ''; opsrec "last $((NOW - 7200))"; peer 600; echo 21 > "$FIX/hour"
+pr 2 @0123abcd; ok "Bt7 hour 21: gh check, no beat" 0 "$ENDED" 2
+for h in 07 20; do
+  mseed; opsrec "last $((NOW - 7200))"; peer 600; echo "$h" > "$FIX/hour"
+  want=$ENDED; [ "$h" != 20 ] || want=$BEATL
+  pr 1 @0123abcd; ok "Bt7 hour $h" 0 "$want" 0
+done
+own1; fx o_r_1 MERGED "$NEW" '' ''; opsrec "last $((NOW - 7200))"; peer 600
+pr 1 @0123abcd; ok "Bt8 gh move and beat move" 0 "$(nl 'gh:o/r#1 merged' "$CLOSE" "$BEATL")" 1
+own1; opsrec "last $((NOW - 7200))"; printf '%s proj moved: gh:o/r#7 @ffffffff late peer\n' "$((NOW - 300))" > "$FIX/sleepadd.2"
+pr 4 @0123abcd; ok "Bt8b unreadable and beat" 0 "$(nl 'gh:o/r#1 unreadable' "$CLOSE" "$BEATL")" 3
+{ grep -q '^unreadable gh:o/r#1 [0-9][0-9]*$' "$WF" && [ "$(beats)" = 1 ]; } || { echo "FAIL: Bt8b -- .woke [$(cat "$WF")], want the unreadable and beat marks"; fail=1; }
+mseed; slack1; opsrec "last $((NOW - 7200))"; own 600
+pr 2 @0123abcd; ok "Bt9 only own-tag moves" 0 "$ENDED" 0
+mseed; slack1; opsrec "last $((NOW - 7200))"
+pr 3 @0123abcd; ok "Bt10 only a slack wait, record there" 0 "$ENDED" 0
+[ "$(sleeps)" = 2 ] || { echo "FAIL: Bt10 -- slept $(sleeps) times, want 2 (ran to the cap)"; fail=1; }
+mseed; rm -f "$W"; opsrec "last $((NOW - 7200))"
+pr 3 @0123abcd; ok "Bt10b no worklog, record there" 0 "$ENDED" 0
+[ "$(sleeps)" = 2 ] || { echo "FAIL: Bt10b -- slept $(sleeps) times, want 2 (ran to the cap)"; fail=1; }
+# Bt12: a running poller's .poll is "<pid> <epoch> beat"; A1's reader (no beat) reads it alive.
+mseed; slack1; opsrec "last $((NOW - 7200))"; : > "$FIX/sleephold"
+(cd "$T/plain" && PATH="$T/mbin:$PATH" CLUTCH_POLL_SLEEP=0 CLUTCH_POLL_ROUNDS=2 exec sh "$T/scripts/poll.sh" @0123abcd >/dev/null 2>&1) &
+MP=$!
+PIDS="$PIDS $MP"
+i=0; while [ ! -f "$FIX/sleeps" ] && [ "$i" -lt 100 ]; do /bin/sleep 0.1; i=$((i + 1)); done
+case $(cat "$PF" 2>/dev/null) in
+  "$MP "[1-9]*" beat") ;;
+  *) echo "FAIL: Bt12 -- .poll [$(cat "$PF" 2>/dev/null)], want [$MP <epoch> beat]"; fail=1 ;;
+esac
+pa '@0123abcd'; is "Bt12 A1 reader" 0 ''
+pab '@0123abcd'; is "Bt12 beat reader" 0 ''
+rm -f "$FIX/sleephold"; wait "$MP"
+# Bt14: beat marks in .woke change neither 2.18.0 reader (M2, M12, M24).
+own1; fx o_r_1 MERGED "$NEW" '' ''; mkdir -p "$HOME/.clutch/watch"; printf 'beat %s\n' "$((NOW - 100))" > "$WF"
+pr 3 @0123abcd; ok "Bt14 M2" 0 "$(nl 'gh:o/r#1 merged' "$CLOSE")" 1
+pr 2 @0123abcd; ok "Bt14 M12" 0 "$ENDED" 2
+own1; mkdir -p "$HOME/.clutch/watch"; printf 'beat %s\n' "$((NOW - 100))" > "$WF"
+pr 4 @0123abcd; ok "Bt14 M24" 0 "$(nl 'gh:o/r#1 unreadable' "$CLOSE")" 3
+pr 4 @0123abcd; ok "Bt14 M24 restart" 0 "$ENDED" 4
+if [ "$(id -u)" = 0 ]; then
+  echo "SKIP: Bt11, Bt15, Bt16 modes (root reads through chmod)"
+else
+  mseed; opsrec "last $((NOW - 7200))"; peer 600; chmod 222 "$BFR"; : > "$FIX/sleepbf.1"
+  pr 3 @0123abcd; ok "Bt11 peek rc 2, retried" 0 "$BEATL" 0
+  [ "$(sleeps)" = 1 ] || { echo "FAIL: Bt11 -- slept $(sleeps) times, want 1 (woke in round 2)"; fail=1; }
+  mseed; opsrec "last $((NOW - 7200))"; peer 600; echo 400 > "$FIX/hmode"
+  pr 1 @0123abcd; chmod 644 "$WF"; ok "Bt15 beat mark append fails" 0 "$STOP" 0
+  mseed; opsrec "last $((NOW - 7200))"; peer 600; echo 200 > "$FIX/hmode"
+  pr 2 @0123abcd; chmod 644 "$WF"; ok "Bt16 .woke unreadable" 0 "$ENDED" 0
+fi
 
 [ "$fail" -eq 0 ] && echo PASS
 exit "$fail"
