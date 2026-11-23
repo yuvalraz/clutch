@@ -93,11 +93,11 @@
       ], "hasNextPage": false}
     },
     "initiativesById": {
-      "40000000-0000-4000-8000-000000000001": {"id": "I-1", "uuid": "40000000-0000-4000-8000-000000000001", "name": "Harness",
+      "40000000-0000-4000-8000-000000000001": {"id": "DEMO-901", "uuid": "40000000-0000-4000-8000-000000000001", "name": "Harness",
         "url": "https://linear.app/demo/initiative/harness", "status": "Active", "owner": {"name": "Pat"},
         "parentInitiatives": [{"id": "40000000-0000-4000-8000-000000000009", "name": "Ship faster",
           "url": "https://linear.app/demo/initiative/ship-faster"}]},
-      "40000000-0000-4000-8000-000000000002": {"id": "I-2", "uuid": "40000000-0000-4000-8000-000000000002", "name": "Team flow",
+      "40000000-0000-4000-8000-000000000002": {"id": "DEMO-902", "uuid": "40000000-0000-4000-8000-000000000002", "name": "Team flow",
         "url": "https://linear.app/demo/initiative/team-flow", "status": "Active", "owner": {"name": "Sam"},
         "parentInitiatives": []}
     }
@@ -112,6 +112,11 @@ var OPS_MAX_PROJECTS = 40;
 var OPS_MAX_INITIATIVES = 15;
 var OPS_DAY_MS = 86400000;
 var OPS_FLOOR_MS = 4 * 3600000;
+// The fields argument of each Linear call (S0 probe). Without it list_issues omits parentId.
+var OPS_ISSUE_FIELDS = ["id", "title", "url", "status", "statusType", "assignee", "projectId", "parentId", "updatedAt",
+                        "priority"];
+var OPS_PROJECT_FIELDS = ["id", "uuid", "name", "status", "initiatives", "url", "lead"];
+var OPS_ASSIGNED_FIELDS = ["id", "title", "url", "status", "statusType", "project", "projectId", "parentId", "updatedAt"];
 
 function opsUnwrap(p) {
   if (typeof p === "string") {
@@ -179,7 +184,9 @@ function normalizeLinear(payloads) {
   var zones = Object.create(null), homes = Object.create(null), away = Object.create(null), none = null;
   opsMembers(opsList(payloads.projects, "projects")).forEach(function (p) {
     var home = opsLane(p.id, opsStr(p.name), opsStr(p.url));
-    (opsList(opsOwn(payloads.issuesByProject, p.id), "issues") || []).forEach(function (i) { opsAddIssue(home, i); });
+    var page = opsUnwrap(opsOwn(payloads.issuesByProject, p.id));
+    (opsList(page, "issues") || []).forEach(function (i) { opsAddIssue(home, i); });
+    if (page && page.hasNextPage === true) home.lane.truncated = true;
     homes[p.id] = home;
     if (opsStr(p.uuid)) homes[p.uuid] = home;
     var ref = Array.isArray(p.initiatives) ? p.initiatives[0] : null;
@@ -226,13 +233,13 @@ function watchDiff(have, projectsPayload) {
     return true;
   }
   kept.forEach(function (p) {
-    want({key: "project:" + p.id, tool: "list_issues", input: {project: p.id, limit: 100}});
+    want({key: "project:" + p.id, tool: "list_issues", input: {project: p.id, fields: OPS_ISSUE_FIELDS, limit: 100}});
   });
   kept.forEach(function (p) {
-    (Array.isArray(p.initiatives) ? p.initiatives : []).forEach(function (ref) {
-      if (initiatives < OPS_MAX_INITIATIVES && ref && opsStr(ref.id)
-          && want({key: "initiative:" + ref.id, tool: "get_initiative", input: {query: ref.id}})) initiatives += 1;
-    });
+    // Only initiatives[0]: normalizeLinear places a project under its first initiative.
+    var ref = Array.isArray(p.initiatives) ? p.initiatives[0] : null;
+    if (initiatives < OPS_MAX_INITIATIVES && ref && opsStr(ref.id)
+        && want({key: "initiative:" + ref.id, tool: "get_initiative", input: {query: ref.id}})) initiatives += 1;
   });
   have = Array.isArray(have) ? have : [];
   var held = Object.create(null);
@@ -251,12 +258,14 @@ function opsModel(input) {
   var index = Object.create(null), issues = [];
   function lanes(projects) {
     return (projects || []).map(function (p) {
-      return {id: p.id, name: p.name, url: p.url, nodes: (p.issues || []).map(function (i) {
+      var lane = {id: p.id, name: p.name, url: p.url, nodes: (p.issues || []).map(function (i) {
         var node = {ticket: i.id, title: i.title, state: i.state, url: i.url, items: []};
         if (!index[i.id]) index[i.id] = node;
         issues.push(i);
         return node;
       })};
+      if (p.truncated === true) lane.truncated = true;
+      return lane;
     });
   }
   var zones = linear ? (linear.initiatives || []).map(function (z) {

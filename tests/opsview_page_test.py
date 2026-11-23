@@ -23,6 +23,12 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 PAGE = os.path.join(HERE, "..", "templates", "opsview.html")
 NOW = "2026-11-23T12:00:00Z"
 ALLOWED_TOOLS = ("list_projects", "list_issues", "get_initiative")
+# The fields argument of each Linear call, per the S0 probe. Without `fields`,
+# list_issues omits parentId and the parent edges vanish.
+ISSUE_FIELDS = ["id", "title", "url", "status", "statusType", "assignee", "projectId", "parentId", "updatedAt",
+                "priority"]
+PROJECT_FIELDS = ["id", "uuid", "name", "status", "initiatives", "url", "lead"]
+ASSIGNED_FIELDS = ["id", "title", "url", "status", "statusType", "project", "projectId", "parentId", "updatedAt"]
 
 
 def page_source():
@@ -105,10 +111,10 @@ L1 = {
         "P-DEMO-6": {"issues": [issue(61, 6, parent="DEMO-500")], "hasNextPage": False},
     },
     "initiativesById": {
-        iuid(1): {"id": "I-1", "uuid": iuid(1), "name": "Demo initiative one",
+        iuid(1): {"id": "DEMO-901", "uuid": iuid(1), "name": "Demo initiative one",
                   "url": "https://linear.app/demo/initiative/one", "status": "Active",
                   "owner": {"name": "Sam"}, "parentInitiatives": [OBJECTIVE]},
-        iuid(2): {"id": "I-2", "uuid": iuid(2), "name": "Demo initiative two",
+        iuid(2): {"id": "DEMO-902", "uuid": iuid(2), "name": "Demo initiative two",
                   "url": "https://linear.app/demo/initiative/two", "status": "Active",
                   "owner": {"name": "Sam"}, "parentInitiatives": []},
     },
@@ -210,7 +216,8 @@ def ikey(n):
 
 
 def padd(n):
-    return {"key": pkey(n), "tool": "list_issues", "input": {"project": "P-DEMO-%d" % n, "limit": 100}}
+    return {"key": pkey(n), "tool": "list_issues",
+            "input": {"project": "P-DEMO-%d" % n, "fields": ISSUE_FIELDS, "limit": 100}}
 
 
 def iadd(n):
@@ -225,6 +232,7 @@ P_KEYS = [pkey(1), pkey(3), pkey(2), pkey(6), ikey(1), ikey(2)]
 P_PLUS7 = {"projects": PROJECTS["projects"] + [project(7, "started", [1])]}
 P_CAPS = {"projects": [project(n, "planned", [n]) for n in range(1, 6)]
           + [project(n, "started", [n] if n <= 25 else []) for n in range(6, 46)]}
+P_SECOND = {"projects": [project(1, "started", [1, 3])]}
 NOOP = {"drop": [], "add": []}
 
 # ---- the JXA leg ------------------------------------------------------------
@@ -253,12 +261,40 @@ DRIVER = r"""
     });
     return {steps: steps, registered: registered, dupes: dupes, maxLive: maxLive, keys: Object.keys(table)};
   }
+  // Every property the logic reads off a Linear issue or project, through proxies.
+  function reads(payloads) {
+    var seen = {issue: {}, assigned: {}, project: {}};
+    function spy(obj, kind) {
+      return new Proxy(obj, {get: function (t, k) {
+        if (typeof k === "string") seen[kind][k] = 1;
+        return t[k];
+      }});
+    }
+    function issues(list, kind) {
+      return {issues: list.issues.map(function (i) { return spy(i, kind); }), hasNextPage: list.hasNextPage};
+    }
+    var byProject = {};
+    Object.keys(payloads.issuesByProject).forEach(function (k) {
+      byProject[k] = issues(payloads.issuesByProject[k], "issue");
+    });
+    var projects = {projects: payloads.projects.projects.map(function (p) { return spy(p, "project"); })};
+    FNS.normalizeLinear({projects: projects, assigned: issues(payloads.assigned, "assigned"),
+                         issuesByProject: byProject, initiativesById: payloads.initiativesById});
+    FNS.watchDiff([], projects);
+    return {issue: Object.keys(seen.issue).sort(), assigned: Object.keys(seen.assigned).sort(),
+            project: Object.keys(seen.project).sort(),
+            constants: {issue: typeof OPS_ISSUE_FIELDS === "undefined" ? null : OPS_ISSUE_FIELDS,
+                        assigned: typeof OPS_ASSIGNED_FIELDS === "undefined" ? null : OPS_ASSIGNED_FIELDS,
+                        project: typeof OPS_PROJECT_FIELDS === "undefined" ? null : OPS_PROJECT_FIELDS}};
+  }
   var out = {};
   __CALLS__.forEach(function (c) {
     try {
       if (c.fn === "replay") {
         if (!FNS.watchDiff) throw new Error("watchDiff is not a function");
         out[c.name] = {ok: replay(c.args[0])};
+      } else if (c.fn === "reads") {
+        out[c.name] = {ok: reads(c.args[0])};
       } else {
         if (!FNS[c.fn]) throw new Error(c.fn + " is not a function");
         out[c.name] = {ok: FNS[c.fn].apply(null, c.args)};
@@ -276,15 +312,21 @@ CALLS = {
     "nl-full": ("normalizeLinear", [L1]),
     "nl-no-initiative-payloads": ("normalizeLinear", [dict(L1, initiativesById=None)]),
     "nl-parent-field-absent": ("normalizeLinear", [dict(L1, initiativesById={
-        iuid(1): {"id": "I-1", "uuid": iuid(1), "name": "Demo initiative one", "url": "https://linear.app/demo/initiative/one"},
+        iuid(1): {"id": "DEMO-901", "uuid": iuid(1), "name": "Demo initiative one", "url": "https://linear.app/demo/initiative/one"},
     })]),
     "nl-empty": ("normalizeLinear", [{}]),
     "nl-null": ("normalizeLinear", [None]),
     "nl-null-parts": ("normalizeLinear", [{"projects": None, "assigned": None, "issuesByProject": None,
                                            "initiativesById": None}]),
     "nl-projects-array": ("normalizeLinear", [{"projects": PROJECTS["projects"]}]),
+    "nl-truncated": ("normalizeLinear", [dict(L1, issuesByProject=dict(
+        L1["issuesByProject"], **{"P-DEMO-1": dict(L1["issuesByProject"]["P-DEMO-1"], hasNextPage=True),
+                                  "P-DEMO-3": json.dumps(dict(L1["issuesByProject"]["P-DEMO-3"], hasNextPage=True))}))]),
+    "reads": ("reads", [L1]),
     # opsModel
     "m-linear": ("opsModel", [model_input(linear=NL1)]),
+    "m-truncated": ("opsModel", [model_input(linear=dict(NL1, noInitiative=[dict(NL1["noInitiative"][0], truncated=True),
+                                                                             NL1["noInitiative"][1]]))]),
     "m-placed": ("opsModel", [PLACED]),
     "m-other": ("opsModel", [model_input([build("wf-b", "completed", "DEMO-99")], [],
                                          [wait("slack:C1/1.2", "@0000000b", "DEMO-98")],
@@ -333,6 +375,7 @@ CALLS = {
     "wd-shared-initiative-kept": ("watchDiff", [P_KEYS, without(2)]),
     "wd-new-project": ("watchDiff", [P_KEYS, P_PLUS7]),
     "wd-caps": ("watchDiff", [[], P_CAPS]),
+    "wd-first-initiative-only": ("watchDiff", [[], P_SECOND]),
     "wd-null": ("watchDiff", [P_KEYS, None]),
     "wd-garbage": ("watchDiff", [P_KEYS, "not json"]),
     "wd-no-list": ("watchDiff", [P_KEYS, {}]),
@@ -425,6 +468,27 @@ class JxaLogic(unittest.TestCase):
         everywhere = [p["id"] for z in got["initiatives"] for p in z["projects"]]
         self.assertEqual(everywhere.count("P-DEMO-6"), 1)
 
+    def test_truncated_lane(self):
+        got = self.call("nl-truncated")
+        flags = [(p["id"], p.get("truncated")) for z in got["initiatives"] for p in z["projects"]]
+        flags += [(p["id"], p.get("truncated")) for p in got["noInitiative"] + got["outside"]]
+        self.assertEqual(flags, [("P-DEMO-1", True), ("P-DEMO-2", None), ("P-DEMO-6", None),
+                                 ("P-DEMO-3", True), ("none", None), (puid(7), None)])
+        self.assertNotIn("truncated", str(self.call("nl-full")))
+        model = self.call("m-truncated")
+        self.assertEqual([(lane["id"], lane.get("truncated")) for lane in model["noInitiative"]],
+                         [("P-DEMO-3", True), ("none", None)])
+
+    def test_fields_cover_reads(self):
+        got = self.call("reads")
+        self.assertEqual(got["constants"], {"issue": ISSUE_FIELDS, "assigned": ASSIGNED_FIELDS,
+                                            "project": PROJECT_FIELDS})
+        self.assertTrue(got["issue"] and got["assigned"] and got["project"])
+        self.assertLessEqual(set(got["issue"]), set(ISSUE_FIELDS))
+        self.assertLessEqual(set(got["assigned"]), set(ASSIGNED_FIELDS))
+        self.assertLessEqual(set(got["project"]), set(PROJECT_FIELDS))
+        self.assertIn("parentId", got["issue"])
+
     # -- opsModel: placement and the zones items land in --
 
     def test_placement(self):
@@ -516,6 +580,8 @@ class JxaLogic(unittest.TestCase):
         caps = self.call("wd-caps")
         self.assertEqual(caps["drop"], [])
         self.assertEqual(caps["add"], [padd(n) for n in range(6, 46)] + [iadd(n) for n in range(6, 21)])
+        # Only initiatives[0] is watched: normalizeLinear places a project under its first initiative only.
+        self.assertEqual(self.call("wd-first-initiative-only"), {"drop": [], "add": [padd(1), iadd(1)]})
         for name in ("wd-null", "wd-garbage", "wd-no-list", "wd-bad-list"):
             self.assertEqual(self.call(name), NOOP, name)
         self.assertEqual(self.call("wd-all-gone"), {"drop": [pkey(1)], "add": []})
@@ -536,7 +602,7 @@ class JxaLogic(unittest.TestCase):
 
 # ---- the static leg ---------------------------------------------------------
 
-SLUG_RE = re.compile(r"(?<![A-Za-z0-9])([A-Za-z]{2,6})-([0-9]{1,6})(?![A-Za-z0-9])")
+SLUG_RE = re.compile(r"(?<![A-Za-z0-9])([A-Za-z]{1,6})-([0-9]{1,6})(?![A-Za-z0-9])")
 NOT_TICKETS = ("CVE", "GPT", "HTTP", "ISO", "PEP", "RFC", "SHA", "UTF")
 PP8_BANNED = (".set(", ".update(", ".delete(", ".add(", "innerHTML", "outerHTML", "insertAdjacentHTML",
               "document.write")
@@ -590,6 +656,7 @@ class Static(unittest.TestCase):
     def test_demo_tokens_only(self):
         source = page_source()
         self.assertTrue(source, "templates/opsview.html missing")
+        self.assertTrue(SLUG_RE.search("see X-7 next"), "one-letter ids are ticket-like")
         tokens = {m.group(0) for m in SLUG_RE.finditer(source) if m.group(1).upper() not in NOT_TICKETS}
         self.assertTrue(tokens, "no DEMO- ticket in the page")
         self.assertEqual(sorted(t for t in tokens if not re.fullmatch(r"DEMO-[0-9]+", t)), [])
