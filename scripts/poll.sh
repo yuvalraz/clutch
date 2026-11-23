@@ -83,13 +83,16 @@ GW='$4 ~ /^gh:/ {
     if (x !~ /^[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+#[0-9]+$/) next
     split(x, a, /[\/#]/); print r, a[1], a[2], a[3], $5, $1 }'
 MS=$(dirname "$0")/merge.sh
-# mready <ref>: rc 0, head sha in MR_SHA, when merge.sh says the listed PR is
-# ready and .woke, readable (else the dedupe cannot be checked), holds no
-# mergeable mark for that sha. stdin from /dev/null: merge.sh never eats a list.
+# mready <ref> <owner/repo>: rc 0, head sha in MR_SHA, when the repo is on a
+# readable merge list (checked in-process, so no list forks nothing), merge.sh
+# says the PR is ready, and grep reads .woke and finds no mergeable mark for
+# that sha (rc 1; rc 2, a read error, cannot rule out a repeat). stdin from
+# /dev/null: merge.sh never eats a list.
 mready() {
-  [ -f "$MS" ] || return 1
+  [ -f "$MS" ] && clutch_merge_listed "$2" || return 1
   MR_SHA=$(sh "$MS" --ready "$1" </dev/null) || return 1
-  [ -r "$WF" ] && ! LC_ALL=C grep -qxF "mergeable $1 $MR_SHA" "$WF"
+  LC_ALL=C grep -qxF "mergeable $1 $MR_SHA" "$WF"
+  [ "$?" = 1 ]
 }
 
 R=0
@@ -155,7 +158,7 @@ $REF"
     case $STAMP in $ISO) ;; *) WHAT="" ;; esac
     case $WHAT in merged | closed | comment | review\ [A-Z]*) ;; *)
       # No move: a ready PR on the merge list wakes mergeable.
-      mready "$REF" || continue
+      mready "$REF" "$OWNER/$REPO" || continue
       WAKE="$WAKE$REF mergeable
 "
       MARKS="${MARKS}mergeable $REF $MR_SHA
@@ -183,14 +186,15 @@ EOF
         if clutch_ops_record "$TAG"; then
           LC_ALL=C grep -q '^last [0-9][0-9]*$' "$BF"; BL=$?
           # A ready PR on the merge list that no live check reads wakes the
-          # beat, past the hourly cap, with no beat mark.
-          while read -r UR _; do
-            [ -n "$UR" ] && mready "$UR" || continue
+          # beat, past the hourly cap, with no beat mark. An empty or
+          # unreadable merge list skips the unwatched read.
+          while read -r UR UO URP _; do
+            [ -n "$UR" ] && mready "$UR" "$UO/$URP" || continue
             BW=1
             MARKS="${MARKS}mergeable $UR $MR_SHA
 "
           done <<EOF
-$([ ! -f "$MS" ] || clutch_unwatched_loops | LC_ALL=C awk "$GW")
+$([ -f "$MS" ] && ME=$(clutch_merge_entries) && [ -n "$ME" ] && clutch_unwatched_loops | LC_ALL=C awk "$GW")
 EOF
         fi
         # No last line means an empty window: seed one and skip this round's

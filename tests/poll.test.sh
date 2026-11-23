@@ -22,7 +22,8 @@
 # replay copy; the fake gh reads <o_r_n>.m.json for a ready read) and wakes
 # "<ref> mergeable" once per head sha, after a "mergeable <ref> <sha>" mark;
 # no list, no merge.sh, a failed or hung ready read, or an unreadable .woke
-# wakes nothing. Bt1-Bt17 with Bt4b, Bt5b,
+# or failed mark read (M28j) wakes nothing, and with no list or an
+# unreadable one merge.sh is never forked (M28k). Bt1-Bt17 with Bt4b, Bt5b,
 # Bt6b, Bt8b, Bt10b and Bt13b cover the beat: with the tag's ops record there it peeks the beat window
 # from 08:00 to 20:59, wakes on peer moves at most once an hour with
 # "Run /clutch:beat @<tag>." after a "beat <epoch>" mark, seeds a record with
@@ -615,7 +616,42 @@ else
   own1; fx o_r_1 OPEN "$B0" '' ''; mfx o_r_1 "$SHA1"; mlist o/r; : > "$FIX/wokewo"
   pr 1 @0123abcd; chmod 644 "$WF"; ok "M28i .woke unreadable at the check" 0 "$ENDED" 2
   [ ! -s "$WF" ] || { echo "FAIL: M28i -- .woke [$(cat "$WF")]"; fail=1; }
+  # M28k: a merge list that cannot be read (clutch_merge_listed rc 2): no
+  # wake, and merge.sh is never forked.
+  own1; fx o_r_1 OPEN "$B0" '' ''; mfx o_r_1 "$SHA1"; mlist o/r; chmod 000 "$HOME/.clutch/rituals.md"
+  PBIN="$T/m28gbin"; pr 2 @0123abcd; unset PBIN; chmod 644 "$HOME/.clutch/rituals.md"
+  ok "M28k merge list unreadable" 0 "$ENDED" 2
+  ! grep -q 'merge\.sh' "$FIX/shlog" 2>/dev/null || { echo "FAIL: M28k -- forked merge.sh: [$(cat "$FIX/shlog")]"; fail=1; }
 fi
+# M28j: the mark read itself fails (grep rc 2, a stub grep) though .woke
+# passes -r: no mergeable wake, no mark.
+mkdir -p "$T/m28jbin"; cp "$T/mbin/gh" "$T/mbin/date" "$T/mbin/sleep" "$T/m28jbin/"
+printf '#!/bin/sh\ncase "$*" in "-qxF mergeable "*) exit 2 ;; esac\nexec %s "$@"\n' "$(command -v grep)" > "$T/m28jbin/grep"; chmod 755 "$T/m28jbin/grep"
+own1; fx o_r_1 OPEN "$B0" '' ''; mfx o_r_1 "$SHA1"; mlist o/r
+PBIN="$T/m28jbin"; pr 1 @0123abcd; unset PBIN
+ok "M28j mark read fails" 0 "$ENDED" 2
+[ ! -s "$WF" ] || { echo "FAIL: M28j -- .woke [$(cat "$WF")]"; fail=1; }
+# M28k: no merge list: merge.sh is never forked, on the owned path (o/r#1)
+# or the beat path (o/r#2, unwatched; record there, cap shut), clutch_unwatched_loops
+# never runs (a logging ps: it is the only ps caller, for o/r#3's live tag),
+# and the output and gh count equal 2.18.2's (M28d).
+M28L=$(bg sh "$T/stub/poll.sh" @ffffffff); PIDS="$PIDS $M28L"
+printf '#!/bin/sh\necho "$*" >> "$HOME/../fix/pslog"\nexec %s "$@"\n' "$(command -v ps)" > "$T/m28gbin/ps"; chmod 755 "$T/m28gbin/ps"
+own1; madd 100 "proj wait: gh:o/r#2 $B0 pr two"; madd 100 "proj wait: gh:o/r#3 $B0 @ffffffff pr three"
+fx o_r_1 OPEN "$B0" '' ''; mfx o_r_1 "$SHA1"; mfx o_r_2 "$SHA1"
+mkdir -p "$HOME/.clutch/watch"; printf 'last %s\n' "$((NOW - 60))" > "$HOME/.clutch/watch/0123abcd.beat"
+printf '%s %s\n' "$M28L" "$NOW" > "$HOME/.clutch/watch/ffffffff.poll"
+PBIN="$T/m28gbin"; pr 2 @0123abcd; unset PBIN
+ok "M28k no merge list" 0 "$ENDED" 2
+! grep -q 'merge\.sh' "$FIX/shlog" 2>/dev/null || { echo "FAIL: M28k -- forked merge.sh with no list: [$(cat "$FIX/shlog")]"; fail=1; }
+[ ! -s "$FIX/pslog" ] || { echo "FAIL: M28k -- ran clutch_unwatched_loops with no list: ps [$(cat "$FIX/pslog")]"; fail=1; }
+# The same run with o/r listed (o/r#2 not ready) does run it: the ps log is live.
+own1; madd 100 "proj wait: gh:o/r#2 $B0 pr two"; madd 100 "proj wait: gh:o/r#3 $B0 @ffffffff pr three"
+fx o_r_1 OPEN "$B0" '' ''; mlist o/r
+mkdir -p "$HOME/.clutch/watch"; printf 'last %s\n' "$((NOW - 60))" > "$HOME/.clutch/watch/0123abcd.beat"
+printf '%s %s\n' "$M28L" "$NOW" > "$HOME/.clutch/watch/ffffffff.poll"
+PBIN="$T/m28gbin"; pr 1 @0123abcd; unset PBIN
+[ -s "$FIX/pslog" ] || { echo "FAIL: M28k -- the ps log never fired with a list"; fail=1; }
 
 # --- Bt1-Bt16: the poller beats while the tag's ops record is there: from
 # 08:00 to 20:59 it peeks the beat window (clutch_beat_window peek) and wakes
