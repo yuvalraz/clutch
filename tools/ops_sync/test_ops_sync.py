@@ -940,6 +940,12 @@ class SweepDocs(unittest.TestCase):
         self.assertNotIn(("sweep", "k2"), third)
         self.assertEqual(ops_sync.build_docs([], [], None, second, self.T2 + 60), {})
 
+    def test_sweep_ids_go_through_ident(self):
+        # One id rule for sessions, waits and sweep: build_docs' ident names every sweep document.
+        ident = lambda key: "~hguarded" if key == "k2" else ops_sync.enc_doc_id(key)
+        docs = ops_sync.build_docs([], [], self.record(self.T1, item(), item("k2")), {}, self.T1, ident)
+        self.assertEqual(sorted(docs), [("sweep", "gh:demo~2Fapp~237"), ("sweep", "~hguarded")])
+
 
 class SweepCli(unittest.TestCase):
     """CLI seam: `ops_sync.py --sweep` with IF-6 JSON on stdin."""

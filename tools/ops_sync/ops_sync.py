@@ -225,11 +225,12 @@ def validate_sweep(obj: dict) -> list:
     return list(kept.values())
 
 
-def sweep_docs(record: dict, previous_docs: dict) -> dict:
+def sweep_docs(record: dict, previous_docs: dict, ident=enc_doc_id) -> dict:
     swept = iso(record["swept_at"])
     docs = {}
     for item in record["items"]:
-        key = ("sweep", item.get("doc_id") or enc_doc_id(item["key"]))
+        # sync blanks a guarded key field before building and keeps the raw key in id_key for ident.
+        key = ("sweep", ident(item.get("id_key", item["key"])))
         built = {"kind": "sweep", "key": item["key"], "item_kind": item["kind"], "ref": item["ref"],
                  "title": item["title"], "state": item["state"], "waiting_on": item["waiting_on"],
                  "ticket": item["ticket"] or ticket_of([], [item["key"], item["title"]]), "present": True}
@@ -253,7 +254,7 @@ def build_docs(worklog_lines: list, open_wait_lines: list, sweep_record, previou
     docs = session_docs(parse_worklog(worklog_lines, now), ident)
     docs.update(wait_docs(open_wait_lines, previous_docs, now, ident))
     if sweep_record is not None:
-        docs.update(sweep_docs(sweep_record, previous_docs))
+        docs.update(sweep_docs(sweep_record, previous_docs, ident))
     return docs
 
 
@@ -402,15 +403,13 @@ def sync(home: str, sweep_items=None) -> int:
     blanked = 0
     if record is not None:
         # Guard before building, so a blanked field compares equal to its blanked document (RP-6).
-        # A key the guard hits never reaches the id: it gets IF-2's hash form and a blank key field.
+        # The key's id comes from ident below (which counts a hit); a hit also blanks the key field.
         items = []
         for item in record["items"]:
             item = dict(item)
-            if people_guard({"key": item["key"]}, guard):
-                blanked += 1
-                item["doc_id"] = "~h" + hashlib.sha256(item["key"].encode("utf-8")).hexdigest()[:40]
-                item["key"] = ""
+            key = item.pop("key")
             blanked += people_guard(item, guard)
+            item.update(key="" if guard_hit(key, guard) else key, id_key=key)
             items.append(item)
         record = {"swept_at": record["swept_at"], "items": items}
     state = load_state(base)
