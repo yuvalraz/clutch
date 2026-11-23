@@ -10,6 +10,7 @@
 # Also defines clutch_beat_window and clutch_ops_record.
 # Also defines clutch_poll_alive and clutch_poll_young.
 # Also defines clutch_session_paths (CLUTCH_TAG8, CLUTCH_SDIR, CLUTCH_SREL).
+# Also defines clutch_merge_listed and clutch_unwatched_loops.
 
 CLUTCH_GIT=0
 CLUTCH_STATE=0
@@ -443,4 +444,50 @@ clutch_session_paths() {
   CLUTCH_SDIR="$CLUTCH_DIR/s/$CLUTCH_TAG8"
   CLUTCH_SREL=".clutch/s/$CLUTCH_TAG8/"
   return 0
+}
+
+# Is <owner>/<repo> ($1) on the merge list: a "- <owner>/<repo>[ <text>]"
+# line in the "### Merge" section of ~/.clutch/rituals.md, a section that sits
+# under "## Ops" and ends at the next heading? Case is ignored on both sides,
+# a CR at line end is dropped. 0 listed; 1 not (no file, no section, a
+# malformed argument); 2 the file is there but not a readable regular file.
+# Writes nothing, reads no network.
+clutch_merge_listed() {
+  CML_F="$HOME/.clutch/rituals.md"
+  [ -e "$CML_F" ] || [ -L "$CML_F" ] || return 1
+  [ -f "$CML_F" ] && [ -r "$CML_F" ] || return 2
+  CML_A=$1 LC_ALL=C awk '
+    BEGIN { a = tolower(ENVIRON["CML_A"]); if (a !~ /^[a-z0-9._-]+\/[a-z0-9._-]+$/) a = "" }
+    { sub(/\r$/, "") }
+    /^##[ \t]+Ops[ \t]*$/ { ops = 1; on = 0; next }
+    /^##[ \t]/ { ops = 0; on = 0; next }
+    /^#/ { on = ops && /^###[ \t]+Merge[ \t]*$/; next }
+    on && /^- / && a != "" { split(substr($0, 3), e, " ")
+      if (e[1] ~ /^[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+$/ && tolower(e[1]) == a) f = 1 }
+    END { exit !f }' "$CML_F" 2>/dev/null || return 1
+}
+
+# The open wait lines no live silent check reads, raw, oldest first: those
+# with no @tag in field 6 (a session tag, @ plus 8 lowercase hex) and those
+# whose tag's clutch_poll_alive is 1 or 3, minus every line whose ref (field
+# 4 lowercased, trailing ,;:. and CR dropped) a tag with clutch_poll_alive 0
+# or 2 also waits on. rc 1 and 2 as clutch_owned_loops. Writes nothing.
+clutch_unwatched_loops() {
+  CUL_W=$(clutch_open_loops)
+  CUL_RC=$?
+  # The same absence proof as clutch_owned_loops (the tag only passes its guard).
+  [ "$CUL_RC" != 1 ] || { clutch_owned_loops @unwatchd >/dev/null; return; }
+  [ "$CUL_RC" = 0 ] || return "$CUL_RC"
+  [ -n "$CUL_W" ] || return 0
+  CUL_L=""
+  for CUL_T in $(printf '%s\n' "$CUL_W" | LC_ALL=C awk '$6 ~ /^@[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]$/ { print $6 }' | sort -u); do
+    clutch_poll_alive "$CUL_T"
+    case $? in 1 | 3) ;; *) CUL_L="$CUL_L $CUL_T" ;; esac
+  done
+  printf '%s\n' "$CUL_W" | CUL_L="$CUL_L " LC_ALL=C awk '
+    { n++; ln[n] = $0; r = $4; sub(/[,;:.\r]+$/, "", r); k[n] = tolower(r)
+      t[n] = ($6 ~ /^@[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]$/) ? $6 : ""
+      if (t[n] != "" && index(ENVIRON["CUL_L"], " " t[n] " ")) live[k[n]] = 1 }
+    END { for (i = 1; i <= n; i++)
+      if (!live[k[i]] && (t[i] == "" || !index(ENVIRON["CUL_L"], " " t[i] " "))) print ln[i] }'
 }
