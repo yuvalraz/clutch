@@ -170,6 +170,7 @@ It also says so in one line when the waits cannot be read. Entering ops runs
 one tick pass as part of the sweep.
 With a `### Delegation` policy in `~/.clutch/rituals.md`, ops sorts what it reads: L3 waits for your yes as before, L2 does a chore you listed and logs it, L1 drafts, L0 shows only what touches the critical path, and Noise stays hidden.
 A production change, a direct send, a merge or a delete always waits for a yes.
+Merges of your own approved, clean PRs in a repo your `### Merge` list names are the one exception: the watch and the beat merge them (see below).
 An `- Auto:` line names an intake channel, such as a review-request queue: ops posts there without a yes and logs it, and an @-mention the line does not name still waits for your yes.
 Non-critical drafts wait for an approval window, 11:00 and 16:30 by default, which opens on your next sweep.
 A `## Critical path` in your focus file makes the first sweep of the day open with a brief.
@@ -306,6 +307,7 @@ Ops also reads the tablet inbox under `~/.clutch/inbox/`, and `~/.clutch/people.
 `/clutch:watch` reads the waits its session tag owns in `~/.clutch/worklog.md`,
 and the PRs, threads and other items they name.
 `/clutch:beat` reads `~/.clutch/worklog.md` and the items its waits name.
+Their merge pass, `scripts/merge.sh`, also reads the `### Merge` list in `~/.clutch/rituals.md`.
 
 One thing to know before you mix contexts: a brain entry banked at home surfaces in
 whatever repo you run these skills in, a work repo included. Whether that is
@@ -315,7 +317,7 @@ It writes the local `.clutch/` folder, plus your brain on an absorb verdict, and
 in a repo, adds the local folder to git's ignore list. Sessions also append one-line notes
 of what moved to `~/.clutch/worklog.md`, so parallel sessions can see each
 other. That log is not pool stock: it and the watch markers
-`~/.clutch/watch/<tag>`, `<tag>.beat`, `<tag>.poll`, `<tag>.woke` and `<tag>.polled` are the only things sessions write to `~/.clutch`
+`~/.clutch/watch/<tag>`, `<tag>.beat`, `<tag>.poll`, `<tag>.woke`, `<tag>.polled` and `merge.failed` are the only things sessions write to `~/.clutch`
 without a command or a verdict. The log is global: its lines,
 commit subjects and repo names included, reach sessions in every repo, a work
 repo included. If you keep no `~/.clutch` yet, the first note creates it, and
@@ -348,6 +350,7 @@ extra and close-out steps you wrote can use your integrations.
 `/clutch:watch` checks the integrations its session's waits name, every 30
 minutes (every 10 with `CLUTCH_POLL=off`) or on its silent check's wake, until none is left.
 `scripts/poll.sh`, the silent check a session starts in the background while it holds PR waits or is an ops session, calls `gh` and nothing else.
+`scripts/merge.sh`, the merge pass the watch and the beat run, calls `gh` and nothing else, and merges only PRs in the repos your `### Merge` list names.
 `/clutch:beat` checks the integrations its waits name, at most once an hour, on its silent check's wake (every hour with `CLUTCH_POLL=off`), while an ops session is open.
 An ops session's armed sweep sends `/clutch:ops re-sweep armed` at 08:37, 12:37 and 16:37, and only reads, until the session's ops record is gone.
 No hook script here touches the network, and you
@@ -381,6 +384,7 @@ starts its silent check with the shell, which asks permission each time. Add
 `Bash(sh */clutch/*/scripts/poll.sh*)` to `permissions.allow` in your Claude
 Code settings to skip that ask. From a local checkout, allow
 `Bash(sh <checkout>/scripts/poll.sh*)` instead.
+`Bash(sh */clutch/*/scripts/merge.sh*)` lets merges run without the shell's ask; leave it out and each merge asks you first.
 
 One exception, and it is deliberate: one optional file holds your day's facts
 and tool names. The core carries opinions; your day carries facts: which days
