@@ -6,7 +6,6 @@
 <meta name="claude:viewport-fit-sides" content="cover">
 <title>Ops view</title>
 <style>
-@import url("https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap");
 /* Top-down: objective bands hold initiative zones, zones hold project lanes, lanes hold ticket nodes;
    the floor shows what moves now, the waits list everything still open. Edges are an SVG overlay. */
 :root {
@@ -502,11 +501,12 @@ function opsModel(input) {
   var RETRACT = {needs_reauth: 1, server_not_connected: 1, not_in_manifest: 1, blocked_by_policy: 1,
                  approval_required: 1, selection_required: 1};
   var DEMO = location.hash.indexOf("#demo") === 0;
-  var state = {docs: {}, arrived: false, late: false, dbDown: false, mcpDown: false, linear: {}, errors: {},
+  var state = {docs: {}, fresh: {}, late: false, dbDown: false, mcpDown: false, linear: {}, errors: {},
                asking: false, selected: null, now: null};
   var table = {};  // project:/initiative: key -> that watch's Unsubscribe
   var mcp = null;
-  var model = null, nodeEls = {}, drawn = 0;
+  var model = null, nodeEls = {}, drawn = 0, pending = 0;
+  var COLLECTIONS = ["builds", "sessions", "waits", "sweep"];
 
   function copyWith(obj, key, value) {
     var next = {};
@@ -531,6 +531,7 @@ function opsModel(input) {
     a.href = url;
     a.target = "_blank";
     a.rel = "noopener";
+    a.setAttribute("data-key", "a:" + url + " " + text);
     return a;
   }
   function append(parent, kids) {
@@ -550,11 +551,11 @@ function opsModel(input) {
       render();
       return;
     }
-    ["builds", "sessions", "waits", "sweep"].forEach(function (c) {
+    COLLECTIONS.forEach(function (c) {
       db.collection(c).orderBy("updated_at", "desc").limit(500).onSnapshot(function (snap) {
         state.docs = copyWith(state.docs, c, snap.docs.map(function (d) { return d.data(); }));
-        state.arrived = true;
-        state.late = false;
+        // A copy saved on an earlier visit (fromCache: true) is not an arrival (db.d.ts onSnapshot).
+        if (snap.metadata && snap.metadata.fromCache === false) state.fresh = copyWith(state.fresh, c, true);
         render();
       }, function () {
         state.dbDown = true;
@@ -562,11 +563,15 @@ function opsModel(input) {
       });
     });
     setTimeout(function () {
-      if (!state.arrived && !state.dbDown) {
+      if (!allFresh() && !state.dbDown) {
         state.late = true;
         render();
       }
     }, 10000);
+  }
+
+  function allFresh() {
+    return COLLECTIONS.every(function (c) { return state.fresh[c] === true; });
   }
 
   // ---- Linear: two list watches at start, per-id watches from watchDiff ----
@@ -584,6 +589,7 @@ function opsModel(input) {
           });
           table = next;
           state.linear = keep(state.linear, ["projects", "assigned"].concat(Object.keys(table)));
+          state.errors = keep(state.errors, ["projects", "assigned"].concat(Object.keys(table)));
         }
       } else {
         var code = ev.error && ev.error.code;
@@ -620,10 +626,11 @@ function opsModel(input) {
   }
 
   // ---- notices: page states ----
-  function renderNotices(host, empty) {
+  function renderNotices(host, empty, fresh) {
     host.replaceChildren();
     if (state.dbDown) host.appendChild(el("p", "notice", "ops view unavailable"));
-    else if (state.late) host.appendChild(el("p", "notice info", "ops view data has not arrived yet"));
+    else if (state.late && !fresh) host.appendChild(el("p", "notice info", Object.keys(state.docs).length
+      ? "ops view data may be out of date" : "ops view data has not arrived yet"));
     if (state.mcpDown) host.appendChild(el("p", "notice", LINEAR_OTHER));
     var shown = {};
     Object.keys(state.errors).forEach(function (k) {
@@ -634,6 +641,7 @@ function opsModel(input) {
       if (e.code === "approval_required" && mcp) {
         var b = el("button", null, "Allow Linear");
         b.type = "button";
+        b.setAttribute("data-key", "allow:" + e.key);
         b.disabled = state.asking;
         b.addEventListener("click", function () {
           if (state.asking) return;
@@ -696,9 +704,10 @@ function opsModel(input) {
     if (item.kind === "sweep") label += " " + (d.item_kind || "");
     return el("span", "badge " + item.kind, label);
   }
-  function nodeButton(node) {
+  function nodeButton(laneId, node) {
     var b = el("button", "node" + (node.items.length ? " busy" : ""));
     b.type = "button";
+    b.setAttribute("data-key", "node:" + laneId + " " + node.ticket);
     b.setAttribute("aria-pressed", String(state.selected === node.ticket));
     append(b, [el("span", "id", node.ticket), node.title ? el("span", "t", node.title) : null,
                node.state ? el("span", "st", node.state) : null]);
@@ -710,7 +719,7 @@ function opsModel(input) {
   function laneRow(lane) {
     var name = append(el("div", "lane-name"), [el("strong", null, lane.name || lane.id), link(lane.url, "open in Linear"),
                                                 lane.truncated ? el("small", null, "first 100 shown") : null]);
-    var nodes = append(el("div", "nodes"), lane.nodes.map(nodeButton));
+    var nodes = append(el("div", "nodes"), lane.nodes.map(function (n) { return nodeButton(lane.id, n); }));
     if (!lane.nodes.length) nodes.appendChild(el("span", "muted", "No tickets."));
     return append(el("div", "lane"), [name, nodes]);
   }
@@ -829,6 +838,7 @@ function opsModel(input) {
       var rel = e.kind === "parent" ? (e.from === n.ticket ? "parent of" : "child of") : "same session as";
       var b = el("button", null, rel + " " + other);
       b.type = "button";
+      b.setAttribute("data-key", "conn:" + e.kind + " " + other);
       b.addEventListener("click", function () { select(other); });
       right.appendChild(b);
     });
@@ -852,21 +862,29 @@ function opsModel(input) {
 
   function select(ticket) {
     state.selected = state.selected === ticket ? null : ticket;
-    render();
+    paint();
     if (state.selected && nodeEls[state.selected]) nodeEls[state.selected].focus();
   }
 
+  // Live deliveries batch into one frame; select() paints at once so it can move focus.
   function render() {
-    var payloads = linearPayloads();
+    cancelAnimationFrame(pending);
+    pending = requestAnimationFrame(paint);
+  }
+
+  function paint() {
+    // The rebuild replaces every focusable; refocus the new element with the same data-key.
+    var prev = document.activeElement, key = prev && prev.getAttribute ? prev.getAttribute("data-key") : null;
+    var payloads = linearPayloads(), fresh = allFresh();
     model = opsModel({builds: state.docs.builds, sessions: state.docs.sessions, waits: state.docs.waits,
                       sweep: state.docs.sweep, linear: payloads ? normalizeLinear(payloads) : null,
                       now: state.now || undefined});
     nodeEls = {};
     var floor = model.floor;
-    var empty = state.arrived && !model.zones.length && !model.noInitiative.length && !model.outside.length
+    var empty = fresh && !model.zones.length && !model.noInitiative.length && !model.outside.length
       && !model.other.length && !model.unlinked.length && !model.waitsList.length && !floor.builds.length
       && !floor.sessions.length;
-    renderNotices(document.getElementById("notices"), empty);
+    renderNotices(document.getElementById("notices"), empty, fresh);
     renderFloor(document.getElementById("floor"), floor);
     renderMap(document.getElementById("zones"), model, Boolean(payloads));
     renderWaits(document.getElementById("waits"), model.waitsList);
@@ -877,6 +895,15 @@ function opsModel(input) {
     }
     document.getElementById("live").textContent = (DEMO ? "Ops view · demo" : "Ops view · live")
       + (model.lastChange ? " · last change " + when(model.lastChange) : "");
+    if (key && !prev.isConnected) {
+      var all = document.querySelectorAll("[data-key]");
+      for (var i = 0; i < all.length; i += 1) {
+        if (all[i].getAttribute("data-key") === key) {
+          all[i].focus({preventScroll: true});
+          break;
+        }
+      }
+    }
     cancelAnimationFrame(drawn);
     drawn = requestAnimationFrame(drawEdges);
   }
@@ -886,6 +913,8 @@ function opsModel(input) {
     var data = JSON.parse(document.getElementById("demo-data").textContent);
     var flags = location.hash.slice(5);
     var code = (flags.match(/linear=([a-z_]+)/) || [])[1] || null;
+    // #demo?cache: only cached snapshots arrive, so the 10 s notice turns to "may be out of date".
+    var cached = flags.indexOf("cache") >= 0;
     state.now = data.now;
     function later(fn) { setTimeout(fn, 20); }
     function answer(tool, input) {
@@ -903,7 +932,7 @@ function opsModel(input) {
           if (flags.indexOf("late") < 0) {
             later(function () {
               next({docs: (data[name] || []).map(function (d) { return {id: name, data: function () { return d; }}; }),
-                    metadata: {fromCache: false, hasPendingWrites: false}});
+                    metadata: {fromCache: cached, hasPendingWrites: false}});
             });
           }
           return function () {};

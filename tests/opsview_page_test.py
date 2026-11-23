@@ -689,10 +689,10 @@ PAGE_REQUIRED = ('claude.use("db")', 'claude.use("mcp")', 'orderBy("updated_at",
                  "refetchInterval: 900000", "OPS_PROJECT_FIELDS", "OPS_ASSIGNED_FIELDS",
                  "= 40;", "= 15;", "ops view unavailable", "ops view data has not arrived yet",
                  "No initiative: link these projects to an initiative", "Outside your projects: initiative not read",
-                 "first 100 shown") + LINEAR_COPY
+                 "first 100 shown", "ops view data may be out of date") + LINEAR_COPY
 # Verb-shaped tool names; any of them in the page must be one of the three reads.
 TOOL_NAME_RE = re.compile(r'"((?:list|get|save|create|update|delete|search|archive|remove)_[a-z_]+)"')
-ALLOWED_HOSTS = ("fonts.googleapis.com", "cdnjs.cloudflare.com")
+ALLOWED_HOSTS = ()  # no external script, style or font
 
 
 def render_block():
@@ -721,7 +721,7 @@ class Page(unittest.TestCase):
     def test_page_read_only(self):
         source = page_source()
         self.assertIsNotNone(render_block(), "ops-render block missing")
-        found = [text for text in PP8_BANNED + ("new Map", "new Set", "delete ", "<script src", "<link")
+        found = [text for text in PP8_BANNED + ("new Map", "new Set", "delete ", "<script src", "<link", "@import")
                  if text in source]
         self.assertEqual(found, [])
         self.assertIn(".textContent = ", render_block())
@@ -770,6 +770,50 @@ class Page(unittest.TestCase):
         self.assertTrue(diff < drop < add < entry.start(), "drops unsubscribe before adds register")
         self.assertIn("table = next;", render[entry.start():])
         self.assertNotIn("watchDiff(", render[:diff])
+
+    def test_page_fresh_snapshots(self):
+        # A cached copy (fromCache: true) is not an arrival (db.d.ts onSnapshot): only a fromCache:false
+        # snapshot marks its collection fresh, and only four fresh collections clear the 10 s notice.
+        render = render_block()
+        self.assertIsNotNone(render, "ops-render block missing")
+        self.assertNotRegex(render, r"\barrived\b(?! yet)")
+        self.assertIn("snap.metadata && snap.metadata.fromCache === false", render)
+        self.assertIn("state.fresh = copyWith(state.fresh, c, true)", render)
+        empty = re.search(r"var empty = ([^;]*);", render)
+        self.assertIsNotNone(empty)
+        self.assertTrue(empty.group(1).startswith("fresh && "), "empty waits for four fresh collections")
+        late = render.find('"ops view data has not arrived yet"')
+        stale = render.find('"ops view data may be out of date"')
+        self.assertGreater(late, 0)
+        self.assertGreater(stale, 0)
+        self.assertRegex(render, r"state\.late && !fresh\)[^;]*Object\.keys\(state\.docs\)\.length")
+        # #demo?cache delivers cached snapshots only, for the S7 check.
+        self.assertIn('var cached = flags.indexOf("cache") >= 0;', render)
+        self.assertIn("fromCache: cached", render)
+
+    def test_page_dropped_watch_errors(self):
+        render = render_block()
+        self.assertIsNotNone(render, "ops-render block missing")
+        swap = render.find("table = next;")
+        self.assertGreater(swap, 0)
+        branch = render[swap:render.find("} else {", swap)]
+        self.assertIn('state.linear = keep(state.linear, ["projects", "assigned"].concat(Object.keys(table)));', branch)
+        self.assertIn('state.errors = keep(state.errors, ["projects", "assigned"].concat(Object.keys(table)));', branch)
+
+    def test_page_keeps_focus(self):
+        render = render_block()
+        self.assertIsNotNone(render, "ops-render block missing")
+        # Live deliveries batch into one frame; the rebuild refocuses the element with the same data-key.
+        self.assertIn("function render() {", render)
+        self.assertRegex(render, r"function render\(\) \{\s*cancelAnimationFrame\(pending\);\s*"
+                                 r"pending = requestAnimationFrame\(paint\);\s*\}")
+        paint = render[render.find("function paint() {"):]
+        self.assertIn("var prev = document.activeElement", paint)
+        self.assertIn('getAttribute("data-key")', paint)
+        self.assertIn("!prev.isConnected", paint)
+        self.assertIn(".focus({preventScroll: true})", paint)
+        for key in ('"node:" + ', '"conn:" + ', '"allow:" + ', '"a:" + '):
+            self.assertIn(key, render, key)
 
     def test_page_theme(self):
         source = page_source()
