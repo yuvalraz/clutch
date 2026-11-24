@@ -95,7 +95,7 @@ only at one of those moments.
   it reads the PRs every 10 minutes from 08:00 to 21:59 and wakes the session only when one
   merged, closed, or got a review or comment from someone other than you or a bot,
   or gh failed on one 3 reads in a row (`unreadable`).
-  A silent check that keeps ending early, before its first wake, leaves those waits unwatched until a new wait is logged; it is not asked for again.
+  A silent check that ends within 10 minutes of its start, before any wake, leaves those waits unwatched until a new wait is logged; it is not asked for again.
   Otherwise the watch is `/clutch:watch @<tag>` every 30 minutes from 08:07 to 21:37,
   one `No change.` line unless one of its waits moved, gone once none is left.
   `CLUTCH_POLL=off` keeps the 10-minute watch for every kind.

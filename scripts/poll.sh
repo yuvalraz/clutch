@@ -43,7 +43,8 @@ WF="$D/${TAG#@}.woke"
 BF="$D/${TAG#@}.beat"
 [ ! -d "$HOME/.clutch" ] || mkdir -p "$D"
 # Without a readable, appendable .woke a wake could repeat on the same evidence.
-{ : >> "$WF"; } && [ -r "$WF" ] || stopped
+# true, not ':': dash ends the shell on a failed redirect of a special builtin.
+true >> "$WF" && [ -r "$WF" ] || stopped
 START=$(date +%s)
 case $START in '' | *[!0-9]*) ended ;; esac
 { printf '%s %s%s\n' "$$" "$START" "$BEAT" > "$PF.$$" && mv -f "$PF.$$" "$PF"; } || { rm -f "$PF.$$"; stopped; }
@@ -54,6 +55,22 @@ NAP=${CLUTCH_POLL_SLEEP:-600}
 # 1-5 digits, >= 1, as stop.sh reads a round; else 600.
 case $NAP in [1-9] | [1-9][0-9] | [1-9][0-9][0-9] | [1-9][0-9][0-9][0-9] | [1-9][0-9][0-9][0-9][0-9]) ;; *) NAP=600 ;; esac
 ISO='[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]:[0-9][0-9]:[0-9][0-9]Z'
+# ghq: one gh read, killed (its own pid only) after 60 s, a kill being a gh
+# failure: a hung gh would keep the check alive, read as armed. macOS has no
+# timeout(1); /bin/sleep, as bash 3.2 command -p still takes a hashed sleep.
+ghq() {
+  gh api graphql -f query="$Q" -f o="$OWNER" -f r="$REPO" -F n="$NUM" --jq "$F" </dev/null &
+  GHQ_P=$!
+  # 1 s naps, no trap: a kill lands on the default TERM action at any point,
+  # and at most one 1 s sleep outlives it.
+  ( n=0; while [ "$n" -lt 60 ]; do /bin/sleep 1; n=$((n + 1)); done; kill "$GHQ_P" ) >/dev/null &
+  GHQ_K=$!
+  wait "$GHQ_P"
+  GHQ_RC=$?
+  kill "$GHQ_K"
+  wait "$GHQ_K"
+  return "$GHQ_RC"
+}
 Q='query($o:String!,$r:String!,$n:Int!){viewer{login} repository(owner:$o,name:$r){pullRequest(number:$n){state updatedAt comments(last:50){nodes{createdAt author{__typename login}}} reviews(last:50){nodes{state submittedAt author{__typename login}}}}}}'
 
 R=0
@@ -103,7 +120,7 @@ while [ "$R" -lt "$MAX" ]; do
         elif ($rv | length) > 0 then "review \($rv[-1].state) \($t)"
         elif ($cm | length) > 0 then "comment \($t)"
         else empty end'
-    if ! GOT=$(gh api graphql -f query="$Q" -f o="$OWNER" -f r="$REPO" -F n="$NUM" --jq "$F" </dev/null); then
+    if ! GOT=$(ghq); then
       FAILS="$FAILS
 $REF"
       [ "$(printf '%s\n' "$FAILS" | LC_ALL=C awk -v r="$REF" '$0 == r { n++ } END { print n + 0 }')" -ge 3 ] || continue
@@ -130,7 +147,8 @@ $WAITS
 EOF
   # The beat, 08:00-20:59: peer moves in the window and the hourly cap open
   # (no M, or now - 120 - M >= 3600, M the newer of the newest last and the
-  # newest beat mark). An unreadable record or .woke means no beat wake.
+  # newest beat mark, values after now left out: a clock stepped back never
+  # shuts the cap). An unreadable record or .woke means no beat wake.
   BW=""
   case $BEAT$HR in
     ' beat'0[89] | ' beat'1[0-9] | ' beat'20)
@@ -146,8 +164,8 @@ EOF
         elif [ "$BL" = 0 ] && MV=$(clutch_beat_window "$TAG" peek) && [ -n "$MV" ] &&
           [ -r "$BF" ] && [ -r "$WF" ] &&
           [ "$(LC_ALL=C awk -v n="$BN" -v bf="$BF" '
-            FILENAME == bf && /^last [0-9]+$/ && (m == "" || $2 + 0 > m + 0) { m = $2 }
-            FILENAME != bf && /^beat [0-9]+$/ && (m == "" || $2 + 0 > m + 0) { m = $2 }
+            FILENAME == bf && /^last [0-9]+$/ && $2 + 0 <= n + 0 && (m == "" || $2 + 0 > m + 0) { m = $2 }
+            FILENAME != bf && /^beat [0-9]+$/ && $2 + 0 <= n + 0 && (m == "" || $2 + 0 > m + 0) { m = $2 }
             END { if (m == "" || n - 120 - m >= 3600) print "open" }' "$BF" "$WF")" = open ]; then
           BW=1
           MARKS="${MARKS}beat $((BN - 120))

@@ -325,7 +325,7 @@ clutch_poll_alive() {
 # Did <@tag>'s ended silent check die young? 0 when its .poll first line is
 # well-formed ("<pid> <start>[ <third>]", start of at most 12 digits), the
 # start is under one round ago (poll.sh's sleep: CLUTCH_POLL_SLEEP when 1-5
-# digits >= 1, else 600 s; a future start reads as young) and it never woke
+# digits >= 1, else 600 s; a start after now is not young) and it never woke
 # (.woke empty or absent, or .poll newer than .woke; equal mtimes on a
 # non-empty .woke count as a wake), say killed by a Bash timeout or a
 # headless exit. 1 otherwise, an unreadable .poll or a date failure included.
@@ -345,7 +345,9 @@ clutch_poll_young() {
   CPY_START=$(LC_ALL=C awk 'NR == 1 && (NF == 2 || NF == 3) && $1 ~ /^[1-9][0-9]*$/ && $2 ~ /^[1-9][0-9]*$/ && length($2) <= 12 { print $2 }' "$CPY_F.poll" 2>/dev/null)
   CPY_NOW=$(date +%s 2>/dev/null)
   case $CPY_START.$CPY_NOW in *[!0-9.]* | .* | *.) return 1 ;; esac
-  [ $((CPY_NOW - CPY_START)) -lt "$CPY_NAP" ] 2>/dev/null || return 1
+  # A start after now (a clock stepped back) is not young.
+  CPY_AGE=$((CPY_NOW - CPY_START))
+  [ "$CPY_AGE" -ge 0 ] && [ "$CPY_AGE" -lt "$CPY_NAP" ] 2>/dev/null || return 1
   [ ! -s "$CPY_F.woke" ] || [ "$CPY_F.poll" -nt "$CPY_F.woke" ]
 }
 
