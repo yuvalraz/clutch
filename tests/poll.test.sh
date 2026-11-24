@@ -321,11 +321,16 @@ cm() { printf '{"createdAt":"%s","author":{"__typename":"%s","login":"%s"}}' "$1
 rv() { printf '{"state":"%s","submittedAt":"%s","author":{"__typename":"%s","login":"%s"}}' "$1" "$2" "$3" "$4"; }
 # pr <rounds> <tag>: run the poller; OUT, RC, ERR, NGH (gh calls). PBEAT
 # sets CLUTCH_BEAT, PSCRIPT another staged poll.sh, PSH the shell (sh), PBIN
-# the fake bin dir ($T/mbin).
+# the fake bin dir ($T/mbin). /bin/dash (macOS 26.6) now and then dies of
+# SIGSEGV within 1 ms of its exec, before it runs a line (rc 139); poll.sh
+# never ends rc 139, so pr and M16 run such a launch once more (M-SEGV).
 pr() {
-  : > "$FIX/log"
-  OUT=$(cd "$T/plain" && PATH="${PBIN:-$T/mbin}:$PATH" CLUTCH_BEAT=${PBEAT:-} CLUTCH_POLL_SLEEP=${PSLEEP:-0} CLUTCH_POLL_ROUNDS=$1 "${PSH:-sh}" "${PSCRIPT:-$T/scripts/poll.sh}" "$2" 2>"$T/err")
-  RC=$?
+  for PTRY in 1 2; do
+    : > "$FIX/log"
+    OUT=$(cd "$T/plain" && PATH="${PBIN:-$T/mbin}:$PATH" CLUTCH_BEAT=${PBEAT:-} CLUTCH_POLL_SLEEP=${PSLEEP:-0} CLUTCH_POLL_ROUNDS=$1 "${PSH:-sh}" "${PSCRIPT:-$T/scripts/poll.sh}" "$2" 2>"$T/err")
+    RC=$?
+    [ "$RC" = 139 ] || break
+  done
   ERR=$(cat "$T/err")
   NGH=$(grep -c '' "$FIX/log")
 }
@@ -418,7 +423,10 @@ pr 4 @0123abcd; ok "M24e outside-window round neither counts nor resets" 0 "$(nl
 own1; fx o_r_1 OPEN "$B0" '' ''; : > "$FIX/repoll"
 pr 3 @0123abcd; ok "M15 superseded" 0 "$ENDED" 1
 own1; fx o_r_1 MERGED "$NEW" '' ''; : > "$FIX/log"
-OUT=$(cd "$T/plain" && PATH="$T/mbin:$PATH" CLUTCH_WATCH=off CLUTCH_POLL_SLEEP=0 CLUTCH_POLL_ROUNDS=2 sh "$T/scripts/poll.sh" @0123abcd 2>"$T/err"); RC=$?
+for PTRY in 1 2; do
+  OUT=$(cd "$T/plain" && PATH="$T/mbin:$PATH" CLUTCH_WATCH=off CLUTCH_POLL_SLEEP=0 CLUTCH_POLL_ROUNDS=2 sh "$T/scripts/poll.sh" @0123abcd 2>"$T/err"); RC=$?
+  [ "$RC" = 139 ] || break
+done
 ERR=$(cat "$T/err"); NGH=$(grep -c '' "$FIX/log" 2>/dev/null)
 ok "M16 CLUTCH_WATCH=off" 0 "$ENDED" 0
 [ ! -e "$HOME/.clutch/watch/0123abcd.poll" ] || { echo "FAIL: M16 -- .poll written"; fail=1; }
@@ -483,6 +491,17 @@ else
   pr 1 @0123abcd; ok "M20d dash, no ~/.clutch" 0 "$STOP" 0
   unset PSH
 fi
+# M-SEGV: a launch that dies rc 139 (the dash SIGSEGV at exec) runs once
+# more; a shell that dies on every launch still fails rc 139.
+mkdir -p "$T/segv"
+printf '#!/bin/sh\n[ -e "%s/segv/once" ] || { : > "%s/segv/once"; exit 139; }\nexec sh "$@"\n' "$T" "$T" > "$T/segv/once.sh"
+printf '#!/bin/sh\nexit 139\n' > "$T/segv/always.sh"; chmod 755 "$T/segv/once.sh" "$T/segv/always.sh"
+own1; fx o_r_1 MERGED "$NEW" '' ''
+PSH="$T/segv/once.sh"; pr 1 @0123abcd; unset PSH
+ok "M-SEGV one rc 139 launch runs again" 0 "$(nl 'gh:o/r#1 merged' "$CLOSE")" 1
+own1; fx o_r_1 MERGED "$NEW" '' ''
+PSH="$T/segv/always.sh"; pr 1 @0123abcd; unset PSH
+[ "$RC" = 139 ] || { echo "FAIL: M-SEGV always -- rc $RC, want 139"; fail=1; }
 own1; madd 50 "proj wait: gh:o/r#2 $B0 @0123abcd pr two"; madd 40 "proj wait: gh:o/r#3 $B0 @0123abcd pr three"
 fx o_r_1 MERGED "$NEW" '' ''; fx o_r_2 OPEN "$NEW" "$(cm "$NEW" User al)" ''; fx o_r_3 OPEN "$B0" '' ''
 pr 1 @0123abcd; ok "M22 two moved" 0 "$(nl 'gh:o/r#1 merged' 'gh:o/r#2 comment' "$CLOSE")" 3
