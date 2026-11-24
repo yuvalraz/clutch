@@ -308,6 +308,7 @@ fpin "$S" "G15 pick list shape" 'one question, header "Focus", `multiSelect: fal
 fpin "$S" "G15 four-option rule" 'AskUserQuestion takes two to four options and adds Other on its own'
 fpin "$S" "G15 dropped focus typeable" 'the question names it as typeable under Other'
 fpin "$S" "G15 recommended" 'option 1 is `<focus> (Recommended)`'
+fpin "$S" "G15 recommended no thread" '"Your last focus in this folder." with no thread'
 fpin "$S" "G15 no guess options" 'With no guess, the options are build, ideate, ops, and review, and the question says investigate can be typed under Other.'
 fpin "$S" "G15 investigate off" 'When the session-start ask in context offers only four focuses (its list lacks investigate), never offer or mention investigate'
 fpin "$S" "G15 option order" 'The rest follow in the order build, ideate, ops, review, investigate until there are four.'
