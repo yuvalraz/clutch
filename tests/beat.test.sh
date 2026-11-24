@@ -594,7 +594,7 @@ awk '/^- An ops session is told at turn end/{f=1} f && /^- / && !/^- An ops/{f=0
   tr -s '[:space:]' ' ' | grep -q 'The beat and the armed sweep stop themselves once the session.s ops record is gone' \
   || { echo "FAIL: B-readme-stop -- the beat bullet does not say the beat and sweep stop once the ops record is gone"; fail=1; }
 tr -s '[:space:]' ' ' < "$HERE/../README.md" |
-  grep -q 'and only reads, until the session.s ops record is gone' \
+  grep -q 'and only reads, plus the ops view push when it is on, until the session.s ops record is gone' \
   || { echo "FAIL: B-readme-stop -- the armed sweep line does not say it runs until the ops record is gone"; fail=1; }
 
 # --- H1-H10: clutch_beat_window. bw <tag>: the helper sourced from the
@@ -894,6 +894,55 @@ else
   r1fx
   R1_OUT=$(cd "$T/plain" && sh -c "$RBAD" 2>/dev/null); R1_RC=$?
   [ "$R1_RC" = 2 ] && [ -z "$R1_OUT" ] || { echo "FAIL: R1 bad -- want rc 2, empty; rc $R1_RC: $R1_OUT"; fail=1; }
+fi
+
+# --- B-OV0-B-OV2: the ops view tail on the read line. OLD_BT5 is the 2.18.1
+# line; the beat's line is it plus the tail. Off (no ~/.clutch/opsview.json,
+# or a directory there), the two lines print, exit and leave the same tree; on,
+# the new line adds one last line `OPS VIEW: on` after a read that exits 0,
+# and keeps the rc. Each run gets a fresh fixture and date +%s pinned to NOW,
+# so the record's `last` append matches.
+OLD_BT5='sh -c '"'"'. "${CLAUDE_PLUGIN_ROOT}/scripts/prelude.sh" && L=$(clutch_beat_window "@<tag>") || exit; [ -z "$L" ] || printf "%s\n" "$L" | LC_ALL=C cut -c1-300'"'"
+OV_TAIL='; R=$?; [ ! -f "$HOME/.clutch/opsview.json" ] || echo "OPS VIEW: on"; exit $R'
+[ "$RLINE" = "${OLD_BT5%?}$OV_TAIL'" ] || { echo "FAIL: B-OV tail -- the read line is not the 2.18.1 line plus the tail: $RLINE"; fail=1; }
+# ovrun <cmd> <moves|quiet|none|unread> [on|dir]: sets OUT, RC and TREE.
+ovrun() {
+  rm -rf "$HOME/.clutch"
+  case $2 in
+    moves) r1fx ;;
+    quiet) seed; mkrec "last $((NOW - 1000))" ;;
+    none) mkdir -p "$HOME/.clutch" ;;
+    unread) r1fx; chmod 000 "$W" ;;
+  esac
+  case ${3:-} in on) : > "$HOME/.clutch/opsview.json" ;; dir) mkdir "$HOME/.clutch/opsview.json" ;; esac
+  OUT=$(cd "$T/plain" && PATH="$T/bin:$PATH" && FAKE_NOW=$NOW && export PATH FAKE_NOW && sh -c "$1" 2>&1); RC=$?
+  TREE=$(cd "$HOME" && find . | LC_ALL=C sort && find . -type f | LC_ALL=C sort | while IFS= read -r f; do cat "$f" 2>/dev/null; done)
+  chmod 644 "$W" 2>/dev/null
+}
+if [ -n "${RCMD:-}" ]; then
+  OLD_CMD=$(rl1 "$(rl1 "$OLD_BT5" '${CLAUDE_PLUGIN_ROOT}' "$T")" '@<tag>' '@0123abcd')
+  ovk='moves quiet none'
+  if [ "$(id -u)" = 0 ]; then echo "SKIP: B-OV unread (root reads through chmod)"; else ovk="$ovk unread"; fi
+  for k in $ovk; do
+    ovrun "$OLD_CMD" "$k"; o_out=$OUT; o_rc=$RC; o_tree=$TREE
+    case "$k:$o_rc:${o_out:+set}" in moves:0:set|quiet:0:|none:1:|unread:2:) ;;
+      *) echo "FAIL: B-OV0 [$k] -- fixture gives rc $o_rc [$o_out]"; fail=1 ;; esac
+    ovrun "$RCMD" "$k"
+    [ "$RC" = "$o_rc" ] && [ "$OUT" = "$o_out" ] \
+      || { echo "FAIL: B-OV0 [$k] off -- rc $RC [$OUT], 2.18.1 rc $o_rc [$o_out]"; fail=1; }
+    [ "$TREE" = "$o_tree" ] || { echo "FAIL: B-OV2 [$k] -- the off run left another tree"; fail=1; }
+    for m in on dir; do
+      ovrun "$OLD_CMD" "$k" "$m"; o_out=$OUT; o_rc=$RC
+      want=$o_out
+      if [ "$m" = on ] && [ "$o_rc" = 0 ]; then
+        if [ -n "$o_out" ]; then want="$o_out
+OPS VIEW: on"; else want='OPS VIEW: on'; fi
+      fi
+      ovrun "$RCMD" "$k" "$m"
+      [ "$RC" = "$o_rc" ] && [ "$OUT" = "$want" ] \
+        || { echo "FAIL: B-OV1 [$k $m] -- rc $RC [$OUT], want rc $o_rc [$want]"; fail=1; }
+    done
+  done
 fi
 
 # --- R2: the ops Step 0 record snippet, @<tag> filled, under sh and zsh -f.

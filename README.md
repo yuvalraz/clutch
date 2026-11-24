@@ -108,7 +108,7 @@ only at one of those moments.
   something moved. When what moved sits off the day's
   focuses, it names the focus it sits beside. After the beat's ask, the session is
   told, once a day, to arm a sweep: `/clutch:ops re-sweep armed` at 08:37, 12:37 and 16:37.
-  The armed sweep only reads and speaks: it keeps the session's mode, and the actions
+  The armed sweep only reads and speaks, plus the ops view push when it is on: it keeps the session's mode, and the actions
   and posts your delegation policy pre-approves wait for a sweep you type.
   The beat and the armed sweep stop themselves once the session's ops record is gone,
   such as when the session turns to review.
@@ -136,6 +136,11 @@ only at one of those moments.
    spark next week.
 3. **The worklog.** `~/.clutch/worklog.md`, one short line per `moved:` note,
    `on:` claim or `wait:` loop, shared by every session in every repo.
+4. **The ops view** (optional). `~/.clutch/opsview.json` turns it on: the ops session's beat and sweeps push sessions, waits and sweep items to your private Ops view page through `scripts/opsview-sync.sh`, which runs `tools/ops_sync/ops_sync.py`.
+   `templates/opsview.html` is the page: it reads the Linear projects you are a member of, your assigned tickets and their initiatives, and flags a project with no initiative.
+   A sweep that skipped or failed to read an integration it tried keeps the last sweep record and pushes only sessions and waits; a push that fails is said once, by a sweep, never by a beat.
+   An integration unavailable for a whole session loses its earlier sweep items from the page until a sweep reads it again.
+   With the file absent nothing changes.
 
 The brain is a plain directory. Point it wherever you like, including inside a
 git repo you sync yourself. Clutch never moves it for you.
@@ -170,6 +175,7 @@ It also says so in one line when the waits cannot be read. Entering ops runs
 one tick pass as part of the sweep.
 With a `### Delegation` policy in `~/.clutch/rituals.md`, ops sorts what it reads: L3 waits for your yes as before, L2 does a chore you listed and logs it, L1 drafts, L0 shows only what touches the critical path, and Noise stays hidden.
 A production change, a direct send, a merge or a delete always waits for a yes.
+Merges of your own approved, clean PRs in a repo your `### Merge` list names are the one exception: the watch and the beat merge them (see below).
 An `- Auto:` line names an intake channel, such as a review-request queue: ops posts there without a yes and logs it, and an @-mention the line does not name still waits for your yes.
 Non-critical drafts wait for an approval window, 11:00 and 16:30 by default, which opens on your next sweep.
 A `## Critical path` in your focus file makes the first sweep of the day open with a brief.
@@ -306,6 +312,8 @@ Ops also reads the tablet inbox under `~/.clutch/inbox/`, and `~/.clutch/people.
 `/clutch:watch` reads the waits its session tag owns in `~/.clutch/worklog.md`,
 and the PRs, threads and other items they name.
 `/clutch:beat` reads `~/.clutch/worklog.md` and the items its waits name.
+Their merge pass, `scripts/merge.sh`, also reads the `### Merge` list in `~/.clutch/rituals.md`.
+With the ops view on (`~/.clutch/opsview.json` exists), the ops session's beat and sweeps also read that file, and `~/.clutch/people.md` to keep its lines out of what they send.
 
 One thing to know before you mix contexts: a brain entry banked at home surfaces in
 whatever repo you run these skills in, a work repo included. Whether that is
@@ -315,13 +323,14 @@ It writes the local `.clutch/` folder, plus your brain on an absorb verdict, and
 in a repo, adds the local folder to git's ignore list. Sessions also append one-line notes
 of what moved to `~/.clutch/worklog.md`, so parallel sessions can see each
 other. That log is not pool stock: it and the watch markers
-`~/.clutch/watch/<tag>`, `<tag>.beat`, `<tag>.poll`, `<tag>.woke` and `<tag>.polled` are the only things sessions write to `~/.clutch`
+`~/.clutch/watch/<tag>`, `<tag>.beat`, `<tag>.poll`, `<tag>.woke`, `<tag>.polled` and `merge.failed` are the only things sessions write to `~/.clutch`
 without a command or a verdict. The log is global: its lines,
 commit subjects and repo names included, reach sessions in every repo, a work
 repo included. If you keep no `~/.clutch` yet, the first note creates it, and
 that folder is the brain: from then on an absorb verdict in `/clutch:fomo`
 files ideas into `~/.clutch/ideas/`, which sessions in every repo read,
 instead of the repo's `.clutch/ideas/`.
+With the ops view on, the ops session's beat and sweeps also write `~/.clutch/opsview/` and `~/.clutch/sweep.json` without a command, and send what changed to your private Ops view page; a write cut short can leave `~/.clutch/.sweep.json.tmp` or a dot-named `.tmp` file under `~/.clutch/opsview/`, which the next run overwrites.
 
 Every other write comes from a command you fire. `/clutch:fomo --brain` banks
 straight to the brain. `/clutch:rituals` writes `~/.clutch/rituals.md`.
@@ -340,7 +349,7 @@ When the tablet inbox has new pages or typed tasks, `/clutch:ops` files them: wo
 Some commands reach out, and only when you invoke them or a session's armed
 watch or beat fires one. `/clutch:fomo` fetches
 a banked link, and a spark, daydream, dream-spark, or ideate pass may run a web
-search. `/clutch:ops` and `/clutch:morning` check the integrations you named.
+search. `/clutch:ops` and `/clutch:morning` check the integrations you named, and with the ops view on `/clutch:ops` also pushes to your Ops view page.
 `/clutch:morning` and `/clutch:eod` run the prep command you set, and the
 extra and close-out steps you wrote can use your integrations.
 `/clutch:review` reads PRs and posts to one only on a yes.
@@ -348,8 +357,9 @@ extra and close-out steps you wrote can use your integrations.
 `/clutch:watch` checks the integrations its session's waits name, every 30
 minutes (every 10 with `CLUTCH_POLL=off`) or on its silent check's wake, until none is left.
 `scripts/poll.sh`, the silent check a session starts in the background while it holds PR waits or is an ops session, calls `gh` and nothing else.
-`/clutch:beat` checks the integrations its waits name, at most once an hour, on its silent check's wake (every hour with `CLUTCH_POLL=off`), while an ops session is open.
-An ops session's armed sweep sends `/clutch:ops re-sweep armed` at 08:37, 12:37 and 16:37, and only reads, until the session's ops record is gone.
+`scripts/merge.sh`, the merge pass the watch and the beat run, calls `gh` and nothing else, and merges only PRs in the repos your `### Merge` list names.
+`/clutch:beat` checks the integrations its waits name, at most once an hour, on its silent check's wake (every hour with `CLUTCH_POLL=off`), while an ops session is open, and with the ops view on it sends what changed to your Ops view page in one `ArtifactData` batch, plus one retry when a document is refused.
+An ops session's armed sweep sends `/clutch:ops re-sweep armed` at 08:37, 12:37 and 16:37, and only reads, plus the ops view push when it is on, until the session's ops record is gone.
 No hook script here touches the network, and you
 can verify it:
 
@@ -359,6 +369,7 @@ grep -rE 'curl|wget|/dev/tcp|nc ' scripts/
 
 That returns nothing.
 The one Python helper in `scripts/` sends nothing either: its test suite parses its imports and fails on any network module.
+`tools/ops_sync/ops_sync.py` sends nothing either: it writes local files, and its test suite fails on any network import; the model makes the one `ArtifactData` batch, plus one retry when a document is refused.
 
 It is read-mostly and fails open, so it sits underneath whatever else you run.
 On a repo with stricter guardrails, the strictest rule wins: the
@@ -381,6 +392,8 @@ starts its silent check with the shell, which asks permission each time. Add
 `Bash(sh */clutch/*/scripts/poll.sh*)` to `permissions.allow` in your Claude
 Code settings to skip that ask. From a local checkout, allow
 `Bash(sh <checkout>/scripts/poll.sh*)` instead.
+`Bash(sh */clutch/*/scripts/merge.sh*)` lets merges run without the shell's ask; leave it out and each merge pass asks you first.
+With the ops view on, the beat and sweeps also run `scripts/opsview-sync.sh`: allow `Bash(sh */clutch/*/scripts/opsview-sync.sh*)`, or `Bash(sh <checkout>/scripts/opsview-sync.sh*)` from a checkout, the same way.
 
 One exception, and it is deliberate: one optional file holds your day's facts
 and tool names. The core carries opinions; your day carries facts: which days

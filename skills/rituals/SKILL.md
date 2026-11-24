@@ -95,6 +95,10 @@ An Auto line, `- Auto: <channel> — <what to post>`, names a channel a process 
 Under `### Windows`, the approval window times, 24-hour, comma or line separated; the default is 11:00 and 16:30, used when the section is absent, empty or holds no valid time.
 A window opens on the first ops sweep at or after its time; nothing fires on its own.
 Under `### Buckets`, optional, `- work: <terms>` and `- personal: <terms>` name words that mark a tablet item as work or personal; ops reads them when it files the tablet inbox, only for an item that does not read clearly on its own; an unclear item that matches neither stays unsure.
+Under `### Merge`, optional, one `- <owner>/<repo>` per line names a repo with no GitHub auto-merge.
+The watch and the beat merge your own approved PR there with a merge commit once GitHub reports it clean: checks green, no conflicts, not a draft, no changes requested, into the default branch.
+A repo that allows no merge commits is skipped, and a merge never uses force or admin rights. A failed merge is named once and stays held.
+The list is separate from Delegation, and an L3 line about merging still holds every merge ops itself would do.
 
 ```markdown
 ## Ops
@@ -109,6 +113,8 @@ Under `### Buckets`, optional, `- work: <terms>` and `- personal: <terms>` name 
 ### Buckets
 - work: <your team, your product>
 - personal: <home, family>
+### Merge
+- <owner>/<repo>
 ```
 
 Your focus file may hold a `## Critical path`: one `###` block per delivery, each step a `- [ ]` or `- [x]` line, and a blocked step ending in `waits on: <who>`.
