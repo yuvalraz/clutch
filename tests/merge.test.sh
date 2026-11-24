@@ -67,11 +67,18 @@ tree() { find "$HOME/.clutch" 2>/dev/null | sort | while read -r f; do [ ! -f "$
 # on PATH; OUT, RC, ERR, NGH. MSH the shell (sh), MWAIT CLUTCH_MERGE_WAIT,
 # MPATH another PATH. ML1: nothing under ~/.clutch changes but merge.failed
 # (and the watch dir it sits in).
+# SEGV: /bin/dash (macOS 26.6) now and then dies of SIGSEGV within 1 ms of
+# its exec, before it runs a line (rc 139, the same address each time; crash
+# reports 2026-11-23). No merge.sh or prelude rc is 139, so mr, pf and MK13e
+# run such a launch once more.
 mr() {
-  mf_log0
-  TB=$(tree)
-  OUT=$(cd "$T/plain" && PATH="${MPATH:-$MF_PATH}" CLUTCH_MERGE_WAIT="${MWAIT:-}" "${MSH:-sh}" "$T/scripts/merge.sh" "$@" 2>"$T/err")
-  RC=$?
+  for MTRY in 1 2; do
+    mf_log0
+    TB=$(tree)
+    OUT=$(cd "$T/plain" && PATH="${MPATH:-$MF_PATH}" CLUTCH_MERGE_WAIT="${MWAIT:-}" "${MSH:-sh}" "$T/scripts/merge.sh" "$@" 2>"$T/err")
+    RC=$?
+    [ "$RC" = 139 ] || break
+  done
   ERR=$(cat "$T/err")
   NGH=$(mf_ngh)
   TD=$(printf '%s\n--\n%s\n' "$TB" "$(tree)" | awk -v w="$HOME/.clutch/watch" '$0 == "--" { s = 1; next } !s { b[$0] = 1; next } !b[$0] && $0 != w && $0 != w "/merge.failed"')
@@ -92,7 +99,12 @@ bad() {
     || { echo "FAIL: $SHL $1 -- rc $RC stdout [$OUT] stderr [$ERR] gh $NGH, want rc $2 and one merge.sh: line"; fail=1; }
 }
 # pf <fn> <args>: a prelude function under the series shell, from a non-git dir.
-pf() { OUT=$(cd "$T/plain" && "${MSH:-sh}" -c '. "$1"; f=$2; shift 2; "$f" "$@"' x "$T/scripts/prelude.sh" "$@" 2>&1); RC=$?; }
+pf() {
+  for MTRY in 1 2; do
+    OUT=$(cd "$T/plain" && "${MSH:-sh}" -c '. "$1"; f=$2; shift 2; "$f" "$@"' x "$T/scripts/prelude.sh" "$@" 2>&1); RC=$?
+    [ "$RC" = 139 ] || break
+  done
+}
 failed() { cat "$MFF" 2>/dev/null; }
 # one <label> <want>: merge.failed holds exactly that.
 one() { [ "$(failed)" = "$2" ] || { echo "FAIL: $SHL $1 -- merge.failed [$(failed)], want [$2]"; fail=1; }; }
@@ -330,8 +342,21 @@ done
 MSH=sh; SHL=sh
 
 # --- MR3: the watchdog length. 1-5 digits, no leading zero, else 60 s: each
-# case's --ready against a gh that hangs 30 s still runs after 3 s; once its
-# gh is killed by pid it ends rc 2 within 3 s. 2 gives a 2 s watchdog.
+# case's --ready against a gh that hangs 30 s still runs 3 s after every gh
+# has hung (its pid file written, waited for up to 20 s); once its gh is
+# killed by pid it ends rc 2 (waited for up to 15 s, inside the 60 s
+# watchdog). Condition waits, not fixed sleeps, so a slow start under load
+# is no failure. 2 gives a 2 s watchdog.
+# mr3w <prefix> <tenths>: rc 0 once $T/<prefix>.1-5 all hold something.
+mr3w() {
+  mw=0
+  while [ "$mw" -lt "$2" ]; do
+    mj=1; while [ "$mj" -le 5 ] && [ -s "$T/$1.$mj" ]; do mj=$((mj + 1)); done
+    [ "$mj" -le 5 ] || return 0
+    /bin/sleep 0.1; mw=$((mw + 1))
+  done
+  return 1
+}
 base; echo 30 > "$MFIX/hang"
 i=0
 for v in unset abc 0 007 123456; do
@@ -343,18 +368,19 @@ for v in unset abc 0 007 123456; do
     echo $? > "$T/rc.$i"
   ) &
 done
+mr3w hp 200
 /bin/sleep 3
 i=0
 for v in unset abc 0 007 123456; do
   i=$((i + 1))
-  [ ! -f "$T/rc.$i" ] || { echo "FAIL: MR3 [$v] -- ended in under 3 s, want the 60 s watchdog"; fail=1; }
+  [ ! -f "$T/rc.$i" ] || { echo "FAIL: MR3 [$v] -- ended within 3 s of its gh hanging, want the 60 s watchdog"; fail=1; }
   kill "$(cat "$T/hp.$i" 2>/dev/null)" 2>/dev/null || { echo "FAIL: MR3 [$v] -- no hung gh to kill"; fail=1; }
 done
-/bin/sleep 3
+mr3w rc 150
 i=0
 for v in unset abc 0 007 123456; do
   i=$((i + 1))
-  [ "$(cat "$T/rc.$i" 2>/dev/null)" = 2 ] || { echo "FAIL: MR3 [$v] -- rc [$(cat "$T/rc.$i" 2>/dev/null)] 3 s after its gh was killed, want 2"; fail=1; }
+  [ "$(cat "$T/rc.$i" 2>/dev/null)" = 2 ] || { echo "FAIL: MR3 [$v] -- rc [$(cat "$T/rc.$i" 2>/dev/null)] up to 15 s after its gh was killed, want 2"; fail=1; }
 done
 wait
 T0=$(date +%s); MWAIT=2; mr --ready 'gh:acme/web#7'; unset MWAIT; TE=$(($(date +%s) - T0))
@@ -380,7 +406,10 @@ else
     T0=$(date +%s)
     i=0
     while [ "$i" -lt 30 ]; do
-      OUT=$(cd "$T/plain" && PATH=$NOGH "$sh" "$T/sq/merge.sh" --ready 'gh:acme/web#7' 2>"$T/err"); RC=$?
+      for MTRY in 1 2; do
+        OUT=$(cd "$T/plain" && PATH=$NOGH "$sh" "$T/sq/merge.sh" --ready 'gh:acme/web#7' 2>"$T/err"); RC=$?
+        [ "$RC" = 139 ] || break
+      done
       ERR=$(cat "$T/err"); NGH=0; SHL=$sh
       ok "MK13e no gh [$i]" 2 '' 0
       i=$((i + 1))
