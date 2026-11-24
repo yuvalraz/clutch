@@ -310,9 +310,20 @@ fpin "$S" "G15 dropped focus typeable" 'the question names it as typeable under 
 fpin "$S" "G15 recommended" 'option 1 is `<focus> (Recommended)`'
 fpin "$S" "G15 no guess options" 'With no guess, the options are build, ideate, ops, and review, and the question says investigate can be typed under Other.'
 fpin "$S" "G15 investigate off" 'When the session-start ask in context offers only four focuses (its list lacks investigate), never offer or mention investigate'
-fpin "$S" "G15 picked option" 'A picked option declares that focus: run it exactly as `/clutch:intent <focus>`, record included.'
-fpin "$S" "G15 Other reply" 'Under Other, naming a focus declares it; a plain go or yes declares the guessed focus; anything else is an ignored ask, and the once-only law holds.'
-fpin "$S" "G15 fallback" 'When AskUserQuestion is not available, is denied, or errors (as in -p or SDK runs), ask the text question instead, unchanged.'
+fpin "$S" "G15 option order" 'The rest follow in the order build, ideate, ops, review, investigate until there are four.'
+fpin "$S" "G15 guess offered first" 'the pick list offers it first'
+fpin "$S" "G15 build description" 'build "Maker session: craft gear, tests ship with the code."'
+fpin "$S" "G15 ideate description" 'ideate "Divergent session: explore wide before landing."'
+fpin "$S" "G15 ops description" 'ops "Operations: sweep the tools, close loops one at a time."'
+fpin "$S" "G15 review description" 'review "Review session: one PR at a time."'
+fpin "$S" "G15 investigate description" 'investigate "Read-only evidence: every finding tied to evidence."'
+fpin "$S" "G15 picked option" 'A picked option declares its focus word alone, without ` (Recommended)`; that bare word is the argument and the record line'"'"'s focus.'
+fpin "$S" "G15 picked option runs" 'Run it exactly as `/clutch:intent <focus>`, record included.'
+fpin "$S" "G15 Other reply" 'Under Other, naming a focus declares it, and anything else but a plain go or yes is an ignored ask; the once-only law holds.'
+fpin "$S" "G15 Other go" 'Under Other, a plain go or yes declares the guessed focus only when a guess is in context; with no guess it is an ignored ask like any other reply.'
+fpin "$S" "G15 dismissed" 'A user who dismisses the pick list (the tool reports the user declined or rejected it) has ignored the ask: do not re-ask in text; the once-only law holds.'
+fpin "$S" "G15 fallback" 'The text question is the fallback only when the pick list cannot be shown: the tool is absent, its use is refused by the permission mode (as in -p or SDK runs), or it errors before the user answers; then ask the text question instead, unchanged.'
+fpin "$S" "G15 deferred tool" 'When AskUserQuestion is a deferred tool (listed by name only), load it with tool search before asking; a deferred tool is not unavailable.'
 # Coupling: the anchor's guessed line carries the skill's trigger with <focus> filled.
 case "$(guessed build)" in *'looks like build again'*) ;; *) echo "FAIL: G15 coupling -- guessed line lacks the trigger"; fail=1 ;; esac
 TRIG=$(grep -oF 'looks like <focus> again' "$S" | head -n 1 | sed 's/<focus>/build/')

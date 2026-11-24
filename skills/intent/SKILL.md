@@ -44,13 +44,20 @@ With a guess in context (see Guessed focus), option 1 is `<focus> (Recommended)`
 The rest follow in the order build, ideate, ops, review, investigate until there are four.
 With no guess, the options are build, ideate, ops, and review, and the question says investigate can be typed under Other.
 When the session-start ask in context offers only four focuses (its list lacks investigate), never offer or mention investigate: the four, the guess first when present, are exactly the options.
-Each option carries a one-line description: build "Maker session: craft gear, tests ship with the code.",
-ideate "Divergent session: explore wide before landing.", ops "Operations: sweep the tools, close loops one at a time.",
-review "Review session: one PR at a time.", investigate "Read-only evidence: every finding tied to evidence.".
+Each option carries a one-line description:
+build "Maker session: craft gear, tests ship with the code.",
+ideate "Divergent session: explore wide before landing.",
+ops "Operations: sweep the tools, close loops one at a time.",
+review "Review session: one PR at a time.",
+investigate "Read-only evidence: every finding tied to evidence.".
 
-A picked option declares that focus: run it exactly as `/clutch:intent <focus>`, record included.
-Under Other, naming a focus declares it; a plain go or yes declares the guessed focus; anything else is an ignored ask, and the once-only law holds.
-When AskUserQuestion is not available, is denied, or errors (as in -p or SDK runs), ask the text question instead, unchanged.
+A picked option declares its focus word alone, without ` (Recommended)`; that bare word is the argument and the record line's focus.
+Run it exactly as `/clutch:intent <focus>`, record included.
+Under Other, naming a focus declares it, and anything else but a plain go or yes is an ignored ask; the once-only law holds.
+Under Other, a plain go or yes declares the guessed focus only when a guess is in context; with no guess it is an ignored ask like any other reply.
+A user who dismisses the pick list (the tool reports the user declined or rejected it) has ignored the ask: do not re-ask in text; the once-only law holds.
+When AskUserQuestion is a deferred tool (listed by name only), load it with tool search before asking; a deferred tool is not unavailable.
+The text question is the fallback only when the pick list cannot be shown: the tool is absent, its use is refused by the permission mode (as in -p or SDK runs), or it errors before the user answers; then ask the text question instead, unchanged.
 
 ## Guessed focus
 
