@@ -180,6 +180,7 @@ one tick pass as part of the sweep.
 With a `### Delegation` policy in `~/.clutch/rituals.md`, ops sorts what it reads: L3 waits for your yes as before, L2 does a chore you listed and logs it, L1 drafts, L0 shows only what touches the critical path, and Noise stays hidden.
 A production change, a direct send, a merge or a delete always waits for a yes.
 Merges of your own approved, clean PRs in a repo your `### Merge` list names are the one exception: the watch and the beat merge them (see below).
+A `### Merge` entry may add `no-review`, your standing approval of your own PRs in that repo when it has no review rule, and `base=<branch>`, a branch it also merges into beside the default.
 An `- Auto:` line names an intake channel, such as a review-request queue: ops posts there without a yes and logs it, and an @-mention the line does not name still waits for your yes.
 Non-critical drafts wait for an approval window, 11:00 and 16:30 by default, which opens on your next sweep.
 A `## Critical path` in your focus file makes the first sweep of the day open with a brief.

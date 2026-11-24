@@ -309,6 +309,7 @@ fpin "$R" "README: merge reads list"    'Their merge pass, `scripts/merge.sh`, a
 fpin "$R" "README: merge.failed marker" '`<tag>.woke`, `<tag>.polled` and `merge.failed` are the only things sessions write'
 fpin "$R" "README: merge network"       '`scripts/merge.sh`, the merge pass the watch and the beat run, calls `gh` and nothing else, and merges only PRs in the repos your `### Merge` list names.'
 fpin "$R" "README: merge allow rule"    '`Bash(sh */clutch/*/scripts/merge.sh*)` lets merges run without the shell'"'"'s ask; leave it out and each merge pass asks you first.'
+fpin "$R" "README: merge options"       'A `### Merge` entry may add `no-review`, your standing approval of your own PRs in that repo when it has no review rule, and `base=<branch>`, a branch it also merges into beside the default.'
 # The handoff path: /clutch:intent ops must be able to invoke the skill, so
 # model invocation stays enabled (negative pin).
 if grep -q 'disable-model-invocation: true' "$O"; then
