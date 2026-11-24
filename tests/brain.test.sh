@@ -320,12 +320,12 @@ printf '%s\n' "$HITS" | sed -n 2p | grep -q 'brain probe entry' \
 # Env hygiene: every sibling invocation clears the override-var scrub list
 # (Durable Decision 8) via ONE subshell unset line below -- the ten vars this
 # file takes plus the siblings' own SPRINT_SKILL INTENT_SKILL ANCHOR_SH, and
-# CLUTCH_WATCH, CLUTCH_GUESS and CLUTCH_PLAIN, the three env inputs (not override vars) in that line. FOMO_SKILL is shared with fomo-snippet.test.sh. Any new override var added to this file or a sibling suite MUST
+# CLUTCH_WATCH, CLUTCH_GUESS and CLUTCH_PLAIN, the three env inputs (not override vars) in that line, with MERGE_SH and CLUTCH_MERGE_WAIT for tests/merge.test.sh. FOMO_SKILL is shared with fomo-snippet.test.sh. Any new override var added to this file or a sibling suite MUST
 # be added to that unset line in the same edit. Without the scrub, a BASE
 # replay's poisoned var (e.g. README_FILE) inherits into the children and
 # lights sibling suites red.
 run_scrubbed() {
-  ( unset FOMO_SKILL SPARK_SKILL IDEATE_SKILL DAYDREAM_SKILL DREAMSPARK_SKILL RETRACE_SKILL README_FILE GLOSSARY_FILE CONSTITUTION_FILE HEARTBEAT_SH SPRINT_SKILL INTENT_SKILL ANCHOR_SH STOP_SH PRELUDE_SH CONST_FILE WATCH_SKILL INVESTIGATE_SKILL BEAT_SKILL CLUTCH_WATCH CLUTCH_GUESS CLUTCH_PLAIN CLUTCH_INVESTIGATE CLUTCH_BEAT CLUTCH_PER_SESSION CLUTCH_TITLE CLUTCH_POLL CLUTCH_POLL_SLEEP CLUTCH_POLL_ROUNDS POLL_SH
+  ( unset FOMO_SKILL SPARK_SKILL IDEATE_SKILL DAYDREAM_SKILL DREAMSPARK_SKILL RETRACE_SKILL README_FILE GLOSSARY_FILE CONSTITUTION_FILE HEARTBEAT_SH SPRINT_SKILL INTENT_SKILL ANCHOR_SH STOP_SH PRELUDE_SH CONST_FILE WATCH_SKILL INVESTIGATE_SKILL BEAT_SKILL CLUTCH_WATCH CLUTCH_GUESS CLUTCH_PLAIN CLUTCH_INVESTIGATE CLUTCH_BEAT CLUTCH_PER_SESSION CLUTCH_TITLE CLUTCH_POLL CLUTCH_POLL_SLEEP CLUTCH_POLL_ROUNDS POLL_SH MERGE_SH CLUTCH_MERGE_WAIT
     HOME="$1" sh "$2" </dev/null >/dev/null )
 }
 mkdir "$T/h6"
