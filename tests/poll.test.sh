@@ -23,7 +23,8 @@
 # "<ref> mergeable" once per head sha, after a "mergeable <ref> <sha>" mark;
 # no list, no merge.sh, a failed or hung ready read, or an unreadable .woke
 # or failed mark read (M28j) wakes nothing, and with no list or an
-# unreadable one merge.sh is never forked (M28k). Bt1-Bt17 with Bt4b, Bt5b,
+# unreadable one merge.sh is never forked (M28k); a no-review or base= entry
+# wakes a PR its plain entry would not (M28l, M28m). Bt1-Bt17 with Bt4b, Bt5b,
 # Bt6b, Bt8b, Bt10b and Bt13b cover the beat: with the tag's ops record there it peeks the beat window
 # from 08:00 to 20:59, wakes on peer moves at most once an hour with
 # "Run /clutch:beat @<tag>." after a "beat <epoch>" mark, seeds a record with
@@ -671,6 +672,21 @@ mkdir -p "$HOME/.clutch/watch"; printf 'last %s\n' "$((NOW - 60))" > "$HOME/.clu
 printf '%s %s\n' "$M28L" "$NOW" > "$HOME/.clutch/watch/ffffffff.poll"
 PBIN="$T/m28gbin"; pr 1 @0123abcd; unset PBIN
 [ -s "$FIX/pslog" ] || { echo "FAIL: M28k -- the ps log never fired with a list"; fail=1; }
+# M28l: a no-review entry: a PR with no review rule and no reviews wakes
+# mergeable; under a plain entry it does not.
+# mnr <o_r_n>: the ready read's fixture loses its review decision and reviews.
+mnr() { /usr/bin/jq '.data.repository.pullRequest.reviewDecision = null | .data.repository.pullRequest.latestOpinionatedReviews.nodes = []' "$FIX/$1.m.json" > "$FIX/$1.m.t" && mv "$FIX/$1.m.t" "$FIX/$1.m.json"; }
+own1; fx o_r_1 OPEN "$B0" '' ''; mfx o_r_1 "$SHA1"; mnr o_r_1; mlist 'o/r no-review'
+pr 1 @0123abcd; ok "M28l no-review wakes mergeable" 0 "$MWAKE" 2
+own1; fx o_r_1 OPEN "$B0" '' ''; mfx o_r_1 "$SHA1"; mnr o_r_1; mlist o/r
+pr 1 @0123abcd; ok "M28l plain entry stays quiet" 0 "$ENDED" 2
+# M28m: a base= entry: a PR into that branch wakes mergeable; a plain entry does not.
+own1; fx o_r_1 OPEN "$B0" '' ''; mfx o_r_1 "$SHA1"; mlist 'o/r base=dev'
+/usr/bin/jq '.data.repository.pullRequest.baseRefName = "dev"' "$FIX/o_r_1.m.json" > "$FIX/o_r_1.m.t" && mv "$FIX/o_r_1.m.t" "$FIX/o_r_1.m.json"
+pr 1 @0123abcd; ok "M28m base=dev wakes mergeable" 0 "$MWAKE" 2
+own1; fx o_r_1 OPEN "$B0" '' ''; mfx o_r_1 "$SHA1"; mlist o/r
+/usr/bin/jq '.data.repository.pullRequest.baseRefName = "dev"' "$FIX/o_r_1.m.json" > "$FIX/o_r_1.m.t" && mv "$FIX/o_r_1.m.t" "$FIX/o_r_1.m.json"
+pr 1 @0123abcd; ok "M28m plain entry stays quiet" 0 "$ENDED" 2
 
 # --- Bt1-Bt16: the poller beats while the tag's ops record is there: from
 # 08:00 to 20:59 it peeks the beat window (clutch_beat_window peek) and wakes

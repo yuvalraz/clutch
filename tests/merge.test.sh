@@ -20,7 +20,12 @@
 # clutch_unwatched_loops (untagged waits and waits of tags whose silent check
 # is not alive, minus refs a live or unknown tag also waits on). MR1-MR3
 # cover --ready's return codes, bad arguments and the watchdog length. MA1
-# checks every gh call of the whole suite for forbidden merge flags; ML1 that
+# checks every gh call of the whole suite for forbidden merge flags. MO1-MO8
+# cover options after the repo on a list line (clutch_merge_entries prints the
+# repo and the leading run of no-review and base=<branch> words): no-review
+# waives only the approval when reviewDecision is null, base= adds a base
+# beside the default branch, a bad or late word is a note, and the first line
+# for a repo is read. ML1 that
 # merge.sh writes nothing but merge.failed; MV1 that a ### Merge section
 # leaves clutch_ops_due's window read alone. The series runs under sh and
 # dash. prelude.sh and merge.sh are staged into a scratch tree and run under a
@@ -117,6 +122,18 @@ none() {
   mr @0123abcd; ok "$NL" 0 '' 1; merges "$NL" ''
   mr --ready 'gh:acme/web#7'; ok "$NL --ready" 3 '' 1
 }
+# lb <list line> <jq update...>: base, with that one list line.
+lb() { LB=$1; shift; base "$@"; mf_list "$LB"; }
+# lnone <label> <list line> <jq update...>: none, with that one list line.
+lnone() {
+  NL=$1; LB=$2; shift 2
+  lb "$LB" "$@"
+  mr @0123abcd; ok "$NL" 0 '' 1; merges "$NL" ''
+  mr --ready 'gh:acme/web#7'; ok "$NL --ready" 3 '' 1
+}
+# nonr <label> <jq update...>: lnone under '- acme/web no-review', the PR with
+# no review rule and no reviews before the updates.
+nonr() { NRL=$1; shift; lnone "$NRL" '- acme/web no-review' "$NR1" "$NR2" "$NR3" "$@"; }
 
 series() {
   # --- MG1-MG6: the merge list
@@ -286,6 +303,78 @@ gh:acme/web#8 @0123abcd merged' 6
   ok "MK22 several waits, one tag" 0 'gh:acme/web#7 @0123abcd held
 gh:acme/web#8 @0123abcd merged
 gh:acme/web#9 @0123abcd merged' 7
+
+  # --- MO1-MO8: options after the repo on a ### Merge line
+  TB1=$(printf '\t'); CR1=$(printf '\r')
+  mf_reset
+  mf_list '- acme/web' '- ACME/Web no-review base=Dev/X' '- acme/web  (no auto-merge here)' '- acme/web note no-review' \
+    '- acme/web no-reveiw base=dev' '- acme/web base=' '- acme/web base=a"b' '- acme/web base=a;b' '- acme/web base=a|true' \
+    '- acme/web base=a b' "- acme/web${TB1}no-review" "- crlf/repo no-review$CR1" '- acme/web no-review no-review' \
+    '- acme/web base=a base=b' '- acme/web base=x"]|true as $nr|'
+  pf clutch_merge_entries
+  is "MO1 parse" 0 'acme/web
+acme/web no-review base=Dev/X
+acme/web
+acme/web
+acme/web
+acme/web
+acme/web
+acme/web
+acme/web
+acme/web base=a
+acme/web no-review
+crlf/repo no-review
+acme/web no-review no-review
+acme/web base=a base=b
+acme/web'
+  mf_reset; mf_list '- acme/web no-review base=dev'
+  pf clutch_merge_listed acme/web; is "MO1b listed with options" 0 ''
+  pf clutch_merge_listed ACME/Web; is "MO1b listed with options, any case" 0 ''
+  pf clutch_merge_listed no-review; is "MO1b an option is no repo" 1 ''
+  NR1="$MF_P.reviewDecision = null"; NR2="$MF_P.latestOpinionatedReviews.nodes = []"; NR3="$MF_P.writerReviews.nodes = []"
+  lb '- acme/web no-review' "$NR1" "$NR2" "$NR3"
+  mr --ready 'gh:acme/web#7'; ok "MO2 no-review --ready" 0 "$S" 1
+  base "$NR1" "$NR2" "$NR3"
+  mr --ready 'gh:acme/web#7'; ok "MO2 control --ready" 3 '' 1
+  lb '- acme/web no-review' "$NR1" "$NR2" "$NR3"
+  mr @0123abcd; ok "MO3 no-review merges" 0 'gh:acme/web#7 @0123abcd merged' 3; merges "MO3" "$M7"
+  base "$NR1" "$NR2" "$NR3"
+  mr @0123abcd; ok "MO3 control" 0 '' 1; merges "MO3 control" ''
+  nonr "MO4 review required" "$MF_P.reviewDecision = \"REVIEW_REQUIRED\""
+  nonr "MO4 decision changes requested" "$MF_P.reviewDecision = \"CHANGES_REQUESTED\""
+  nonr "MO4 a review requests changes" "$MF_P.latestOpinionatedReviews.nodes = [{\"state\":\"CHANGES_REQUESTED\"}]"
+  nonr "MO4 draft" "$MF_P.isDraft = true"
+  nonr "MO4 someone else's PR" "$MF_P.author.login = \"pal\""
+  nonr "MO4 no merge commits" '.data.repository.mergeCommitAllowed = false'
+  nonr "MO4 stacked base" "$MF_P.baseRefName = \"feat/parent\""
+  nonr "MO4 closed" "$MF_P.state = \"CLOSED\""
+  lb '- acme/web no-review' "$NR1" "$NR2" "$NR3" "$MF_P.mergeStateStatus = \"BLOCKED\""
+  mr @0123abcd; ok "MO4 not CLEAN" 0 'gh:acme/web#7 @0123abcd held' 1; merges "MO4 not CLEAN" ''
+  mr --ready 'gh:acme/web#7'; ok "MO4 not CLEAN --ready" 4 '' 1
+  lb '- acme/web no-review' "$NR1" "$NR2" "$NR3"; mkdir -p "$HOME/.clutch/watch"; printf 'gh:acme/web#7 %s\n' "$S" > "$MFF"
+  mr @0123abcd; ok "MO4 recorded failure" 0 'gh:acme/web#7 @0123abcd held' 1; merges "MO4 recorded failure" ''
+  mr --ready 'gh:acme/web#7'; ok "MO4 recorded failure --ready" 4 '' 1
+  lb '- acme/web base=dev' "$MF_P.baseRefName = \"dev\""
+  mr @0123abcd; ok "MO5 base=dev into dev" 0 'gh:acme/web#7 @0123abcd merged' 3; merges "MO5 dev" "$M7"
+  lb '- acme/web base=dev'
+  mr @0123abcd; ok "MO5 base=dev into main" 0 'gh:acme/web#7 @0123abcd merged' 3; merges "MO5 main" "$M7"
+  lnone "MO5 base=dev into another" '- acme/web base=dev' "$MF_P.baseRefName = \"feat/x\""
+  lnone "MO5 base=Dev into dev" '- acme/web base=Dev' "$MF_P.baseRefName = \"dev\""
+  lnone "MO5 base=dev unapproved" '- acme/web base=dev' "$NR1" "$NR2" "$NR3" "$MF_P.baseRefName = \"dev\""
+  lb '- acme/web base=Rel/X.1' "$MF_P.baseRefName = \"Rel/X.1\""
+  mr --ready 'gh:acme/web#7'; ok "MO5 slash branch --ready" 0 "$S" 1
+  lb '- acme/web base=x' '.data.repository.defaultBranchRef = null' "$MF_P.baseRefName = \"x\""
+  mr --ready 'gh:acme/web#7'; ok "MO5 no default branch, base=x --ready" 0 "$S" 1
+  lb '- acme/web no-review base=branded' "$NR1" "$NR2" "$NR3" "$MF_P.baseRefName = \"branded\""
+  mr @0123abcd; ok "MO5 no-review base=branded" 0 'gh:acme/web#7 @0123abcd merged' 3; merges "MO5 branded" "$M7"
+  lnone "MO6 bad base" '- acme/web base=x"]|true as $nr|' "$NR1" "$NR2" "$NR3"
+  lnone "MO6 bad base into it" '- acme/web base=x"]|true as $nr|' "$NR1" "$NR2" "$NR3" "$MF_P.baseRefName = \"x\\\"]|true as \$nr|\""
+  base "$NR1" "$NR2" "$NR3"; mf_list '- acme/web' '- acme/web no-review'
+  mr @0123abcd; ok "MO7 the plain line first" 0 '' 1; merges "MO7 plain first" ''
+  base "$NR1" "$NR2" "$NR3"; mf_list '- acme/web no-review' '- acme/web'
+  mr @0123abcd; ok "MO7 the no-review line first" 0 'gh:acme/web#7 @0123abcd merged' 3; merges "MO7 no-review first" "$M7"
+  mf_reset; mf_list '- acme/web no-review'; mf_pr acme web 7 "$NR1" "$NR2" "$NR3"; mf_wait 100 'gh:acme/web#7'
+  mr --unwatched; ok "MO8 --unwatched no-review" 0 'gh:acme/web#7 merged' 3; merges "MO8" "$M7"
 
   # --- MU1-MU8: --unwatched
   mf_reset; mf_list '- acme/web'; mf_pr acme web 7; mf_wait 100 'gh:acme/web#7'
