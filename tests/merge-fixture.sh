@@ -15,7 +15,8 @@
 # mf_list [<line> ...]: ~/.clutch/rituals.md holding "## Ops", "### Merge"
 #   and the lines.
 # mf_wait <age s> <ref> [<@tag>]: appends "<epoch> proj wait: <ref> b1 [<@tag>] pr".
-# mf_live <@tag>: a live stub poller for the tag and its .poll (pid in MF_PIDS).
+# mf_live <@tag>: a live stub poller for the tag and its .poll (pid in MF_PIDS),
+#   back once ps names its poll.sh.
 # mf_dead <@tag>: a .poll whose pid has ended.
 # mf_ngh: the gh calls (each one's cwd goes to $MFIX/cwd) since the last mf_reset or mf_log0.
 # mf_merges: those calls that are "pr merge" calls.
@@ -136,6 +137,13 @@ mf_live() {
   printf 'sleep 60\n' > "$T/mfstub/poll.sh"
   MF_LP=$( (sh "$T/mfstub/poll.sh" "$1" </dev/null >/dev/null 2>&1 & echo $!) )
   MF_PIDS="$MF_PIDS $MF_LP"
+  # Until the stub execs, ps names the forking shell (read as another tag's
+  # poller): wait up to 10 s for its poll.sh command line.
+  MF_N=0
+  while [ "$MF_N" -lt 100 ]; do
+    case $(ps -ww -p "$MF_LP" -o command= 2>/dev/null) in *"poll.sh $1") break ;; esac
+    /bin/sleep 0.1; MF_N=$((MF_N + 1))
+  done
   printf '%s %s beat\n' "$MF_LP" "$(date +%s)" > "$HOME/.clutch/watch/${1#@}.poll"
 }
 

@@ -339,7 +339,12 @@ fpin "$R" "README: young-death limit"  'A silent check that ends within 10 minut
 fpin "$R" "README: unreadable wake"     'or gh failed on one 3 reads in a row (`unreadable`)'
 fpin "$R" "README: poll off"            '`CLUTCH_POLL=off` keeps the 10-minute watch for every kind.'
 fpin "$R" "README: poll allow rule"     '`Bash(sh */clutch/*/scripts/poll.sh*)`'
-fpin "$R" "README: poll network"        '`scripts/poll.sh`, the silent check a session starts in the background while it holds PR waits or is an ops session, calls `gh` and nothing else.'
+fpin "$R" "README: poll network"        '`scripts/poll.sh`, the silent check a session starts in the background while it holds PR waits or is an ops session, calls `gh`, and `scripts/merge.sh --ready` for a PR in a repo your `### Merge` list names, and nothing else.'
+fpin "$R" "README: mergeable wake"      'became ready to merge in a repo your `### Merge` list names (`mergeable`),'
+fpin "$R" "README: watch merges"        'Each watch tick also merges the approved, clean PRs among its waits in those repos with a merge commit.'
+fpin "$R" "README: beat cadence"        '  `/clutch:beat @<tag>`, at most once an hour from 08:00 to 20:59, when another session logged a move, or sooner for a PR it can merge.'
+if grep -qF 'only when another' "$R"; then echo "FAIL: README beat bullet still says only when another session logged a move"; fail=1; fi
+fpin "$R" "README: beat merges"         'The beat also merges your approved, clean PRs in a repo your `### Merge` list names for waits no live silent check reads, before its read, and its silent check wakes it for one sooner than the hour.'
 if grep -qE 'asked once to arm|one ask to arm' "$R"; then
   echo "FAIL: README says the user is asked to arm a watch"; fail=1
 fi
@@ -376,7 +381,7 @@ nws_l=$(grep -c '' "$WS")
 fpin "$WS" "W12 re-hold open thing"     'If the thing is still open after the move, such as approved, commented or changes requested, append a fresh `wait:` line right after that `moved:` line, with the same snippet and text `<kind>:<ref> <new baseline> @<tag> <text>`: the same ref, the new baseline and the same `@<tag>`, so a later merge stays watched.'
 fpin "$WS" "W13 merged not held"        'A thing that merged or closed is not held again.'
 # W-poll: the silent check's wake runs one tick; its wake reasons include unreadable.
-fpin "$WS" "W-poll wake"                'A wake from the session'"'"'s silent check holds `Run /clutch:watch @<tag> for the moved waits.` after one `<ref> <what>` line per wait, `<what>` being `merged`, `closed`, `review <STATE>`, `comment` or `unreadable` (gh failed on it 3 reads in a row): run this skill once for that tag, reading every owned wait as above.'
+fpin "$WS" "W-poll wake"                'A wake from the session'"'"'s silent check holds `Run /clutch:watch @<tag> for the moved waits.` after one `<ref> <what>` line per wait, `<what>` being `merged`, `closed`, `review <STATE>`, `comment`, `unreadable` (gh failed on it 3 reads in a row) or `mergeable` (approved and clean, in a repo the `### Merge` list names): run this skill once for that tag, reading every owned wait as above.'
 fpin "$WS" "W-poll no task"             'On a wake where no wait is left and there is no recurring task, say so in one line and delete nothing.'
 fpin "$WS" "W-poll ended"               'The silent check'"'"'s ended line, `The silent check for @<tag> ended; end the turn.`, needs no reply beyond ending the turn.'
 
@@ -416,10 +421,10 @@ if grep -qiE '^disable-model-invocation:[[:space:]]*["'"'"']?true' "$BS"; then
   echo "FAIL: BT2 beat skill disables model invocation -- its fires never run"
   fail=1
 fi
-fpin "$BS" "BT3 what sends it"          '`/clutch:beat @<tag>` is what an ops session'"'"'s armed beat sends: the session'"'"'s silent check, at most once an hour from 08:00 to 20:59 when another session moved, or an older hourly task.'
+fpin "$BS" "BT3 what sends it"          '`/clutch:beat @<tag>` is the line an ops session'"'"'s armed beat runs: the session'"'"'s silent check prints it at most once an hour from 08:00 to 20:59 when another session moved, or sooner when a PR wait no live silent check reads can merge, and an older hourly task sends it.'
 fpin "$BS" "BT3 wake"                   'A wake from the session'"'"'s silent check holds `Run /clutch:beat @<tag>.`, alone or after the watch'"'"'s lines: run this skill once for that tag.'
 fpin "$BS" "BT4 no gear"                'It sets no gear, no focus and no mode: the session keeps the rules it had.'
-fpin "$BS" "BT4b not a sweep"           'It is not a sweep or a tick: no sweep, no config read.'
+fpin "$BS" "BT4b not a sweep"           'It is not a sweep or a tick: no sweep, and no config read beyond the `### Merge` list its merge pass checks.'
 fpin "$BS" "BT5 read line"              'sh -c '"'"'. "${CLAUDE_PLUGIN_ROOT}/scripts/prelude.sh" && L=$(clutch_beat_window "@<tag>") || exit; [ -z "$L" ] || printf "%s\n" "$L" | LC_ALL=C cut -c1-300; R=$?; [ ! -f "$HOME/.clutch/opsview.json" ] || echo "OPS VIEW: on"; exit $R'"'"
 fpin "$BS" "BT-OV beat line"            'A last line `OPS VIEW: on` is never a move, a wait or a worklog line, and output that holds only it is empty output; with it, after any `moved:` lines and before the reply, run the ops view push once: the steps between the `<!-- opsview push -->` markers in the ops skill'"'"'s `### Ops view`, which, when not in view, you find by those markers under the plugin'"'"'s skills folder.'
 fpin "$BS" "BT6 line shapes"            'Each line is a wait no session'"'"'s tag owns, `<epoch> <repo> wait: <kind>:<ref> <baseline> <text>`, or a move another session logged since the last beat, `<epoch> <repo> moved: <text>`.'
@@ -595,7 +600,7 @@ fpin "$R" "README safe: helper imports" 'its test suite parses its imports and f
 fpin "$R" "README: ops view item"       '4. **The ops view** (optional). `~/.clutch/opsview.json` turns it on: the ops session'"'"'s beat and sweeps push sessions, waits and sweep items to your private Ops view page through `scripts/opsview-sync.sh`, which runs `tools/ops_sync/ops_sync.py`.'
 fpin "$R" "README: ops view off"        'With the file absent nothing changes.'
 fpin "$R" "README: ops view partial"    'A sweep that skipped or failed to read an integration it tried keeps the last sweep record and pushes only sessions and waits; a push that fails is said once, by a sweep, never by a beat.'
-fpin "$R" "README: beat push"           '`/clutch:beat` checks the integrations its waits name, at most once an hour, on its silent check'"'"'s wake (every hour with `CLUTCH_POLL=off`), while an ops session is open, and with the ops view on it sends what changed to your Ops view page in one `ArtifactData` batch, plus one retry when a document is refused.'
+fpin "$R" "README: beat push"           '`/clutch:beat` checks the integrations its waits name, at most once an hour when another session logged a move, or sooner for a PR it can merge, on its silent check'"'"'s wake (every hour with `CLUTCH_POLL=off`), while an ops session is open, and with the ops view on it sends what changed to your Ops view page in one `ArtifactData` batch, plus one retry when a document is refused.'
 fpin "$R" "README: ops_sync sends nothing" '`tools/ops_sync/ops_sync.py` sends nothing either: it writes local files, and its test suite fails on any network import; the model makes the one `ArtifactData` batch, plus one retry when a document is refused.'
 fpin "$R" "README: ops push"            '`/clutch:ops` and `/clutch:morning` check the integrations you named, and with the ops view on `/clutch:ops` also pushes to your Ops view page.'
 fpin "$R" "README: ops view unavailable" 'An integration unavailable for a whole session loses its earlier sweep items from the page until a sweep reads it again.'

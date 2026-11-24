@@ -29,7 +29,7 @@ It prints at most one line per owned wait: `<ref> @<tag> merged`, `<ref> @<tag> 
 A `merged` line is that wait's move: append its `moved:` line first, with the constitution's worklog snippet, verb `moved:` and the line exactly as printed as its text, and do not read that wait again. Being a move, it gets the session's own standing rules like any merge, such as the bookkeeping after a merge; an outward step there still waits for its usual yes.
 A `did not merge` line is named once and writes nothing; a `held` line needs nothing. Exit status 0 with no output means nothing merged. Any other outcome: say once that the merge pass cannot run, and stay silent about it on later ticks. A `did not merge` line or the cannot-run line is part of the reply even when nothing else moved, so that reply is not `No change.`
 
-A wake from the session's silent check holds `Run /clutch:watch @<tag> for the moved waits.` after one `<ref> <what>` line per wait, `<what>` being `merged`, `closed`, `review <STATE>`, `comment` or `unreadable` (gh failed on it 3 reads in a row): run this skill once for that tag, reading every owned wait as above.
+A wake from the session's silent check holds `Run /clutch:watch @<tag> for the moved waits.` after one `<ref> <what>` line per wait, `<what>` being `merged`, `closed`, `review <STATE>`, `comment`, `unreadable` (gh failed on it 3 reads in a row) or `mergeable` (approved and clean, in a repo the `### Merge` list names): run this skill once for that tag, reading every owned wait as above.
 On a wake where no wait is left and there is no recurring task, say so in one line and delete nothing.
 The silent check's ended line, `The silent check for @<tag> ended; end the turn.`, needs no reply beyond ending the turn.
 
