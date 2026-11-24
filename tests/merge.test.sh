@@ -24,8 +24,8 @@
 # cover options after the repo on a list line (clutch_merge_entries prints the
 # repo and the leading run of no-review and base=<branch> words): no-review
 # waives only the approval when reviewDecision is null, base= adds a base
-# beside the default branch, a bad or late word is a note, and the first line
-# for a repo is read. ML1 that
+# beside the default branch, a bad or late word is a note, and the options of
+# every line for a repo count, never another repo's (MO7). ML1 that
 # merge.sh writes nothing but merge.failed; MV1 that a ### Merge section
 # leaves clutch_ops_due's window read alone. The series runs under sh and
 # dash. prelude.sh and merge.sh are staged into a scratch tree and run under a
@@ -375,6 +375,14 @@ acme/web'
   mr @0123abcd; ok "MO7 the no-review line first" 0 'gh:acme/web#7 @0123abcd merged' 3; merges "MO7 no-review first" "$M7"
   base "$NR1" "$NR2" "$NR3" "$MF_P.baseRefName = \"dev\""; mf_list '- acme/web base=dev' '- acme/web no-review'
   mr @0123abcd; ok "MO7 union of base= and no-review" 0 'gh:acme/web#7 @0123abcd merged' 3; merges "MO7 union" "$M7"
+  for MOL in '- other/repo no-review' '- acme/web-x no-review'; do
+    base "$NR1" "$NR2" "$NR3"; mf_list '- acme/web' "$MOL"
+    mr @0123abcd; ok "MO7 no union across repos ($MOL)" 0 '' 1; merges "MO7 across repos ($MOL)" ''
+    mr --ready 'gh:acme/web#7'; ok "MO7 no union across repos ($MOL) --ready" 3 '' 1
+  done
+  base "$MF_P.baseRefName = \"dev\""; mf_list '- acme/web' '- other/repo base=dev'
+  mr @0123abcd; ok "MO7 no union across repos (base=dev)" 0 '' 1; merges "MO7 across repos (base=dev)" ''
+  mr --ready 'gh:acme/web#7'; ok "MO7 no union across repos (base=dev) --ready" 3 '' 1
   mf_reset; mf_list '- acme/web no-review'; mf_pr acme web 7 "$NR1" "$NR2" "$NR3"; mf_wait 100 'gh:acme/web#7'
   mr --unwatched; ok "MO8 --unwatched no-review" 0 'gh:acme/web#7 merged' 3; merges "MO8" "$M7"
 
