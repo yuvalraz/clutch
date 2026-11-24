@@ -160,6 +160,7 @@ build, ideate, ops, review, or investigate? Ignoring it is also an answer, and i
 When you declared a focus in this folder before, the question names it first (`looks like build again`), and a plain go takes it. Outside a repo the question rides each new session too. `CLUTCH_GUESS=off` turns the guess off. `CLUTCH_INVESTIGATE=off` keeps the question to the first four.
 Declaring a focus outside a repo writes the session's tempo under `.clutch` in that folder, never in your home folder, so the gear and the budget ride every turn there as in a repo; `CLUTCH_PLAIN=off` turns that off.
 `/clutch:intent` takes the answer and engages the matching gear.
+Typed bare, `/clutch:intent` asks the question as a pick list with the guess first, falling back to the text question where a pick list cannot run.
 
 **Build.** A maker session in the craft gear (explore, then commit). The catch
 commands are at hand: one smallest move, a sprint, an igniter, a triage, a

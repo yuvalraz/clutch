@@ -9,8 +9,8 @@
 # swaps the last line for the guessed ask; resume with a gear and compact
 # stay silent. G11-G12 run outside git: startup and clear end with the ask
 # (today's five-way line, or the guessed one), resume/compact/fork never ask, and the key is the folder name exactly, spaces as
-# hyphens. G13-G16 pin the intent skill's record line, guessed question and
-# go answer and the README sentences; G14 runs the skill's own record
+# hyphens. G13-G16 pin the intent skill's record line, pick list, guessed
+# question and go answer and the README sentences; G14 runs the skill's own record
 # snippet, then the anchor, as a round trip. prelude.sh and anchor.sh are
 # staged into a scratch scripts/ dir; PRELUDE_SH, ANCHOR_SH, INTENT_SKILL and
 # README_FILE override the targets for replay against a historical version.
@@ -301,6 +301,18 @@ fpin "$S" "G15 same as the argument" 'run it exactly as `/clutch:intent <focus>`
 fpin "$S" "G15 other reply" 'Any other reply is an ignored'
 fpin "$S" "G15 when_to_use" 'and so does a plain "go" or "yes" when the question named a likely focus'
 fpin "$S" "G15 go is not an unknown argument" 'except a plain go or yes when a guess is in context'
+# The pick list: the bare form asks through AskUserQuestion, guess first, text question as fallback.
+fpin "$S" "G15 bare form pick list" 'bare: a pick list through the AskUserQuestion tool (see Pick list)'
+fpin "$S" "G15 pick list tool" 'The bare form asks its one question through the AskUserQuestion tool'
+fpin "$S" "G15 pick list shape" 'one question, header "Focus", `multiSelect: false`, four options'
+fpin "$S" "G15 four-option rule" 'AskUserQuestion takes two to four options and adds Other on its own'
+fpin "$S" "G15 dropped focus typeable" 'the question names it as typeable under Other'
+fpin "$S" "G15 recommended" 'option 1 is `<focus> (Recommended)`'
+fpin "$S" "G15 no guess options" 'With no guess, the options are build, ideate, ops, and review, and the question says investigate can be typed under Other.'
+fpin "$S" "G15 investigate off" 'When the session-start ask in context offers only four focuses (its list lacks investigate), never offer or mention investigate'
+fpin "$S" "G15 picked option" 'A picked option declares that focus: run it exactly as `/clutch:intent <focus>`, record included.'
+fpin "$S" "G15 Other reply" 'Under Other, naming a focus declares it; a plain go or yes declares the guessed focus; anything else is an ignored ask, and the once-only law holds.'
+fpin "$S" "G15 fallback" 'When AskUserQuestion is not available, is denied, or errors (as in -p or SDK runs), ask the text question instead, unchanged.'
 # Coupling: the anchor's guessed line carries the skill's trigger with <focus> filled.
 case "$(guessed build)" in *'looks like build again'*) ;; *) echo "FAIL: G15 coupling -- guessed line lacks the trigger"; fail=1 ;; esac
 TRIG=$(grep -oF 'looks like <focus> again' "$S" | head -n 1 | sed 's/<focus>/build/')
@@ -312,6 +324,7 @@ case "$(last "$OUT")" in *"${TRIG:-unset trigger}"*) ;; *) echo "FAIL: G15 coupl
 # --- G16: README names the kill switch and the store
 fpin "$R" "G16 kill switch" '`CLUTCH_GUESS=off` turns the guess off'
 fpin "$R" "G16 store" '`~/.clutch/intents`'
+fpin "$R" "G16 pick list" 'asks the question as a pick list with the guess first, falling back to the text question'
 
 # --- G17: an investigate record is guessed by default
 rm -f "$T/repo/.clutch/tempo"

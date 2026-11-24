@@ -24,7 +24,8 @@ never by settings.
   hand off.
 - `/clutch:intent investigate` declares an investigate session: one confirm
   line, then hand off.
-- `/clutch:intent` bare: ask one question: build, ideate, ops, review, or investigate?
+- `/clutch:intent` bare: a pick list through the AskUserQuestion tool (see Pick list).
+  Its text fallback: ask one question: build, ideate, ops, review, or investigate?
   Nothing else, unless a guess is in context (see Guessed focus).
 
 Any other argument gets one line naming the five focuses, no error ceremony,
@@ -34,10 +35,28 @@ Invocation scope: this skill fires when the user answers the session-start
 question or explicitly asks to set the session's focus, and at no other
 moment. A stray "build" mid-conversation invokes nothing.
 
+## Pick list
+
+The bare form asks its one question through the AskUserQuestion tool:
+one question, header "Focus", `multiSelect: false`, four options.
+AskUserQuestion takes two to four options and adds Other on its own, so one of five focuses cannot be an option; the question names it as typeable under Other.
+With a guess in context (see Guessed focus), option 1 is `<focus> (Recommended)`, its description naming <thread>, or "Your last focus in this folder." with no thread.
+The rest follow in the order build, ideate, ops, review, investigate until there are four.
+With no guess, the options are build, ideate, ops, and review, and the question says investigate can be typed under Other.
+When the session-start ask in context offers only four focuses (its list lacks investigate), never offer or mention investigate: the four, the guess first when present, are exactly the options.
+Each option carries a one-line description: build "Maker session: craft gear, tests ship with the code.",
+ideate "Divergent session: explore wide before landing.", ops "Operations: sweep the tools, close loops one at a time.",
+review "Review session: one PR at a time.", investigate "Read-only evidence: every finding tied to evidence.".
+
+A picked option declares that focus: run it exactly as `/clutch:intent <focus>`, record included.
+Under Other, naming a focus declares it; a plain go or yes declares the guessed focus; anything else is an ignored ask, and the once-only law holds.
+When AskUserQuestion is not available, is denied, or errors (as in -p or SDK runs), ask the text question instead, unchanged.
+
 ## Guessed focus
 
 When the session-start ask in context reads `looks like <focus> again`,
-the bare form asks this one question instead:
+a guess is in context: the pick list offers it first, and the text fallback
+asks this one question instead:
 "Looks like <focus> on <thread>, go?"
 <thread> is a few words naming the work, from the first of these in
 context: the Thread line, the Last landed line, this folder's newest
@@ -46,8 +65,9 @@ Worklog line. With none of them, ask "Looks like <focus>, go?".
 A plain go or yes declares <focus>, as the reply to that question or to the session-start ask, or as the argument.
 Then run it exactly as `/clutch:intent <focus>`, record included.
 Naming another focus declares that one. Any other reply is an ignored
-ask, and the once-only law holds. Without that line in context, the bare
-form asks the five-way question as before.
+ask, and the once-only law holds. Without that line in context, there is
+no guess: the pick list has no Recommended option, and the text fallback
+asks the five-way question as before.
 
 ## Record
 
