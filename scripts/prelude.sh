@@ -447,10 +447,13 @@ clutch_session_paths() {
   return 0
 }
 
-# The merge list: each "- <owner>/<repo>[ <text>]" line in the "### Merge"
-# section of ~/.clutch/rituals.md, a section that sits under "## Ops" and
-# ends at the next heading, printed as <owner>/<repo> lowercased, a CR at line
-# end dropped. 0 (none printed when the section is missing or empty); 1 no
+# The merge list: each "- <owner>/<repo>[ <option>...][ <text>]" line in the
+# "### Merge" section of ~/.clutch/rituals.md, a section that sits under
+# "## Ops" and ends at the next heading, printed as <owner>/<repo> lowercased
+# and then each option of the blank-separated run right after the repo, one
+# space before each, as written (an option is no-review or base=<branch>,
+# <branch> of A-Z a-z 0-9 . _ / -; the first other word starts a note), a CR
+# at line end dropped. 0 (none printed when the section is missing or empty); 1 no
 # file; 2 the file is there but not a readable regular file. Writes nothing,
 # reads no network.
 clutch_merge_entries() {
@@ -462,8 +465,11 @@ clutch_merge_entries() {
     /^##[ \t]+Ops[ \t]*$/ { ops = 1; on = 0; next }
     /^##[ \t]/ { ops = 0; on = 0; next }
     /^#/ { on = ops && /^###[ \t]+Merge[ \t]*$/; next }
-    on && /^- / { split(substr($0, 3), e, " ")
-      if (e[1] ~ /^[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+$/) print tolower(e[1]) }' "$CME_F" 2>/dev/null || return 2
+    on && /^- / { n = split(substr($0, 3), e, " ")
+      if (e[1] !~ /^[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+$/) next
+      o = ""
+      for (i = 2; i <= n && (e[i] == "no-review" || e[i] ~ /^base=[A-Za-z0-9._\/-]+$/); i++) o = o " " e[i]
+      print tolower(e[1]) o }' "$CME_F" 2>/dev/null || return 2
 }
 
 # Is <owner>/<repo> ($1) on the merge list (clutch_merge_entries)? Case is
@@ -473,7 +479,7 @@ clutch_merge_listed() {
   CML_E=$(clutch_merge_entries) || return
   printf '%s\n' "$CML_E" | CML_A=$1 LC_ALL=C awk '
     BEGIN { a = tolower(ENVIRON["CML_A"]); if (a !~ /^[a-z0-9._-]+\/[a-z0-9._-]+$/) exit 1 }
-    $0 == a { f = 1 }
+    $1 == a { f = 1 }
     END { exit !f }'
 }
 
