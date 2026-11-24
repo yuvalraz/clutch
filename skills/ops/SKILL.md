@@ -96,7 +96,7 @@ For each Auto line, also read your own items it covers (for example your open PR
 
 Bounds (HARD):
 
-- The sweep reads; it never writes to any integration; L2 actions and Auto posts run after the reads (see Delegation).
+- The sweep reads; it never writes to any integration; L2 actions and Auto posts run after the reads (see Delegation), and so does the ops view push (see Ops view).
 - Today's horizon only: nothing past the next workday.
 - It reads each reachable tool once and ends. It never polls, never loops,
   never watches anything in the background.
@@ -107,7 +107,7 @@ Read the worklog window in the same pulse, once;
 the tick pass reads the wait loops with its own line (see Tick):
 
 ```sh
-sh -c '. "${CLAUDE_PLUGIN_ROOT}/scripts/prelude.sh" && clutch_worklog_window'
+sh -c '. "${CLAUDE_PLUGIN_ROOT}/scripts/prelude.sh" && clutch_worklog_window; R=$?; [ ! -f "$HOME/.clutch/opsview.json" ] || echo "OPS VIEW: on"; exit $R'
 ```
 
 Each line is a session's, maybe this one's from before a compaction or
@@ -116,6 +116,8 @@ already closed. Leave both out of the situation and never propose them
 uninvited; the user's explicit ask wins over any claim. Empty output
 means no peer context, and the sweep goes on. A
 `/scripts/prelude.sh` not-found error means clutch is not loaded as a plugin: say so once and go on.
+Exit status 2 means the worklog is unreadable: say so in one line, never that there is no peer context, and the sweep goes on.
+A last line `OPS VIEW: on` says the ops view is on: it is never a move, a wait or a worklog line, and output that holds only that line is empty output.
 
 A `wait:` line is a wait loop: someone else's move, pending on something
 you did; leave it out of the situation unless the tick finds it moved.
@@ -135,6 +137,7 @@ sh -c '. "${CLAUDE_PLUGIN_ROOT}/scripts/prelude.sh" && clutch_ops_due brief'
 Read the tablet inbox once, after the tick pass (see Tablet inbox).
 
 Then classify what the sweep read (see Delegation).
+With `OPS VIEW: on`, record and push what the sweep read (see Ops view).
 
 ### Step 3: The situation
 
@@ -144,7 +147,7 @@ what it needs now, never as overdue, late, or missed.
 
 The situation is at most seven lines. It is a read of now, not a dashboard
 and not a report for later. Nothing from the sweep is written anywhere
-except the tick pass's `moved:` lines and the L2 and Auto lines (see Delegation) and the tablet inbox items (see Tablet inbox); the rest
+except the tick pass's `moved:` lines, the ops view record and push when it is on (see Ops view), and the L2 and Auto lines (see Delegation) and the tablet inbox items (see Tablet inbox); the rest
 lives in the turn, and a fresh sweep replaces it.
 The day brief, when due: for each delivery under `## Critical path`, its move (the first step neither done nor blocked), each blocked step with who it waits on, and today's meetings that touch a step.
 It fits the seven lines, names steps instead of counting them, and never calls anything late.
@@ -168,7 +171,7 @@ behavior:
   then the next. A checkpoint is the closed loop itself, never a summary.
   Never two loops open at once. A wait loop is someone else's move, not the
   loop you are working, so it never counts against one loop at a time.
-  Wait loops are never listed or counted, at the close or anywhere.
+  Wait loops are never listed or counted in the session, at the close or anywhere.
 - **Outward-facing actions keep a human checkpoint.** Sending a message,
   accepting or moving a meeting, changing a ticket's state, anything another
   person will see: draft it, show it, send on a yes. Reading is free.
@@ -210,10 +213,10 @@ behavior:
   flinch at the wall versus never entering awareness, before anything else
   engages. **A loop that wants a clock** gets `/clutch:sprint`.
 - **Re-sweep on request only.**
-  `/clutch:ops re-sweep` is the only path to a second sweep that acts, and only you type it; the session's armed sweep sends `/clutch:ops re-sweep armed`, which only reads (see Armed sweep).
+  `/clutch:ops re-sweep` is the only path to a second sweep that acts, and only you type it; the session's armed sweep sends `/clutch:ops re-sweep armed`, which only reads, plus the ops view push when it is on (see Armed sweep).
 - **A closed loop logs one line.** Append its `moved:` line with the
   constitution's worklog snippet, silently; speak on MISS or an error.
-  That line is the only thing a closed loop writes; the sweep itself still writes nothing beyond its L2 and Auto lines and the tablet inbox items.
+  That line is the only thing a closed loop writes; the sweep itself still writes nothing beyond its L2 and Auto lines and the tablet inbox items, and the ops view record and push.
   A tick's `moved:` line, the sweep's tick pass included, is the closed loop's one line.
 
 ### Tick
@@ -259,7 +262,7 @@ An ops session's beat does not send a tick either: it sends `/clutch:beat @<tag>
 
 ### Armed sweep
 
-`/clutch:ops re-sweep armed` comes from the session's armed sweep, not from you, so it reads and speaks and writes nothing.
+`/clutch:ops re-sweep armed` comes from the session's armed sweep, not from you, so it reads and speaks and writes nothing but the ops view record and push when the ops view is on (see Ops view).
 First check the session's ops record. Replace `@<tag>` with the latest `Session tag:` line; with no `Session tag:` line, skip the check:
 
 ```sh
@@ -272,9 +275,9 @@ Any other outcome goes on below; the check never writes.
 It skips Step 0: no gear change and no record.
 Skip it only when the latest `tempo gear:` line in view names a gear other than espresso: reply with exactly `Not in ops; the sweep skipped.` and nothing else.
 An earlier gear line is context, never a reason to skip.
-With no gear line in view, run the read-only sweep anyway: it writes nothing, so a read is the safe default.
+With no gear line in view, run the read-only sweep anyway: it writes nothing but the ops view push, so a read is the safe default.
 Otherwise it runs Steps 1-4 with reads only: the config read, the Step 2 sweep reads, the tick pass's read of each wait loop, then the situation and one smallest move.
-It skips the L2 actions and Auto posts, the day brief and approval window checks and their drafts, the tablet inbox fold, claim and route, and every worklog or wait-loop write, `moved:` lines included.
+It skips the L2 actions and Auto posts, the day brief and approval window checks and their drafts, the tablet inbox fold, claim and route, and every worklog or wait-loop write, `moved:` lines included. With `OPS VIEW: on`, it still records and pushes what it read (see Ops view): the one write it makes.
 A missing config, key or state dir gets one line, never a question, a persisted answer or a hand-off.
 What an L2 action or Auto post would do, an L1 draft, and a wait loop that moved, are named in the situation as what waits for a sweep you type.
 
@@ -413,6 +416,40 @@ When the user says an unsure item is work, or a filed item sits in the wrong buc
 A personal or unsure item never goes to the state dir, the fomo pool or any integration.
 A tick never reads the tablet inbox.
 
+### Ops view
+
+The ops view is a page the user opens: a dashboard by the user's choice (2026-11-23), never a line in the session.
+No in-session line points at it uninvited, and every rule above about lists, counts and dashboards still governs what the session says.
+It is on when `~/.clutch/opsview.json` exists; with it off, nothing in this section runs.
+
+The record step: after its reads, a sweep records what it read with this run, which is also the push's step 1:
+
+```sh
+sh "${CLAUDE_PLUGIN_ROOT}/scripts/opsview-sync.sh" --sweep <<'OPS_SWEEP'
+{"items": [{"key": "<kind>:<ref>", "kind": "<pr|slack|meeting|linear|other>", "ref": "<https link or null>", "title": "<short title>", "state": "<state>", "waiting_on": "<name or role, or null>", "ticket": "<ticket id or null>"}]}
+OPS_SWEEP
+```
+
+One item per thing the sweep read that is live today: a PR waiting on a review, a thread waiting on a reply, today's meeting, a ticket in motion.
+`key` uses the wait-loop ref forms (`gh:<owner>/<repo>#<number>`, `slack:<channel>/<thread ts>`, `linear:<issue id>`), and `cal:<event id>` for a meeting.
+`title` is the item's own title, never message text; `waiting_on` is a display name or role as the item shows it, never anything from `~/.clutch/people.md`; `ticket` is the first ticket id in the PR's branch name or title, else null.
+The heredoc is quoted, so the items need JSON escaping only.
+A missing value is JSON null, never the string `"null"`.
+When the sweep skipped or failed to read an integration it tried to read this sweep, it does not record: push step 1 runs plain `opsview-sync.sh` (no `--sweep`) instead, so sessions and waits still push and the last full sweep record stays. An integration that is not set up, or is unavailable all session, is not skipped here, so it never blocks the record.
+Exit status 2 names on stderr what it refused: fix the items once and run it again; if that fails too, it is a push failure.
+
+<!-- opsview push -->
+The ops view push runs only after a read printed `OPS VIEW: on`:
+
+1. Run `sh "${CLAUDE_PLUGIN_ROOT}/scripts/opsview-sync.sh"`. In a sweep, the record run (see the record step above) is this step: it prints the same lines; a sweep that does not record runs this plain line.
+2. `OPS: off`, or `OPS: unchanged` as the second line: the push is done.
+3. Otherwise the first line is `OPS: <url>`, and each `OPS_DOC: <collection> <doc_id> <file_path> [if_version=<n>]` line is one document. Load `ArtifactData` first when it is a deferred tool, then send every line in one `ArtifactData` call: action `batch`, `url` from the first line, one entry per line with `op` `set`, its `collection`, `doc_id` and `file_path`, and `if_version` only when the line ends with `if_version=<n>`.
+4. Then, for the documents the call wrote, if any, run `sh "${CLAUDE_PLUGIN_ROOT}/scripts/opsview-sync.sh" --ack <collection>/<doc_id>=<version>`, one argument per document, each with the `version` the result gave it; when the call wrote none, go to step 5.
+5. Documents the call did not write: send them once more in one `batch`; a document refused on its version first takes `if_version` from one `get` of it, and the rest keep their line's `if_version`. Ack what that wrote, if anything. A document the retry still did not write is a failure, handled by step 6 (`--failed`).
+6. Any other failure (a non-zero exit, `ArtifactData` cannot be loaded, the call or the retry fails, a result with no `version`): in a beat, run `sh "${CLAUDE_PLUGIN_ROOT}/scripts/opsview-sync.sh" --failed '<one-line reason>'` and say nothing about the push, whatever that run prints and even when it fails. In a sweep, run the same line with `--failed --speak`; on `OPS: say`, or when that run itself fails, say one line after the situation, outside its seven lines: the ops view stopped updating, and why. On `OPS: quiet`, say nothing. Escape ' as '\''.
+7. A push that succeeds is never named. A beat's reply never names the push and is the reply it would be without it: `No change.` stays exact.
+<!-- /opsview push -->
+
 ### Session close
 
 `/clutch:eod` owns the day's close: the retro, tomorrow's focuses, the fun
@@ -432,9 +469,9 @@ and the one open loop with its next move. Nothing else is written.
 
 ## What this skill does NOT do
 
-- Fire on its own, re-sweep on its own (the session's armed sweep is a request that only reads), or watch anything in the background
-- Send anything without a yes, or write to any integration without one beyond the L2 actions and Auto posts your policy lists
-- Produce a dashboard, a report, or a list for later
+- Fire on its own, re-sweep on its own (the session's armed sweep is a request that only reads, plus the ops view push), or watch anything in the background
+- Send anything without a yes, or write to any integration without one beyond the L2 actions and Auto posts your policy lists and the ops view push (see Ops view)
+- Produce a dashboard, a report, or a list for later in the session (the ops view is the user's own page; see Ops view)
 - Count unread, waiting, overdue, or missed anything
 - Write code or design anything: that is a build session
 - Scaffold config, guess paths, or invent integrations
