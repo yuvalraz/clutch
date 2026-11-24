@@ -88,14 +88,19 @@ pin "$O" "ops: no overdue framing"      'never as overdue'
 pin "$O" "ops: re-sweep on request"     'Re-sweep on request only'
 fpin "$O" "ops: armed sweep line"       '- `/clutch:ops re-sweep armed` is the line the session'"'"'s armed sweep sends at 08:37, 12:37 and 16:37, after an ops session'"'"'s turn end asks once a day to arm it.'
 fpin "$O" "ops: armed sweep own rules"  'It is a read-only sweep with its own rules (see Armed sweep), never a hand-typed re-sweep.'
-fpin "$O" "ops: armed sweep only path"  '`/clutch:ops re-sweep` is the only path to a second sweep that acts, and only you type it; the session'"'"'s armed sweep sends `/clutch:ops re-sweep armed`, which only reads (see Armed sweep).'
-fpin "$O" "ops: never re-sweep alone"   '- Fire on its own, re-sweep on its own (the session'"'"'s armed sweep is a request that only reads), or watch anything in the background'
+fpin "$O" "ops: armed sweep only path"  '`/clutch:ops re-sweep` is the only path to a second sweep that acts, and only you type it; the session'"'"'s armed sweep sends `/clutch:ops re-sweep armed`, which only reads, plus the ops view push when it is on (see Armed sweep).'
+fpin "$O" "ops: never re-sweep alone"   '- Fire on its own, re-sweep on its own (the session'"'"'s armed sweep is a request that only reads, plus the ops view push), or watch anything in the background'
 pin  "$O" "AS section"                  '^### Armed sweep$'
-fpin "$O" "AS writes nothing"           '`/clutch:ops re-sweep armed` comes from the session'"'"'s armed sweep, not from you, so it reads and speaks and writes nothing.'
+fpin "$O" "AS ops view only write"      '`/clutch:ops re-sweep armed` comes from the session'"'"'s armed sweep, not from you, so it reads and speaks and writes nothing but the ops view record and push when the ops view is on (see Ops view).'
 fpin "$O" "AS skips Step 0"             'It skips Step 0: no gear change and no record.'
 fpin "$O" "AS outside ops"              'Skip it only when the latest `tempo gear:` line in view names a gear other than espresso: reply with exactly `Not in ops; the sweep skipped.` and nothing else.'
 fpin "$O" "AS latest gear line"         'An earlier gear line is context, never a reason to skip.'
-fpin "$O" "AS no gear line reads"       'With no gear line in view, run the read-only sweep anyway: it writes nothing, so a read is the safe default.'
+fpin "$O" "AS no gear line reads"       'With no gear line in view, run the read-only sweep anyway: it writes nothing but the ops view push, so a read is the safe default.'
+fpin "$O" "AS records with the view"    'With `OPS VIEW: on`, it still records and pushes what it read (see Ops view): the one write it makes.'
+# The replaced armed-sweep sentences are gone, so no unqualified "writes nothing" stands beside the push.
+for old in 'so it reads and speaks and writes nothing.' 'it writes nothing, so a read is the safe default.' 'which only reads (see Armed sweep).' 'a request that only reads), or watch'; do
+  [ "$(grep -cF -- "$old" "$O")" = 0 ] || { echo "FAIL: AS ops view -- the old sentence is back: $old"; fail=1; }
+done
 # The skip never claims a read: no `No change.` and no gear-only skip in the
 # Armed sweep section (joined so a wrap cannot hide it).
 ASEC=$(awk '/^### Armed sweep$/{f=1;next} /^### /{f=0} f' "$O" | tr -s '[:space:]' ' ')
@@ -120,7 +125,7 @@ if tr -s '[:space:]' ' ' < "$O" | grep -qF 'sends this same line'; then
   echo "FAIL: ops: armed sweep -- still says the armed sweep sends the hand-typed line"; fail=1
 fi
 # README: the armed sweep is described as it runs.
-tr -s '[:space:]' ' ' < "$R" | grep -qF 'The armed sweep only reads and speaks: it keeps the session'"'"'s mode, and the actions and posts your delegation policy pre-approves wait for a sweep you type.' \
+tr -s '[:space:]' ' ' < "$R" | grep -qF 'The armed sweep only reads and speaks, plus the ops view push when it is on: it keeps the session'"'"'s mode, and the actions and posts your delegation policy pre-approves wait for a sweep you type.' \
   || { echo "FAIL: README: armed sweep -- the read-only, mode-keeping sentence is missing"; fail=1; }
 if tr -s '[:space:]' ' ' < "$R" | grep -qF 'the same read-only sweep you can ask for'; then
   echo "FAIL: README: armed sweep -- still calls it the same sweep you can ask for"; fail=1
@@ -149,7 +154,12 @@ pin "$O" "ops: closed loop logs"        'A closed loop logs one line'
 pin "$O" "ops: snippet speaks on MISS"  'silently; speak on MISS or an error'
 pin "$O" "ops: only write"              'the only thing a closed loop writes'
 fpin "$O" "ops: sweep writes only L2"  'the sweep itself still writes nothing beyond its L2 and Auto lines'
-fpin "$O" "ops: sweep bound L2 exception" '- The sweep reads; it never writes to any integration; L2 actions and Auto posts run after the reads (see Delegation).'
+fpin "$O" "ops: sweep bound L2 exception" '- The sweep reads; it never writes to any integration; L2 actions and Auto posts run after the reads (see Delegation), and so does the ops view push (see Ops view).'
+# The sweep's worklog read carries the ops view gate tail; the gate sentence explains it.
+fpin "$O" "OV sweep read line"          'sh -c '"'"'. "${CLAUDE_PLUGIN_ROOT}/scripts/prelude.sh" && clutch_worklog_window; R=$?; [ ! -f "$HOME/.clutch/opsview.json" ] || echo "OPS VIEW: on"; exit $R'"'"
+fpin "$O" "OV gate sentence"            'A last line `OPS VIEW: on` says the ops view is on: it is never a move, a wait or a worklog line, and output that holds only that line is empty output.'
+fpin "$O" "OV sweep records"            'With `OPS VIEW: on`, record and push what the sweep read (see Ops view).'
+fpin "$O" "OV Step 3 writes"            "except the tick pass's \`moved:\` lines, the ops view record and push when it is on (see Ops view), and the L2 and Auto lines (see Delegation) and the tablet inbox items (see Tablet inbox); the rest"
 # Paired with the two pins above: neither write ban stands without its L2 exception.
 nsw=$(grep -cF -e 'the sweep itself still writes nothing.' -e 'it never writes to any integration.' "$O")
 [ "$nsw" = 0 ] || { echo "FAIL: ops -- a sweep write ban lacks its L2 exception ($nsw hit)"; fail=1; }
@@ -168,7 +178,7 @@ fpin "$O" "sweep: one read per loop"    'it reads each wait loop once'
 fpin "$O" "sweep: window read once"     'Read the worklog window in the same pulse, once'
 fpin "$O" "sweep: tick pass own read"   'the tick pass reads the wait loops with its own line'
 fpin "$O" "sweep: tick pass writes"     "except the tick pass's \`moved:\` lines"
-fpin "$O" "wait: never listed"          'Wait loops are never listed or counted, at the close or anywhere.'
+fpin "$O" "wait: never listed in session" 'Wait loops are never listed or counted in the session, at the close or anywhere.'
 fpin "$O" "arm: clause"                 "(I'll hold this as an open loop)"
 fpin "$O" "arm: opt-out"                "send, don't watch"
 fpin "$O" "arm: replaces moved, MISS"   "instead of its \`moved:\` line; speak on MISS or an error"
@@ -263,7 +273,8 @@ fpin "$O" "window: empty or error"      'Empty output or an error: no window is 
 fpin "$O" "window: no stored queue"     'No draft is kept between windows: each window reads fresh, so there is no pending list.'
 fpin "$O" "window: after situation"     'In the sweep, the window screen follows the situation, and approving it is the one smallest move.'
 fpin "$O" "window: not in a tick"       'A tick never runs the window.'
-fpin "$O" "deleg: does-not send"        'Send anything without a yes, or write to any integration without one beyond the L2 actions and Auto posts your policy lists'
+fpin "$O" "deleg: does-not send"        '- Send anything without a yes, or write to any integration without one beyond the L2 actions and Auto posts your policy lists and the ops view push (see Ops view)'
+fpin "$O" "ops: no in-session list"     '- Produce a dashboard, a report, or a list for later in the session (the ops view is the user'"'"'s own page; see Ops view)'
 nwi=$(grep -c 'Write to any integration, or send anything, without a yes' "$O")
 [ "$nwi" = 0 ] || { echo "FAIL: ops -- still has the old does-not send line ($nwi hit)"; fail=1; }
 
@@ -409,7 +420,8 @@ fpin "$BS" "BT3 what sends it"          '`/clutch:beat @<tag>` is what an ops se
 fpin "$BS" "BT3 wake"                   'A wake from the session'"'"'s silent check holds `Run /clutch:beat @<tag>.`, alone or after the watch'"'"'s lines: run this skill once for that tag.'
 fpin "$BS" "BT4 no gear"                'It sets no gear, no focus and no mode: the session keeps the rules it had.'
 fpin "$BS" "BT4b not a sweep"           'It is not a sweep or a tick: no sweep, no config read.'
-fpin "$BS" "BT5 read line"              'sh -c '"'"'. "${CLAUDE_PLUGIN_ROOT}/scripts/prelude.sh" && L=$(clutch_beat_window "@<tag>") || exit; [ -z "$L" ] || printf "%s\n" "$L" | LC_ALL=C cut -c1-300'"'"
+fpin "$BS" "BT5 read line"              'sh -c '"'"'. "${CLAUDE_PLUGIN_ROOT}/scripts/prelude.sh" && L=$(clutch_beat_window "@<tag>") || exit; [ -z "$L" ] || printf "%s\n" "$L" | LC_ALL=C cut -c1-300; R=$?; [ ! -f "$HOME/.clutch/opsview.json" ] || echo "OPS VIEW: on"; exit $R'"'"
+fpin "$BS" "BT-OV beat line"            'A last line `OPS VIEW: on` is never a move, a wait or a worklog line, and output that holds only it is empty output; with it, after any `moved:` lines and before the reply, run the ops view push once: the steps between the `<!-- opsview push -->` markers in the ops skill'"'"'s `### Ops view`, which, when not in view, you find by those markers under the plugin'"'"'s skills folder.'
 fpin "$BS" "BT6 line shapes"            'Each line is a wait no session'"'"'s tag owns, `<epoch> <repo> wait: <kind>:<ref> <baseline> <text>`, or a move another session logged since the last beat, `<epoch> <repo> moved: <text>`.'
 fpin "$BS" "BT6b read is for the reply" 'Unlike the session-start Worklog block, the beat'"'"'s read is for the reply: name a peer'"'"'s `moved:` line.'
 fpin "$BS" "BT7 nothing to read"        'Exit status 0 with empty output, or exit status 1 with no error text, means nothing to read: reply `No change.`'
@@ -454,11 +466,74 @@ fi
 nbs_l=$(grep -c '' "$BS")
 [ "$nbs_l" -lt 60 ] || { echo "FAIL: BT-size beat skill is $nbs_l lines, want under 60"; fail=1; }
 
+# --- the ops view: the framing, the on-switch and the push block, held once
+# in the ops skill; the beat points to it by its markers (one line above).
+pin  "$O" "OV section"                  '^### Ops view$'
+fpin "$O" "OV framing"                  'The ops view is a page the user opens: a dashboard by the user'"'"'s choice (2026-11-23), never a line in the session.'
+fpin "$O" "OV framing rules hold"       'No in-session line points at it uninvited, and every rule above about lists, counts and dashboards still governs what the session says.'
+fpin "$O" "OV on-switch"                'It is on when `~/.clutch/opsview.json` exists; with it off, nothing in this section runs.'
+# A function, not cat inside $(): bash 3.2 misparses the block's lone quote there.
+ov_block() {
+  cat <<'OVEOF'
+<!-- opsview push -->
+The ops view push runs only after a read printed `OPS VIEW: on`:
+
+1. Run `sh "${CLAUDE_PLUGIN_ROOT}/scripts/opsview-sync.sh"`. In a sweep, the record run (see the record step above) is this step: it prints the same lines; a sweep that does not record runs this plain line.
+2. `OPS: off`, or `OPS: unchanged` as the second line: the push is done.
+3. Otherwise the first line is `OPS: <url>`, and each `OPS_DOC: <collection> <doc_id> <file_path> [if_version=<n>]` line is one document. Load `ArtifactData` first when it is a deferred tool, then send every line in one `ArtifactData` call: action `batch`, `url` from the first line, one entry per line with `op` `set`, its `collection`, `doc_id` and `file_path`, and `if_version` only when the line ends with `if_version=<n>`.
+4. Then, for the documents the call wrote, if any, run `sh "${CLAUDE_PLUGIN_ROOT}/scripts/opsview-sync.sh" --ack <collection>/<doc_id>=<version>`, one argument per document, each with the `version` the result gave it; when the call wrote none, go to step 5.
+5. Documents the call did not write: send them once more in one `batch`; a document refused on its version first takes `if_version` from one `get` of it, and the rest keep their line's `if_version`. Ack what that wrote, if anything. A document the retry still did not write is a failure, handled by step 6 (`--failed`).
+6. Any other failure (a non-zero exit, `ArtifactData` cannot be loaded, the call or the retry fails, a result with no `version`): in a beat, run `sh "${CLAUDE_PLUGIN_ROOT}/scripts/opsview-sync.sh" --failed '<one-line reason>'` and say nothing about the push, whatever that run prints and even when it fails. In a sweep, run the same line with `--failed --speak`; on `OPS: say`, or when that run itself fails, say one line after the situation, outside its seven lines: the ops view stopped updating, and why. On `OPS: quiet`, say nothing. Escape ' as '\''.
+7. A push that succeeds is never named. A beat's reply never names the push and is the reply it would be without it: `No change.` stays exact.
+<!-- /opsview push -->
+OVEOF
+}
+OV_BLOCK=$(ov_block)
+while IFS= read -r ovl; do
+  [ -z "$ovl" ] || fpin "$O" "OV push steps" "$ovl"
+done <<OVEOF
+$OV_BLOCK
+OVEOF
+OV_HAVE=$(awk '/^<!-- opsview push -->$/{f=1} f; /^<!-- \/opsview push -->$/{exit}' "$O")
+[ "$OV_HAVE" = "$OV_BLOCK" ] || { echo "FAIL: OV push steps -- the block between the markers differs from the pinned block"; fail=1; }
+fpin "$O" "OV push beat silent"         'in a beat, run `sh "${CLAUDE_PLUGIN_ROOT}/scripts/opsview-sync.sh" --failed '"'"'<one-line reason>'"'"'` and say nothing about the push, whatever that run prints and even when it fails.'
+fpin "$O" "OV push sweep speaks"        'In a sweep, run the same line with `--failed --speak`; on `OPS: say`, or when that run itself fails, say one line after the situation, outside its seven lines: the ops view stopped updating, and why.'
+fpin "$O" "OV push failed run"          'or when that run itself fails, say one line after the situation'
+fpin "$O" "OV push quiet"               'On `OPS: quiet`, say nothing.'
+# OV block once: one skill holds the push block, the ops skill, once.
+OV_FILES=$(grep -rlxF '<!-- opsview push -->' "$HERE/../skills")
+[ "$OV_FILES" = "$HERE/../skills/ops/SKILL.md" ] || { echo "FAIL: OV block once -- held by: $OV_FILES"; fail=1; }
+for ovm in '<!-- opsview push -->' '<!-- /opsview push -->'; do
+  [ "$(grep -cxF -- "$ovm" "$O")" = 1 ] || { echo "FAIL: OV block once -- $ovm is not in the ops skill exactly once"; fail=1; }
+done
+fpin "$O" "OV push retry unwritten"     'A document the retry still did not write is a failure, handled by step 6 (`--failed`).'
+# The record step: the sweep's one write when the view is on, before the push block.
+fpin "$O" "OV record step"              'The record step: after its reads, a sweep records what it read with this run, which is also the push'"'"'s step 1:'
+fpin "$O" "OV record snippet"         'sh "${CLAUDE_PLUGIN_ROOT}/scripts/opsview-sync.sh" --sweep <<'"'"'OPS_SWEEP'"'"
+fpin "$O" "OV record template"          '{"items": [{"key": "<kind>:<ref>", "kind": "<pr|slack|meeting|linear|other>", "ref": "<https link or null>", "title": "<short title>", "state": "<state>", "waiting_on": "<name or role, or null>", "ticket": "<ticket id or null>"}]}'
+fpin "$O" "OV record rules"             'One item per thing the sweep read that is live today: a PR waiting on a review, a thread waiting on a reply, today'"'"'s meeting, a ticket in motion.'
+fpin "$O" "OV record rules"             '`key` uses the wait-loop ref forms (`gh:<owner>/<repo>#<number>`, `slack:<channel>/<thread ts>`, `linear:<issue id>`), and `cal:<event id>` for a meeting.'
+fpin "$O" "OV record rules"             '`title` is the item'"'"'s own title, never message text; `waiting_on` is a display name or role as the item shows it, never anything from `~/.clutch/people.md`; `ticket` is the first ticket id in the PR'"'"'s branch name or title, else null.'
+# The tablet section holds the same sentence, so this one is pinned inside Ops view.
+awk '/^### Ops view$/{f=1;next} /^### /{f=0} f' "$O" | grep -qxF 'The heredoc is quoted, so the items need JSON escaping only.' \
+  || { echo "FAIL: OV record rules -- the quoted-heredoc sentence is not in Ops view"; fail=1; }
+fpin "$O" "OV record rules"             'Exit status 2 names on stderr what it refused: fix the items once and run it again; if that fails too, it is a push failure.'
+# A partial sweep never records: ops_sync would mark the integration it skipped present:false.
+awk '/^### Ops view$/{f=1;next} /^### /{f=0} f' "$O" | grep -qxF 'When the sweep skipped or failed to read an integration it tried to read this sweep, it does not record: push step 1 runs plain `opsview-sync.sh` (no `--sweep`) instead, so sessions and waits still push and the last full sweep record stays. An integration that is not set up, or is unavailable all session, is not skipped here, so it never blocks the record.' \
+  || { echo "FAIL: OV partial sweep -- the no-record rule is not in Ops view"; fail=1; }
+fpin "$O" "OV record null"              'A missing value is JSON null, never the string `"null"`.'
+fpin "$O" "sweep window unreadable"     'Exit status 2 means the worklog is unreadable: say so in one line, never that there is no peer context, and the sweep goes on.'
+awk '/^It is on when `~\/\.clutch\/opsview\.json` exists/{s=NR} /--sweep <<.OPS_SWEEP.$/{r=NR} /^<!-- opsview push -->$/{p=NR} END{exit !(s && r && p && s < r && r < p)}' "$O" \
+  || { echo "FAIL: OV record step -- not between the on-switch sentence and the push block"; fail=1; }
+# The section sits before Session close.
+awk '/^### Ops view$/{v=NR} /^### Session close$/{c=NR} END{exit !(v && c && v < c)}' "$O" \
+  || { echo "FAIL: OV section -- not before ### Session close"; fail=1; }
+
 # --- the tablet inbox: the sweep claims, reads, sorts and routes it once
 pin  "$O" "tablet: section"             '^### Tablet inbox$'
 fpin "$O" "tablet: read in the sweep"   'Read the tablet inbox once, after the tick pass (see Tablet inbox).'
 fpin "$O" "tablet: Step 3 writes"       'and the tablet inbox items (see Tablet inbox); the rest'
-fpin "$O" "tablet: Step 5 writes"       'the sweep itself still writes nothing beyond its L2 and Auto lines and the tablet inbox items.'
+fpin "$O" "tablet: Step 5 writes"       'the sweep itself still writes nothing beyond its L2 and Auto lines and the tablet inbox items, and the ops view record and push.'
 fpin "$O" "tablet: buckets not a key"   'An optional `### Buckets` list under `## Ops` sorts the tablet inbox (see Tablet inbox); it is not a missing key either.'
 fpin "$O" "tablet: empty is silent"     'Empty output: nothing arrived; say nothing about the tablet.'
 fpin "$O" "tablet: other error"         'Any other error: one line, and the sweep goes on.'
@@ -516,6 +591,20 @@ fpin "$R" "README safe: ops reads"      'Ops also reads the tablet inbox under `
 fpin "$R" "README safe: waiting file"   'before today'"'"'s focus file exists, work lines wait in `<state dir>/tablet.md` and move into that file once it does'
 fpin "$R" "README safe: ops writes"     '`/clutch:ops` files them: work lines into today'"'"'s focus file (or, with no focus file set, `~/.clutch/personal.md`)'
 fpin "$R" "README safe: helper imports" 'its test suite parses its imports and fails on any network module'
+# The ops view (2.19.0): the README names the item, the push, the reads, the writes and the allow rule.
+fpin "$R" "README: ops view item"       '4. **The ops view** (optional). `~/.clutch/opsview.json` turns it on: the ops session'"'"'s beat and sweeps push sessions, waits and sweep items to your private Ops view page through `scripts/opsview-sync.sh`, which runs `tools/ops_sync/ops_sync.py`.'
+fpin "$R" "README: ops view off"        'With the file absent nothing changes.'
+fpin "$R" "README: ops view partial"    'A sweep that skipped or failed to read an integration it tried keeps the last sweep record and pushes only sessions and waits; a push that fails is said once, by a sweep, never by a beat.'
+fpin "$R" "README: beat push"           '`/clutch:beat` checks the integrations its waits name, at most once an hour, on its silent check'"'"'s wake (every hour with `CLUTCH_POLL=off`), while an ops session is open, and with the ops view on it sends what changed to your Ops view page in one `ArtifactData` batch, plus one retry when a document is refused.'
+fpin "$R" "README: ops_sync sends nothing" '`tools/ops_sync/ops_sync.py` sends nothing either: it writes local files, and its test suite fails on any network import; the model makes the one `ArtifactData` batch, plus one retry when a document is refused.'
+fpin "$R" "README: ops push"            '`/clutch:ops` and `/clutch:morning` check the integrations you named, and with the ops view on `/clutch:ops` also pushes to your Ops view page.'
+fpin "$R" "README: ops view unavailable" 'An integration unavailable for a whole session loses its earlier sweep items from the page until a sweep reads it again.'
+fpin "$R" "README: ops view reads"      'With the ops view on (`~/.clutch/opsview.json` exists), the ops session'"'"'s beat and sweeps also read that file, and `~/.clutch/people.md` to keep its lines out of what they send.'
+fpin "$R" "README: ops view writes"     'With the ops view on, the ops session'"'"'s beat and sweeps also write `~/.clutch/opsview/` and `~/.clutch/sweep.json` without a command, and send what changed to your private Ops view page; a write cut short can leave `~/.clutch/.sweep.json.tmp` or a dot-named `.tmp` file under `~/.clutch/opsview/`, which the next run overwrites.'
+fpin "$R" "README: opsview allow rule"  'With the ops view on, the beat and sweeps also run `scripts/opsview-sync.sh`: allow `Bash(sh */clutch/*/scripts/opsview-sync.sh*)`, or `Bash(sh <checkout>/scripts/opsview-sync.sh*)` from a checkout, the same way.'
+if tr -s '[:space:]' ' ' < "$R" | grep -qE 'and only reads, until|armed sweep only reads and speaks:'; then
+  echo "FAIL: README: armed sweep -- still says it only reads, with no ops view push"; fail=1
+fi
 
 # --- local mirror of the private-vocab, intent, F and G wording gates.
 # Same regex strings as de-private.test.sh; rc 1 = clean, 0 = leak,
@@ -628,6 +717,112 @@ OUT=$(cd "$T/plain" && sh -c "$CMD"); RC=$?
 [ "$RC" = 0 ] || { echo "FAIL: O-run exited $RC: $CMD"; exit 1; }
 [ "$OUT" = "proj on: fresh-claim" ] \
   || { echo "FAIL: O-run wanted only the fresh claim, got: $OUT"; exit 1; }
+
+# --- O-OV0-O-OV1: the ops view tail on the sweep's worklog read. OLD_OR is the
+# 2.18.1 line; the skill's line is it plus the tail. Off (no
+# ~/.clutch/opsview.json, or a directory there), both lines print, exit and
+# leave the same tree; on, the new line adds one last line `OPS VIEW: on`
+# whatever the read's rc, and keeps the rc.
+OLD_OR='sh -c '"'"'. "${CLAUDE_PLUGIN_ROOT}/scripts/prelude.sh" && clutch_worklog_window'"'"
+OR_TAIL='; R=$?; [ ! -f "$HOME/.clutch/opsview.json" ] || echo "OPS VIEW: on"; exit $R'
+[ "$LINE" = "${OLD_OR%?}$OR_TAIL'" ] \
+  || { echo "FAIL: O-OV tail -- the read line is not the 2.18.1 line plus the tail: $LINE"; exit 1; }
+OLD_OCMD=$(subroot "$OLD_OR")
+# orun <cmd> <claims|quiet|none|unread> [on|dir]: a fresh HOME; sets OUT, RC and TREE.
+orun() {
+  HOME="$T/ov-home"; export HOME
+  chmod -R u+rw "$HOME" 2>/dev/null; rm -rf "$HOME"; mkdir -p "$HOME"
+  case $2 in
+    claims|unread) mkdir -p "$HOME/.clutch"
+      printf '%s proj on: fresh-claim\n%s proj on: stale-claim\n' "$NOW" "$((NOW - 5 * 3600))" > "$HOME/.clutch/worklog.md" ;;
+    quiet) mkdir -p "$HOME/.clutch"
+      printf '%s proj on: stale-claim\n' "$((NOW - 5 * 3600))" > "$HOME/.clutch/worklog.md" ;;
+  esac
+  [ "$2" = unread ] && chmod 000 "$HOME/.clutch/worklog.md"
+  case ${3:-} in
+    on) mkdir -p "$HOME/.clutch"; : > "$HOME/.clutch/opsview.json" ;;
+    dir) mkdir -p "$HOME/.clutch/opsview.json" ;;
+  esac
+  OUT=$(cd "$T/plain" && sh -c "$1" 2>&1); RC=$?
+  chmod 644 "$HOME/.clutch/worklog.md" 2>/dev/null
+  TREE=$(cd "$HOME" && find . | LC_ALL=C sort && find . -type f | LC_ALL=C sort | while IFS= read -r f; do cat "$f"; done)
+}
+ork='claims quiet none'
+if [ "$(id -u)" = 0 ]; then echo "SKIP: O-OV unread (root reads through chmod)"; else ork="$ork unread"; fi
+for k in $ork; do
+  orun "$OLD_OCMD" "$k"; o_out=$OUT; o_rc=$RC; o_tree=$TREE
+  case "$k:$o_rc:${o_out:+set}" in claims:0:set|quiet:0:|none:1:|unread:2:*) ;;
+    *) echo "FAIL: O-OV0 [$k] -- fixture gives rc $o_rc [$o_out]"; exit 1 ;; esac
+  orun "$CMD" "$k"
+  [ "$RC" = "$o_rc" ] && [ "$OUT" = "$o_out" ] \
+    || { echo "FAIL: O-OV0 [$k] off -- rc $RC [$OUT], 2.18.1 rc $o_rc [$o_out]"; exit 1; }
+  [ "$TREE" = "$o_tree" ] || { echo "FAIL: O-OV0 [$k] -- the off run left another tree"; exit 1; }
+  for m in on dir; do
+    orun "$OLD_OCMD" "$k" "$m"; o_out=$OUT; o_rc=$RC
+    want=$o_out
+    # Unlike the beat's line, this one has no `|| exit`: the tag follows any rc.
+    if [ "$m" = on ]; then
+      if [ -n "$o_out" ]; then want="$o_out
+OPS VIEW: on"; else want='OPS VIEW: on'; fi
+    fi
+    orun "$CMD" "$k" "$m"
+    [ "$RC" = "$o_rc" ] && [ "$OUT" = "$want" ] \
+      || { echo "FAIL: O-OV1 [$k $m] -- rc $RC [$OUT], want rc $o_rc [$want]"; exit 1; }
+  done
+done
+
+# --- O-OV2: the skill's record snippet, filled with one item whose title holds
+# a space, a quote and a $, run under sh and zsh -f. On: sweep.json holds the
+# item as written and the run prints `OPS: <url>`, then an `OPS_DOC: sweep`
+# line. Off (O-OV2b): `OPS: off` and the HOME tree unchanged.
+nrs=$(awk '/^[ \t]*```sh/{n++; f=1; b[n] = ""; next} /^[ \t]*```/{f=0} f{b[n] = b[n] $0 "\n"}
+  END {k = 0; for (i = 1; i <= n; i++) if (index(b[i], "--sweep <<")) {k++; s = b[i]}
+       printf "%s", s > out; print k}' out="$T/rec.raw" "$O")
+[ "$nrs" = 1 ] || { echo "FAIL: O-OV2 wants exactly one sh block running --sweep, got $nrs"; exit 1; }
+subroot "$(cat "$T/rec.raw")" > "$T/rec.tpl"
+case $(cat "$T/rec.tpl") in *CLAUDE_PLUGIN_ROOT*) echo "FAIL: O-OV2 -- plugin root left unsubstituted"; exit 1 ;; esac
+RT='Or'"'"'s \"fix\" $HOME' awk '
+  function rl(s, a, b,   i) { i = index(s, a); return i ? substr(s, 1, i - 1) b substr(s, i + length(a)) : s }
+  { $0 = rl($0, "<kind>:<ref>", "gh:o/r#7"); $0 = rl($0, "<pr|slack|meeting|linear|other>", "pr")
+    $0 = rl($0, "<https link or null>", "https://github.com/o/r/pull/7"); $0 = rl($0, "<short title>", ENVIRON["RT"])
+    $0 = rl($0, "<state>", "review requested"); $0 = rl($0, "<name or role, or null>", "Or")
+    print rl($0, "<ticket id or null>", "ENG-7") }' "$T/rec.tpl" > "$T/rec.sh"
+grep -q '<[a-z]' "$T/rec.sh" && { echo "FAIL: O-OV2 -- a placeholder is left unfilled: $(cat "$T/rec.sh")"; exit 1; }
+if ! PY=$(command -v python3); then
+  echo "SKIP: O-OV2 (no python3)"
+else
+  OVURL='https://example.test/ops-view'
+  SHELLS=sh
+  if command -v zsh >/dev/null 2>&1; then SHELLS="sh zsh"; else echo "SKIP: O-OV2 zsh (no zsh)"; fi
+  for sh in $SHELLS; do
+    [ "$sh" = zsh ] && run="zsh -f" || run=sh
+    HOME="$T/ovr-$sh"; export HOME
+    mkdir -p "$HOME/.clutch"
+    printf '{"url": "%s"}\n' "$OVURL" > "$HOME/.clutch/opsview.json"
+    OUT=$(cd "$T/plain" && $run "$T/rec.sh" 2>"$T/rec.err"); RC=$?
+    [ "$RC" = 0 ] && [ "$(printf '%s\n' "$OUT" | head -n 1)" = "OPS: $OVURL" ] \
+      && printf '%s\n' "$OUT" | grep -q '^OPS_DOC: sweep gh:o~2Fr~237 /' \
+      || { echo "FAIL: O-OV2 [$sh] -- rc $RC: $OUT / $(cat "$T/rec.err")"; exit 1; }
+    "$PY" -B -c 'import json, sys
+it = json.load(open(sys.argv[1]))["items"]
+want = [{"key": "gh:o/r#7", "kind": "pr", "ref": "https://github.com/o/r/pull/7", "title": "Or'"'"'s \"fix\" $HOME", "state": "review requested", "waiting_on": "Or", "ticket": "ENG-7"}]
+sys.exit(0 if it == want else 1)' "$HOME/.clutch/sweep.json" \
+      || { echo "FAIL: O-OV2 [$sh] -- sweep.json does not hold the item as written: $(cat "$HOME/.clutch/sweep.json" 2>&1)"; exit 1; }
+    # O-OV2c: a partial sweep's plain run (no --sweep) keeps the earlier sweep item present.
+    OUT=$(cd "$T/plain" && sh "$(cd "$HERE/.." && pwd)/scripts/opsview-sync.sh" 2>&1); RC=$?
+    PF=$(printf '%s\n' "$OUT" | awk '$1 == "OPS_DOC:" && $2 == "sweep" && $3 == "gh:o~2Fr~237" {print $4}')
+    [ "$RC" = 0 ] && [ -n "$PF" ] && "$PY" -B -c 'import json, sys
+sys.exit(0 if json.load(open(sys.argv[1])).get("present") is True else 1)' "$PF" \
+      || { echo "FAIL: O-OV2c [$sh] -- the plain run did not keep the sweep item present: rc $RC: $OUT"; exit 1; }
+    # O-OV2b: the view off, the same snippet prints OPS: off and writes nothing.
+    HOME="$T/ovr-off-$sh"; export HOME
+    mkdir -p "$HOME/.clutch"
+    OB=$(find "$HOME" | LC_ALL=C sort)
+    OUT=$(cd "$T/plain" && $run "$T/rec.sh" 2>&1); RC=$?
+    [ "$RC" = 0 ] && [ "$OUT" = 'OPS: off' ] && [ "$(find "$HOME" | LC_ALL=C sort)" = "$OB" ] \
+      || { echo "FAIL: O-OV2b [$sh] -- rc $RC: $OUT / $(find "$HOME")"; exit 1; }
+  done
+fi
 
 # --- O-tick: the skill's one tick read line, root substituted like O-run.
 TLINE=$(grep -F 'sh -c' "$O" | grep -F 'clutch_open_loops')
