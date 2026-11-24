@@ -4,9 +4,9 @@
 # under ## Ops in ~/.clutch/rituals.md, read by clutch_merge_entries) does it
 # call gh: one GraphQL read of the PR, and a merge only when that read shows
 # it open, not a draft, the gh user's own, into the default branch or a
-# base=<branch> of its list line, in a repo that allows merge commits, approved
+# base=<branch> of its list lines, in a repo that allows merge commits, approved
 # (no outstanding changes requested, and reviewDecision APPROVED, or none with
-# an approval from a user with write access or, on a no-review line, none
+# an approval from a user with write access or, with a no-review line, none
 # needed) and CLEAN, with exactly
 # `gh pr merge <n> --repo <owner>/<repo> --merge --match-head-commit <sha>`.
 # @<tag> reads the waits the tag owns, --unwatched the waits no live silent
@@ -82,10 +82,11 @@ MF='.data as $d | $d.repository as $rp | $rp.pullRequest as $p | [($p.latestOpin
     else "none" end'
 # rd <owner> <repo> <n> <jq>: one read of the PR.
 rd() { (cd / && mgh api graphql -f query="$MQ" -f o="$1" -f r="$2" -F n="$3" --jq "$4"); }
-# mopt <owner/repo>: MP, the jq prefix for the repo's first LIST line: $xb
-# its base= branches, $nr true with no-review. rc 1 when no line names it.
+# mopt <owner/repo>: MP, the jq prefix for the options of every LIST line
+# naming the repo (options only widen, so their union): $xb its base=
+# branches, $nr true with no-review. rc 1 when no line names it.
 mopt() {
-  MO=$(printf '%s\n' "$LIST" | LC_ALL=C awk -v k="$1" '$1 == k { f = 1; $1 = ""; print; exit } END { exit !f }') || return 1
+  MO=$(printf '%s\n' "$LIST" | LC_ALL=C awk -v k="$1" '$1 == k { f = 1; $1 = ""; print } END { exit !f }') || return 1
   MB='' MN=false
   for MOT in $MO; do case $MOT in no-review) MN=true ;; base=*) MB="$MB,\"${MOT#base=}\"" ;; esac; done
   MP="[${MB#,}] as \$xb | $MN as \$nr | "

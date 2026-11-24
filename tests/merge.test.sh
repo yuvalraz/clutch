@@ -370,9 +370,11 @@ acme/web'
   lnone "MO6 bad base" '- acme/web base=x"]|true as $nr|' "$NR1" "$NR2" "$NR3"
   lnone "MO6 bad base into it" '- acme/web base=x"]|true as $nr|' "$NR1" "$NR2" "$NR3" "$MF_P.baseRefName = \"x\\\"]|true as \$nr|\""
   base "$NR1" "$NR2" "$NR3"; mf_list '- acme/web' '- acme/web no-review'
-  mr @0123abcd; ok "MO7 the plain line first" 0 '' 1; merges "MO7 plain first" ''
+  mr @0123abcd; ok "MO7 the plain line first" 0 'gh:acme/web#7 @0123abcd merged' 3; merges "MO7 plain first" "$M7"
   base "$NR1" "$NR2" "$NR3"; mf_list '- acme/web no-review' '- acme/web'
   mr @0123abcd; ok "MO7 the no-review line first" 0 'gh:acme/web#7 @0123abcd merged' 3; merges "MO7 no-review first" "$M7"
+  base "$NR1" "$NR2" "$NR3" "$MF_P.baseRefName = \"dev\""; mf_list '- acme/web base=dev' '- acme/web no-review'
+  mr @0123abcd; ok "MO7 union of base= and no-review" 0 'gh:acme/web#7 @0123abcd merged' 3; merges "MO7 union" "$M7"
   mf_reset; mf_list '- acme/web no-review'; mf_pr acme web 7 "$NR1" "$NR2" "$NR3"; mf_wait 100 'gh:acme/web#7'
   mr --unwatched; ok "MO8 --unwatched no-review" 0 'gh:acme/web#7 merged' 3; merges "MO8" "$M7"
 

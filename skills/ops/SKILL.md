@@ -81,7 +81,7 @@ focus file when one is set. Ops reads two optional sections of its own,
 `### Delegation` and `### Windows` (see Delegation).
 Neither is a missing key: never ask for them.
 An optional `### Buckets` list under `## Ops` sorts the tablet inbox (see Tablet inbox); it is not a missing key either.
-An optional `### Merge` list under `## Ops` names the repos the watch and the beat merge your approved, clean PRs in (see Step 5); ops never reads it, and it is not a missing key either.
+An optional `### Merge` list under `## Ops` names the repos the watch and the beat merge your clean PRs in, approved or listed `no-review` (see Step 5); ops never reads it, and it is not a missing key either.
 
 ### Step 2: The sweep
 
@@ -178,7 +178,7 @@ behavior:
   person will see: draft it, show it, send on a yes. Reading is free.
   An L2 action or Auto post your delegation policy lists is the one exception (see Delegation).
   L3 is untouchable: a production change, a direct send, a merge or a delete always waits for a yes, whatever the policy says.
-  The one merge without a yes is the watch's or the beat's merge pass, of your approved, clean PR in a repo your `### Merge` list names; ops itself never merges without a yes.
+  The one merge without a yes is the watch's or the beat's merge pass, of your clean PR, approved or listed `no-review`, in a repo your `### Merge` list names; ops itself never merges without a yes.
 - **An outward action that awaits a reply or a state change becomes a wait
   loop.** Its yes ask ends with "(I'll hold this as an open loop)". On the
   yes, once the action succeeds, append its `wait:` line with the snippet

@@ -302,14 +302,15 @@ fpin "$R" "README: window opens"        'which opens on your next sweep'
 fpin "$C" "const: merge exception"      '(not the merge pass of their approved, clean PR in a merge-list repo) or a delete waits for a'
 nom=$(tr -s '[:space:]' ' ' < "$C" | grep -c 'a merge or a delete waits')
 [ "$nom" = 0 ] || { echo "FAIL: const: old merge text gone -- 'a merge or a delete waits' is still there"; fail=1; }
-fpin "$O" "ops: merge pass only"        'The one merge without a yes is the watch'"'"'s or the beat'"'"'s merge pass, of your approved, clean PR in a repo your `### Merge` list names; ops itself never merges without a yes.'
-fpin "$O" "ops: merge list section"     'An optional `### Merge` list under `## Ops` names the repos the watch and the beat merge your approved, clean PRs in (see Step 5); ops never reads it, and it is not a missing key either.'
-fpin "$R" "README: merge exception"     'Merges of your own approved, clean PRs in a repo your `### Merge` list names are the one exception: the watch and the beat merge them (see below).'
+fpin "$O" "ops: merge pass only"        'The one merge without a yes is the watch'"'"'s or the beat'"'"'s merge pass, of your clean PR, approved or listed `no-review`, in a repo your `### Merge` list names; ops itself never merges without a yes.'
+fpin "$O" "ops: merge list section"     'An optional `### Merge` list under `## Ops` names the repos the watch and the beat merge your clean PRs in, approved or listed `no-review` (see Step 5); ops never reads it, and it is not a missing key either.'
+fpin "$R" "README: merge exception"     'Merges of your own clean PRs, approved or listed `no-review`, in a repo your `### Merge` list names are the one exception: the watch and the beat merge them (see below).'
 fpin "$R" "README: merge reads list"    'Their merge pass, `scripts/merge.sh`, also reads the `### Merge` list in `~/.clutch/rituals.md`.'
 fpin "$R" "README: merge.failed marker" '`<tag>.woke`, `<tag>.polled` and `merge.failed` are the only things sessions write'
 fpin "$R" "README: merge network"       '`scripts/merge.sh`, the merge pass the watch and the beat run, calls `gh` and nothing else, and merges only PRs in the repos your `### Merge` list names.'
 fpin "$R" "README: merge allow rule"    '`Bash(sh */clutch/*/scripts/merge.sh*)` lets merges run without the shell'"'"'s ask; leave it out and each merge pass asks you first.'
-fpin "$R" "README: merge options"       'A `### Merge` entry may add `no-review`, your standing approval of your own PRs in that repo when it has no review rule, and `base=<branch>`, a branch it also merges into beside the default.'
+fpin "$R" "README: merge options"       'A `### Merge` entry may add `no-review`, your standing approval of your own PRs in that repo into a branch with no review rule, and `base=<branch>`, a branch it also merges into beside the default.'
+fpin "$R" "README: no-review off"      'Take `no-review` off when anyone else gets write access; options from every line for a repo count, and a misspelled or unknown option word is read as a note and changes nothing.'
 # The handoff path: /clutch:intent ops must be able to invoke the skill, so
 # model invocation stays enabled (negative pin).
 if grep -q 'disable-model-invocation: true' "$O"; then
@@ -342,10 +343,10 @@ fpin "$R" "README: poll off"            '`CLUTCH_POLL=off` keeps the 10-minute w
 fpin "$R" "README: poll allow rule"     '`Bash(sh */clutch/*/scripts/poll.sh*)`'
 fpin "$R" "README: poll network"        '`scripts/poll.sh`, the silent check a session starts in the background while it holds PR waits or is an ops session, calls `gh`, and `scripts/merge.sh --ready` for a PR in a repo your `### Merge` list names, and nothing else.'
 fpin "$R" "README: mergeable wake"      'became ready to merge in a repo your `### Merge` list names (`mergeable`),'
-fpin "$R" "README: watch merges"        'Each watch tick also merges the approved, clean PRs among its waits in those repos with a merge commit.'
+fpin "$R" "README: watch merges"        'Each watch tick also merges the clean PRs among its waits in those repos, approved or listed `no-review`, with a merge commit.'
 fpin "$R" "README: beat cadence"        '  `/clutch:beat @<tag>`, at most once an hour from 08:00 to 20:59, when another session logged a move, or sooner for a PR it can merge.'
 if grep -qF 'only when another' "$R"; then echo "FAIL: README beat bullet still says only when another session logged a move"; fail=1; fi
-fpin "$R" "README: beat merges"         'The beat also merges your approved, clean PRs in a repo your `### Merge` list names for waits no live silent check reads, before its read, and its silent check wakes it for one sooner than the hour.'
+fpin "$R" "README: beat merges"         'The beat also merges your clean PRs, approved or listed `no-review`, in a repo your `### Merge` list names for waits no live silent check reads, before its read, and its silent check wakes it for one sooner than the hour.'
 if grep -qE 'asked once to arm|one ask to arm' "$R"; then
   echo "FAIL: README says the user is asked to arm a watch"; fail=1
 fi
@@ -382,7 +383,7 @@ nws_l=$(grep -c '' "$WS")
 fpin "$WS" "W12 re-hold open thing"     'If the thing is still open after the move, such as approved, commented or changes requested, append a fresh `wait:` line right after that `moved:` line, with the same snippet and text `<kind>:<ref> <new baseline> @<tag> <text>`: the same ref, the new baseline and the same `@<tag>`, so a later merge stays watched.'
 fpin "$WS" "W13 merged not held"        'A thing that merged or closed is not held again.'
 # W-poll: the silent check's wake runs one tick; its wake reasons include unreadable.
-fpin "$WS" "W-poll wake"                'A wake from the session'"'"'s silent check holds `Run /clutch:watch @<tag> for the moved waits.` after one `<ref> <what>` line per wait, `<what>` being `merged`, `closed`, `review <STATE>`, `comment`, `unreadable` (gh failed on it 3 reads in a row) or `mergeable` (approved and clean, in a repo the `### Merge` list names): run this skill once for that tag, reading every owned wait as above.'
+fpin "$WS" "W-poll wake"                'A wake from the session'"'"'s silent check holds `Run /clutch:watch @<tag> for the moved waits.` after one `<ref> <what>` line per wait, `<what>` being `merged`, `closed`, `review <STATE>`, `comment`, `unreadable` (gh failed on it 3 reads in a row) or `mergeable` (approved, or listed `no-review`, and clean, in a repo the `### Merge` list names): run this skill once for that tag, reading every owned wait as above.'
 fpin "$WS" "W-poll no task"             'On a wake where no wait is left and there is no recurring task, say so in one line and delete nothing.'
 fpin "$WS" "W-poll ended"               'The silent check'"'"'s ended line, `The silent check for @<tag> ended; end the turn.`, needs no reply beyond ending the turn.'
 

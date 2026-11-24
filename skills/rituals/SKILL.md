@@ -97,9 +97,10 @@ A window opens on the first ops sweep at or after its time; nothing fires on its
 Under `### Buckets`, optional, `- work: <terms>` and `- personal: <terms>` name words that mark a tablet item as work or personal; ops reads them when it files the tablet inbox, only for an item that does not read clearly on its own; an unclear item that matches neither stays unsure.
 Under `### Merge`, optional, one `- <owner>/<repo>` per line names a repo with no GitHub auto-merge.
 The watch and the beat merge your own approved PR there with a merge commit once GitHub reports it clean: checks green, no conflicts, not a draft, no changes requested, into the default branch.
-After the repo, `no-review` is your standing approval of your own PRs there while you are its only writer: in a repo with no review rule they merge without an approval, and every other check above still applies.
+After the repo, `no-review` is your standing approval of your own PRs there: into a branch with no review rule they merge without an approval, and every other check above still applies; take `no-review` off when anyone else gets write access.
 After the repo, `base=<branch>` also merges into that branch, beside the default branch.
-Options count only in a run right after the repo; the first other word starts a note, and only the first line for a repo is read.
+Options count only in a run right after the repo; the first other word starts a note, and options from every line for a repo count.
+A misspelled or unknown option word is read as a note and changes nothing.
 A repo that allows no merge commits is skipped, and a merge never uses force or admin rights. A failed merge is named once and stays held.
 The list is separate from Delegation, and an L3 line about merging still holds every merge ops itself would do.
 

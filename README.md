@@ -96,7 +96,7 @@ only at one of those moments.
   merged, closed, got a review or comment from someone other than you or a bot,
   became ready to merge in a repo your `### Merge` list names (`mergeable`),
   or gh failed on one 3 reads in a row (`unreadable`).
-  Each watch tick also merges the approved, clean PRs among its waits in those repos with a merge commit.
+  Each watch tick also merges the clean PRs among its waits in those repos, approved or listed `no-review`, with a merge commit.
   A silent check that ends within 10 minutes of its start, before any wake, leaves those waits unwatched until a new wait is logged; it is not asked for again.
   Otherwise the watch is `/clutch:watch @<tag>` every 30 minutes from 08:07 to 21:37,
   one `No change.` line unless one of its waits moved, gone once none is left.
@@ -108,7 +108,7 @@ only at one of those moments.
   The beat reads the moves other sessions logged since the
   last beat and the waits no session's tag owns, and says `No change.` unless
   something moved.
-  The beat also merges your approved, clean PRs in a repo your `### Merge` list names for waits no live silent check reads, before its read, and its silent check wakes it for one sooner than the hour.
+  The beat also merges your clean PRs, approved or listed `no-review`, in a repo your `### Merge` list names for waits no live silent check reads, before its read, and its silent check wakes it for one sooner than the hour.
   When what moved sits off the day's
   focuses, it names the focus it sits beside. After the beat's ask, the session is
   told, once a day, to arm a sweep: `/clutch:ops re-sweep armed` at 08:37, 12:37 and 16:37.
@@ -179,8 +179,9 @@ It also says so in one line when the waits cannot be read. Entering ops runs
 one tick pass as part of the sweep.
 With a `### Delegation` policy in `~/.clutch/rituals.md`, ops sorts what it reads: L3 waits for your yes as before, L2 does a chore you listed and logs it, L1 drafts, L0 shows only what touches the critical path, and Noise stays hidden.
 A production change, a direct send, a merge or a delete always waits for a yes.
-Merges of your own approved, clean PRs in a repo your `### Merge` list names are the one exception: the watch and the beat merge them (see below).
-A `### Merge` entry may add `no-review`, your standing approval of your own PRs in that repo when it has no review rule, and `base=<branch>`, a branch it also merges into beside the default.
+Merges of your own clean PRs, approved or listed `no-review`, in a repo your `### Merge` list names are the one exception: the watch and the beat merge them (see below).
+A `### Merge` entry may add `no-review`, your standing approval of your own PRs in that repo into a branch with no review rule, and `base=<branch>`, a branch it also merges into beside the default.
+Take `no-review` off when anyone else gets write access; options from every line for a repo count, and a misspelled or unknown option word is read as a note and changes nothing.
 An `- Auto:` line names an intake channel, such as a review-request queue: ops posts there without a yes and logs it, and an @-mention the line does not name still waits for your yes.
 Non-critical drafts wait for an approval window, 11:00 and 16:30 by default, which opens on your next sweep.
 A `## Critical path` in your focus file makes the first sweep of the day open with a brief.
