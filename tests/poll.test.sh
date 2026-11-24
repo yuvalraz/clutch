@@ -17,23 +17,32 @@
 # per wait line, every other exit prints the ended line, and a failed write
 # prints the stopped line, under dash too (M20d); a gh that never answers is
 # killed after 60 s and counts as a failure (M27), and no gh returns at once
-# under sh and dash (M27b). Bt1-Bt17 with Bt4b, Bt5b,
+# under sh and dash (M27b). M28-M28i: a quiet owned wait in a repo on the
+# merge list asks merge.sh --ready (staged beside poll.sh, MERGE_SH for a
+# replay copy; the fake gh reads <o_r_n>.m.json for a ready read) and wakes
+# "<ref> mergeable" once per head sha, after a "mergeable <ref> <sha>" mark;
+# no list, no merge.sh, a failed or hung ready read, or an unreadable .woke
+# or failed mark read (M28j) wakes nothing, and with no list or an
+# unreadable one merge.sh is never forked (M28k). Bt1-Bt17 with Bt4b, Bt5b,
 # Bt6b, Bt8b, Bt10b and Bt13b cover the beat: with the tag's ops record there it peeks the beat window
 # from 08:00 to 20:59, wakes on peer moves at most once an hour with
 # "Run /clutch:beat @<tag>." after a "beat <epoch>" mark, seeds a record with
 # no last line in a beat round (a failed seed retries next round), and
 # keeps running with no gh wait while the record is there; the hourly cap
-# leaves out a last or beat mark after now (Bt17).
+# leaves out a last or beat mark after now (Bt17). Bt18-Bt18e: a ready
+# listed PR no live check reads wakes the beat past the cap, in beat hours
+# with the record there, with a mergeable mark and no beat mark.
 # prelude.sh and poll.sh are staged into a scratch tree and run under a
 # scratch HOME. PRELUDE_SH and POLL_SH override the targets for replay or a
 # mutant copy. Silent on pass apart from PASS.
 set -u
-unset CLUTCH_POLL CLUTCH_POLL_SLEEP CLUTCH_POLL_ROUNDS CLUTCH_WATCH CLUTCH_BEAT CLAUDE_PLUGIN_ROOT
+unset CLUTCH_POLL CLUTCH_POLL_SLEEP CLUTCH_POLL_ROUNDS CLUTCH_WATCH CLUTCH_BEAT CLAUDE_PLUGIN_ROOT CLUTCH_MERGE_WAIT
 
 HERE=$(cd "$(dirname "$0")" && pwd)
 P=${PRELUDE_SH:-$HERE/../scripts/prelude.sh}
 PS=${POLL_SH:-$HERE/../scripts/poll.sh}
-for f in "$P" "$PS"; do
+MS=${MERGE_SH:-$HERE/../scripts/merge.sh}
+for f in "$P" "$PS" "$MS"; do
   [ -f "$f" ] || { echo "FAIL: missing $f"; exit 1; }
 done
 # The fake gh applies the real filter; without jq the M series proves nothing.
@@ -47,6 +56,7 @@ export HOME
 mkdir -p "$HOME" "$T/scripts" "$T/plain" "$T/stub" "$T/fakebin"
 cp "$P" "$T/scripts/prelude.sh"
 cp "$PS" "$T/scripts/poll.sh"
+cp "$MS" "$T/scripts/merge.sh"
 NOW=$(date +%s)
 fail=0
 
@@ -235,6 +245,14 @@ if [ -s "$F/fseq" ]; then
   s=$(head -n 1 "$F/fseq"); sed 1d "$F/fseq" > "$F/fseq.t"; mv "$F/fseq.t" "$F/fseq"
   [ "$s" = 1 ] && exit 1
 fi
+# A ready read (merge.sh --ready, its query names mergeStateStatus) reads
+# <owner>_<repo>_<n>.m.json; mhang hangs it, mfail fails it.
+M=''
+case $* in *mergeStateStatus*)
+  M=.m
+  [ -f "$F/mhang" ] && { echo $$ > "$F/mhangpid"; exec /bin/sleep "$(cat "$F/mhang")"; }
+  [ -f "$F/mfail" ] && exit 1 ;;
+esac
 o='' r='' n='' q=''
 while [ $# -gt 0 ]; do
   case $1 in
@@ -243,8 +261,8 @@ while [ $# -gt 0 ]; do
   esac
   shift
 done
-[ -f "$F/${o}_${r}_${n}.json" ] || exit 1
-/usr/bin/jq -r "$q" "$F/${o}_${r}_${n}.json"
+[ -f "$F/${o}_${r}_${n}$M.json" ] || exit 1
+/usr/bin/jq -r "$q" "$F/${o}_${r}_${n}$M.json"
 EOF
 # Fake date: +%H pops the first line of $FIX/hseq when it holds one, else
 # reads $FIX/hour (default 12, inside the window).
@@ -540,6 +558,101 @@ case $PC in
 esac
 [ "$(grep -c '' "$FIX/pollcopy" 2>/dev/null)" = 1 ] || { echo "FAIL: M23 -- .poll is not one line"; fail=1; }
 
+# --- M28-M28i: an owned wait in a repo on the merge list whose read shows no
+# move asks merge.sh --ready; a ready PR wakes "<ref> mergeable" once per
+# head sha, after a "mergeable <ref> <sha>" mark in .woke.
+SHA1=0123456789abcdef0123456789abcdef01234567
+SHA2=89abcdef0123456789abcdef0123456789abcdef
+# mfx <o_r_n> <sha> [<mergeStateStatus>]: the ready read's fixture, approved, the viewer's own.
+mfx() {
+  printf '{"data":{"viewer":{"login":"me"},"repository":{"mergeCommitAllowed":true,"defaultBranchRef":{"name":"main"},"pullRequest":{"state":"OPEN","isDraft":false,"latestOpinionatedReviews":{"nodes":[{"state":"APPROVED"}]},"reviewDecision":"APPROVED","mergeStateStatus":"%s","headRefOid":"%s","baseRefName":"main","author":{"login":"me"}}}}}\n' \
+    "${3:-CLEAN}" "$2" > "$FIX/$1.m.json"
+}
+# mlist <owner/repo>...: ~/.clutch/rituals.md with those lines under ## Ops / ### Merge.
+mlist() { { nl '## Ops' '### Merge'; for x in "$@"; do printf -- '- %s\n' "$x"; done; } > "$HOME/.clutch/rituals.md"; }
+MWAKE=$(nl 'gh:o/r#1 mergeable' "$CLOSE")
+own1; fx o_r_1 OPEN "$B0" '' ''; mfx o_r_1 "$SHA1"; mlist o/r
+pr 1 @0123abcd; ok "M28 ready wakes mergeable" 0 "$MWAKE" 2
+[ "$(cat "$WF" 2>/dev/null)" = "mergeable gh:o/r#1 $SHA1" ] || { echo "FAIL: M28 -- .woke [$(cat "$WF" 2>/dev/null)], want the mergeable mark"; fail=1; }
+pr 2 @0123abcd; ok "M28b same sha stays quiet" 0 "$ENDED" 4
+mfx o_r_1 "$SHA2"
+pr 1 @0123abcd; ok "M28c new sha wakes" 0 "$MWAKE" 2
+[ "$(cat "$WF")" = "$(nl "mergeable gh:o/r#1 $SHA1" "mergeable gh:o/r#1 $SHA2")" ] || { echo "FAIL: M28c -- .woke [$(cat "$WF")]"; fail=1; }
+# M28d: no list, or a list without the repo: the 2.18.2 output and gh count.
+own1; fx o_r_1 OPEN "$B0" '' ''; mfx o_r_1 "$SHA1"
+pr 2 @0123abcd; ok "M28d no merge list" 0 "$ENDED" 2
+mlist x/y; pr 2 @0123abcd; ok "M28d repo not listed" 0 "$ENDED" 2
+fx o_r_1 MERGED "$NEW" '' ''
+pr 1 @0123abcd; ok "M28d repo not listed, a move" 0 "$(nl 'gh:o/r#1 merged' "$CLOSE")" 1
+# M28e: a move and a ready PR in one round: the move only, no ready read.
+own1; fx o_r_1 MERGED "$NEW" '' ''; mfx o_r_1 "$SHA1"; mlist o/r
+pr 1 @0123abcd; ok "M28e move wins" 0 "$(nl 'gh:o/r#1 merged' "$CLOSE")" 1
+[ "$(cat "$WF")" = "gh:o/r#1 $NEW" ] || { echo "FAIL: M28e -- .woke [$(cat "$WF")]"; fail=1; }
+# M28f: a failed ready read wakes nothing and counts no gh failure.
+own1; fx o_r_1 OPEN "$B0" '' ''; mfx o_r_1 "$SHA1"; mlist o/r; : > "$FIX/mfail"
+pr 3 @0123abcd; ok "M28f ready read fails" 0 "$ENDED" 6
+# M28g: no merge.sh beside poll.sh: the 2.18.2 output, and it is never run
+# (a logging sh first on PATH).
+mkdir -p "$T/m28g" "$T/m28gbin"; cp "$T/scripts/prelude.sh" "$T/scripts/poll.sh" "$T/m28g/"
+cp "$T/mbin/gh" "$T/mbin/date" "$T/mbin/sleep" "$T/m28gbin/"
+printf '#!/bin/sh\necho "$*" >> "$HOME/../fix/shlog"\nexec %s "$@"\n' "$(command -v sh)" > "$T/m28gbin/sh"; chmod 755 "$T/m28gbin/sh"
+own1; fx o_r_1 OPEN "$B0" '' ''; mfx o_r_1 "$SHA1"; mlist o/r
+PSCRIPT="$T/m28g/poll.sh" PBIN="$T/m28gbin"; pr 2 @0123abcd; unset PSCRIPT PBIN
+ok "M28g no merge.sh" 0 "$ENDED" 2
+! grep -q 'merge\.sh' "$FIX/shlog" 2>/dev/null || { echo "FAIL: M28g -- ran a missing merge.sh: [$(cat "$FIX/shlog")]"; fail=1; }
+# M28h: a ready read that hangs ends by merge.sh's own watchdog (1 s here).
+own1; fx o_r_1 OPEN "$B0" '' ''; mfx o_r_1 "$SHA1"; mlist o/r; echo 30 > "$FIX/mhang"
+M28S=$(date +%s)
+CLUTCH_MERGE_WAIT=1; export CLUTCH_MERGE_WAIT; pr 1 @0123abcd; unset CLUTCH_MERGE_WAIT
+M28E=$(($(date +%s) - M28S))
+ok "M28h ready read hangs" 0 "$ENDED" 2
+[ "$M28E" -lt 15 ] || { echo "FAIL: M28h -- took ${M28E}s"; fail=1; }
+! kill -0 "$(cat "$FIX/mhangpid" 2>/dev/null)" 2>/dev/null || { echo "FAIL: M28h -- the hung gh is still running"; fail=1; }
+if [ "$(id -u)" = 0 ]; then
+  echo "SKIP: M28i mode (root reads through chmod)"
+else
+  # M28i: .woke turns unreadable (mode 200) on the poll's own read, after its
+  # mark read: no mergeable wake, no mark.
+  own1; fx o_r_1 OPEN "$B0" '' ''; mfx o_r_1 "$SHA1"; mlist o/r; : > "$FIX/wokewo"
+  pr 1 @0123abcd; chmod 644 "$WF"; ok "M28i .woke unreadable at the check" 0 "$ENDED" 2
+  [ ! -s "$WF" ] || { echo "FAIL: M28i -- .woke [$(cat "$WF")]"; fail=1; }
+  # M28k: a merge list that cannot be read (clutch_merge_listed rc 2): no
+  # wake, and merge.sh is never forked.
+  own1; fx o_r_1 OPEN "$B0" '' ''; mfx o_r_1 "$SHA1"; mlist o/r; chmod 000 "$HOME/.clutch/rituals.md"
+  PBIN="$T/m28gbin"; pr 2 @0123abcd; unset PBIN; chmod 644 "$HOME/.clutch/rituals.md"
+  ok "M28k merge list unreadable" 0 "$ENDED" 2
+  ! grep -q 'merge\.sh' "$FIX/shlog" 2>/dev/null || { echo "FAIL: M28k -- forked merge.sh: [$(cat "$FIX/shlog")]"; fail=1; }
+fi
+# M28j: the mark read itself fails (grep rc 2, a stub grep) though .woke
+# passes -r: no mergeable wake, no mark.
+mkdir -p "$T/m28jbin"; cp "$T/mbin/gh" "$T/mbin/date" "$T/mbin/sleep" "$T/m28jbin/"
+printf '#!/bin/sh\ncase "$*" in "-qxF mergeable "*) exit 2 ;; esac\nexec %s "$@"\n' "$(command -v grep)" > "$T/m28jbin/grep"; chmod 755 "$T/m28jbin/grep"
+own1; fx o_r_1 OPEN "$B0" '' ''; mfx o_r_1 "$SHA1"; mlist o/r
+PBIN="$T/m28jbin"; pr 1 @0123abcd; unset PBIN
+ok "M28j mark read fails" 0 "$ENDED" 2
+[ ! -s "$WF" ] || { echo "FAIL: M28j -- .woke [$(cat "$WF")]"; fail=1; }
+# M28k: no merge list: merge.sh is never forked, on the owned path (o/r#1)
+# or the beat path (o/r#2, unwatched; record there, cap shut), clutch_unwatched_loops
+# never runs (a logging ps: it is the only ps caller, for o/r#3's live tag),
+# and the output and gh count equal 2.18.2's (M28d).
+M28L=$(bg sh "$T/stub/poll.sh" @ffffffff); PIDS="$PIDS $M28L"
+printf '#!/bin/sh\necho "$*" >> "$HOME/../fix/pslog"\nexec %s "$@"\n' "$(command -v ps)" > "$T/m28gbin/ps"; chmod 755 "$T/m28gbin/ps"
+own1; madd 100 "proj wait: gh:o/r#2 $B0 pr two"; madd 100 "proj wait: gh:o/r#3 $B0 @ffffffff pr three"
+fx o_r_1 OPEN "$B0" '' ''; mfx o_r_1 "$SHA1"; mfx o_r_2 "$SHA1"
+mkdir -p "$HOME/.clutch/watch"; printf 'last %s\n' "$((NOW - 60))" > "$HOME/.clutch/watch/0123abcd.beat"
+printf '%s %s\n' "$M28L" "$NOW" > "$HOME/.clutch/watch/ffffffff.poll"
+PBIN="$T/m28gbin"; pr 2 @0123abcd; unset PBIN
+ok "M28k no merge list" 0 "$ENDED" 2
+! grep -q 'merge\.sh' "$FIX/shlog" 2>/dev/null || { echo "FAIL: M28k -- forked merge.sh with no list: [$(cat "$FIX/shlog")]"; fail=1; }
+[ ! -s "$FIX/pslog" ] || { echo "FAIL: M28k -- ran clutch_unwatched_loops with no list: ps [$(cat "$FIX/pslog")]"; fail=1; }
+# The same run with o/r listed (o/r#2 not ready) does run it: the ps log is live.
+own1; madd 100 "proj wait: gh:o/r#2 $B0 pr two"; madd 100 "proj wait: gh:o/r#3 $B0 @ffffffff pr three"
+fx o_r_1 OPEN "$B0" '' ''; mlist o/r
+mkdir -p "$HOME/.clutch/watch"; printf 'last %s\n' "$((NOW - 60))" > "$HOME/.clutch/watch/0123abcd.beat"
+printf '%s %s\n' "$M28L" "$NOW" > "$HOME/.clutch/watch/ffffffff.poll"
+PBIN="$T/m28gbin"; pr 1 @0123abcd; unset PBIN
+[ -s "$FIX/pslog" ] || { echo "FAIL: M28k -- the ps log never fired with a list"; fail=1; }
+
 # --- Bt1-Bt16: the poller beats while the tag's ops record is there: from
 # 08:00 to 20:59 it peeks the beat window (clutch_beat_window peek) and wakes
 # with "Run /clutch:beat @<tag>." on peer moves, at most once an hour (the
@@ -657,6 +770,30 @@ else
   mseed; opsrec "last $((NOW - 7200))"; peer 600; echo 200 > "$FIX/hmode"
   pr 2 @0123abcd; chmod 644 "$WF"; ok "Bt16 .woke unreadable" 0 "$ENDED" 0
 fi
+
+# --- Bt18-Bt18e: in a beat round, a ready PR in a listed repo that no live
+# silent check reads (clutch_unwatched_loops) wakes the beat past the hourly
+# cap, after a "mergeable <ref> <sha>" mark and no beat mark.
+# bt18 <wait line>...: record there, a beat mark 10 min old, hour 10, o/r listed and ready.
+bt18() {
+  mseed; for x in "$@"; do madd 100 "$x"; done; opsrec "last $((NOW - 7200))"
+  printf 'beat %s\n' "$((NOW - 600))" > "$WF"; echo 10 > "$FIX/hour"; mfx o_r_1 "$SHA1"; mlist o/r
+}
+bt18 "proj wait: gh:o/r#1 $B0 pr one"
+pr 1 @0123abcd; ok "Bt18 unwatched ready wakes the beat" 0 "$BEATL" 1
+[ "$(cat "$WF")" = "$(nl "beat $((NOW - 600))" "mergeable gh:o/r#1 $SHA1")" ] || { echo "FAIL: Bt18 -- .woke [$(cat "$WF")]"; fail=1; }
+pr 1 @0123abcd; ok "Bt18 same sha stays quiet" 0 "$ENDED" 1
+bt18 "proj wait: gh:o/r#1 $B0 @ffffffff pr one"; printf '%s %s\n' "$DEAD" "$NOW" > "$HOME/.clutch/watch/ffffffff.poll"
+pr 1 @0123abcd; ok "Bt18 dead tag's ready wait" 0 "$BEATL" 1
+bt18 "proj wait: gh:o/r#1 $B0 pr one"; echo 21 > "$FIX/hour"
+pr 1 @0123abcd; ok "Bt18b hour 21" 0 "$ENDED" 0
+bt18 "proj wait: gh:o/r#1 $B0 pr one"; rm -f "$BFR"
+pr 1 @0123abcd; ok "Bt18c no record" 0 "$ENDED" 0
+B18L=$(bg sh "$T/stub/poll.sh" @ffffffff); PIDS="$PIDS $B18L"
+bt18 "proj wait: gh:o/r#1 $B0 @ffffffff pr one"; printf '%s %s\n' "$B18L" "$NOW" > "$HOME/.clutch/watch/ffffffff.poll"
+pr 1 @0123abcd; ok "Bt18d live tag's wait" 0 "$ENDED" 0
+bt18 "proj wait: gh:o/r#1 $B0 pr one" "proj wait: gh:O/R#1 $B0 @ffffffff pr one"; printf '%s %s\n' "$B18L" "$NOW" > "$HOME/.clutch/watch/ffffffff.poll"
+pr 1 @0123abcd; ok "Bt18e ref shared with a live tag" 0 "$ENDED" 0
 
 [ "$fail" -eq 0 ] && echo PASS
 exit "$fail"
